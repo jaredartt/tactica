@@ -10,53 +10,48 @@ combat rules are a placeholder you should expect to throw away.
 
 ---
 
-## Setup
+## This project is already set up
 
-### 1. Create the Supabase project (~5 minutes)
-
-1. Go to <https://supabase.com>, sign in, **New project**. Free tier is
-   correct for this — at 50 accounts and a handful of concurrent players you
-   will not come close to the limits.
-2. Pick a region near you and your players. Save the database password
-   somewhere; you won't need it for this app but you will one day.
-3. Wait for it to finish provisioning (~2 min).
-4. Open **SQL Editor** → **New query**. Paste the entire contents of
-   `supabase/migrations/0001_init.sql` and hit **Run**. It should say Success.
-   The file is safe to re-run if you ever need to.
-5. Open **Authentication → Sign In / Providers → Email**. For testing with a
-   friend today, turn **Confirm email** *off* — otherwise every test account
-   needs a real inbox. Turn it back on before you promote the game publicly.
-6. Open **Project Settings → API**. Copy the **Project URL** and the
-   **anon / public** key.
-
-> Never put the `service_role` key in this app. It bypasses every security
-> policy in the file above, and anything in a `VITE_` variable is shipped to
-> every visitor's browser.
-
-### 2. Run it
+The Supabase project exists, the schema is applied, and `.env.local` is written
+on the machine this was set up from. To run it:
 
 ```bash
 npm install
-cp .env.example .env.local     # then paste your URL + anon key into it
 npm run dev
 ```
 
-Open <http://localhost:5173>. Create an account, hit **Host a room**, and send
-the 5-letter code to your friend — or just open a second browser in a private
-window, make a second account, and join your own room to see both sides.
+Then open <http://localhost:5173>, create an account, hit **Host a room**, and
+send the 5-letter code to a friend. To see both sides yourself, open a second
+browser in a private window and make a second account.
 
-### 3. Put it on GitHub
+| | |
+|---|---|
+| Supabase project | `tactica`, Central EU (Frankfurt), free tier |
+| Project ref | `dnhvfajvfhmqpbwfvyfq` |
+| Repo | `jaredartt/tactica` (private) |
 
-```bash
-git init && git add -A && git commit -m "Tactica: multiplayer skeleton"
-gh repo create tactica --private --source=. --push
-# no gh CLI? create the empty repo on github.com, then:
-#   git remote add origin git@github.com:YOU/tactica.git && git push -u origin main
-```
+`.env.local` holds the project URL and the **publishable** key. That key is
+meant to be public — it ships to every visitor's browser, and Row Level
+Security is what actually constrains it. A `service_role` / secret key must
+never go in that file or in this repo.
 
-`.env.local` is gitignored, so your keys stay out of the repo.
+### Two things to change before you promote this publicly
 
-### 4. Deploy (when you want a link to share)
+1. **Email confirmation is OFF** (Authentication → Sign In / Providers). It was
+   disabled so you and a friend could make test accounts without waiting on
+   Supabase's free-tier email throttle. Turn it back on before strangers can
+   sign up, or people will register addresses they don't own.
+2. **Chat is unmoderated and unrated-limited.** Add a per-user rate limit before
+   this reaches a Discord.
+
+### Setting up a second Supabase project from scratch
+
+If you ever need to rebuild this (a new environment, or you delete the project):
+create a project at supabase.com, paste `supabase/migrations/0001_init.sql`
+into its SQL editor and run it, then copy the project URL and publishable key
+from Project Settings → API into `.env.local` — see `.env.example`.
+
+### Deploy (when you want a link to share)
 
 Vercel or Netlify, both free: import the repo, framework preset **Vite**, and
 add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables.

@@ -7,3 +7,6 @@ dist
 .DS_Store
 .vite
 tsconfig.tsbuildinfo
+
+# vite writes these while running the dev server
+vite.config.ts.timestamp-*
