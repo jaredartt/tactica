@@ -59,7 +59,7 @@ export function Lobby({ profile, onEnter }: Props) {
       <div className="lobby">
         <header className="lobby-head">
           <div>
-            <h1 className="wordmark small">TACTICA</h1>
+            <h1 className="wordmark small">CROWN NEMESIS</h1>
             <p className="muted">Signed in as {profile.username}</p>
           </div>
           <button className="linkbtn" onClick={() => supabase.auth.signOut()}>

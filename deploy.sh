@@ -11,10 +11,14 @@ npm run build
 WORK="$(mktemp -d)"
 cp -R dist/. "$WORK/"
 touch "$WORK/.nojekyll"          # stop Pages running the output through Jekyll
+# The scratch repo has no identity of its own; borrow the project's, and fall
+# back to a placeholder so this works on a machine with no global git config.
+NAME="$(git -C "$OLDPWD" config user.name  || echo 'Crown Nemesis deploy')"
+MAIL="$(git -C "$OLDPWD" config user.email || echo 'deploy@localhost')"
 cd "$WORK"
 git init -q -b gh-pages
 git add -A
-git commit -q -m "Deploy $(date -u +%Y-%m-%dT%H:%MZ)"
+git -c user.name="$NAME" -c user.email="$MAIL" commit -q -m "Deploy $(date -u +%Y-%m-%dT%H:%MZ)"
 git push -q --force "${TACTICA_REMOTE:-https://github.com/jaredartt/tactica.git}" gh-pages
 cd - >/dev/null
 rm -rf "$WORK"

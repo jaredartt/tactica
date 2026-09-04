@@ -1,4 +1,4 @@
-# Tactica
+# Crown Nemesis
 
 A 1v1 turn-based tactics card game that runs in the browser. Accounts, hosted
 rooms, live spectating, in-match chat, a battle log, and a 30-second turn clock.

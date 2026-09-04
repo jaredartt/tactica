@@ -1,5 +1,5 @@
 -- ============================================================================
--- TACTICA — initial schema
+-- CROWN NEMESIS — initial schema
 -- ============================================================================
 -- Design rule for this whole file: the DATABASE owns the game state.
 -- Clients have NO update policy on `matches`. The only way a match changes is
@@ -94,7 +94,7 @@ create table if not exists public.cards (
   range      int  not null default 1  check (range between 1 and 20),
   ability    text not null default '',
   art_url    text,
-  accent     text not null default '#7dd3fc',
+  accent     text not null default '#06b6d4',
   is_active  boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -601,10 +601,10 @@ end $$;
 -- ---------------------------------------------------------------------------
 insert into public.cards (name, hp, attack, move, range, ability, accent)
 select * from (values
-  ('Vanguard',  14, 4, 3, 1, 'Holds the line.',              '#f0abfc'),
-  ('Skirmisher',10, 3, 4, 1, 'Fast, fragile.',               '#7dd3fc'),
-  ('Archer',     8, 4, 2, 3, 'Strikes from a distance.',     '#fde68a'),
-  ('Bulwark',   18, 2, 2, 1, 'Slow, very hard to remove.',   '#a7f3d0')
+  ('Vanguard',  14, 4, 3, 1, 'Holds the line.',              '#7c3aed'),
+  ('Skirmisher',10, 3, 4, 1, 'Fast, fragile.',               '#06b6d4'),
+  ('Archer',     8, 4, 2, 3, 'Strikes from a distance.',     '#f59e0b'),
+  ('Bulwark',   18, 2, 2, 1, 'Slow, very hard to remove.',   '#10b981')
 ) as v(name, hp, attack, move, range, ability, accent)
 where not exists (select 1 from public.cards);
 

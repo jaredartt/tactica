@@ -1,22 +1,92 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none"
+         stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+      <path d="M1.2 8S3.9 3.3 8 3.3 14.8 8 14.8 8 12.1 12.7 8 12.7 1.2 8 1.2 8Z" />
+      <circle cx="8" cy="8" r="2.1" />
+      {!open && <path d="M2.4 2.4l11.2 11.2" />}
+    </svg>
+  )
+}
+
+/** A password input with its own show/hide toggle. */
+function PasswordField({
+  label, value, onChange, autoComplete, id,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  autoComplete: string
+  id: string
+}) {
+  const [show, setShow] = useState(false)
+  return (
+    <label htmlFor={id}>
+      <span>{label}</span>
+      <div className="field">
+        <input
+          id={id}
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          minLength={6}
+          required
+        />
+        <button
+          type="button"
+          className="eye"
+          onClick={() => setShow((s) => !s)}
+          aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-pressed={show}
+          tabIndex={-1}
+        >
+          <EyeIcon open={show} />
+        </button>
+      </div>
+    </label>
+  )
+}
+
 export function Auth() {
   const [mode, setMode] = useState<'in' | 'up'>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [username, setUsername] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
+  const signingUp = mode === 'up'
+  // Only complain once they have actually typed something into the second box.
+  const mismatch = signingUp && confirm.length > 0 && password !== confirm
+  // Only actually block on a *visible* mismatch. Disabling the button on an
+  // empty form just makes it look broken; the browser's own required-field
+  // validation covers the rest.
+  const canSubmit = !busy && !mismatch
+
+  function switchMode() {
+    setMode(signingUp ? 'in' : 'up')
+    setConfirm('')
+    setErr(null)
+    setMsg(null)
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    if (signingUp && password !== confirm) {
+      setErr('Those two passwords do not match.')
+      return
+    }
     setBusy(true)
     setErr(null)
     setMsg(null)
     try {
-      if (mode === 'up') {
+      if (signingUp) {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -38,14 +108,15 @@ export function Auth() {
   return (
     <div className="center-stage">
       <div className="panel auth">
-        <h1 className="wordmark">TACTICA</h1>
+        <h1 className="wordmark">CROWN<br />NEMESIS</h1>
         <p className="muted">A competitive tactics arena.</p>
 
         <form onSubmit={submit}>
-          {mode === 'up' && (
-            <label>
+          {signingUp && (
+            <label htmlFor="cn-username">
               <span>Display name</span>
               <input
+                id="cn-username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="how you appear in the arena"
@@ -55,9 +126,11 @@ export function Auth() {
               />
             </label>
           )}
-          <label>
+
+          <label htmlFor="cn-email">
             <span>Email</span>
             <input
+              id="cn-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -65,28 +138,38 @@ export function Auth() {
               required
             />
           </label>
-          <label>
-            <span>Password</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
-              minLength={6}
-              required
-            />
-          </label>
+
+          <PasswordField
+            id="cn-password"
+            label="Password"
+            value={password}
+            onChange={setPassword}
+            autoComplete={signingUp ? 'new-password' : 'current-password'}
+          />
+
+          {signingUp && (
+            <>
+              <PasswordField
+                id="cn-confirm"
+                label="Repeat password"
+                value={confirm}
+                onChange={setConfirm}
+                autoComplete="new-password"
+              />
+              {mismatch && <p className="error">Those two passwords do not match.</p>}
+            </>
+          )}
 
           {err && <p className="error">{err}</p>}
           {msg && <p className="notice">{msg}</p>}
 
-          <button className="btn primary" disabled={busy}>
-            {busy ? '…' : mode === 'up' ? 'Create account' : 'Sign in'}
+          <button className="btn primary" disabled={!canSubmit}>
+            {busy ? '…' : signingUp ? 'Create account' : 'Sign in'}
           </button>
         </form>
 
-        <button className="linkbtn" onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setErr(null); setMsg(null) }}>
-          {mode === 'in' ? 'No account yet? Create one' : 'Already have an account? Sign in'}
+        <button className="linkbtn" onClick={switchMode}>
+          {signingUp ? 'Already have an account? Sign in' : 'No account yet? Create one'}
         </button>
       </div>
     </div>
