@@ -17,6 +17,9 @@ interface Props {
   onAttack: (targetId: string) => void
 }
 
+// A spectator has no side. They may look at anything and touch nothing.
+const watching = (side: Side | null) => side === null
+
 const manhattan = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 
@@ -106,7 +109,7 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
 
   return (
     <div
-      className={`board${blow ? ' fx-playing' : ''}`}
+      className={`board${blow ? ' fx-playing' : ''}${watching(mySide) ? ' is-watching' : ''}`}
       style={{ width: w * TILE + (w - 1) * GAP, height: h * TILE + (h - 1) * GAP }}
       onClick={() => onSelect(null)}
     >
@@ -122,6 +125,7 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
             style={{ left: x * (TILE + GAP), top: y * (TILE + GAP), width: TILE, height: TILE }}
             onClick={(e) => {
               e.stopPropagation()
+              if (watching(mySide)) return
               if (canMove) onMove(x, y)
               else onSelect(null)
             }}
@@ -138,7 +142,8 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
           <UnitCard
             key={u.id}
             unit={u}
-            mine={u.owner === mySide}
+            yours={mySide !== null && u.owner === mySide}
+            watching={watching(mySide)}
             selected={u.id === selectedId}
             targetable={targets.has(u.id)}
             slotClass={[
@@ -157,6 +162,7 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
             }
             onClick={(e) => {
               e.stopPropagation()
+              if (watching(mySide)) return
               if (targets.has(u.id)) onAttack(u.id)
               else onSelect(u.id === selectedId ? null : u.id)
             }}
@@ -189,7 +195,8 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
 
 function GhostCard({ unit }: { unit: Unit }) {
   return (
-    <div className="unit unit-ghost-card" style={{ '--accent': unit.accent } as React.CSSProperties}>
+    <div className={`unit unit-ghost-card ${unit.owner === 'host' ? 'unit-host' : 'unit-guest'}`}
+         style={{ '--accent': unit.accent } as React.CSSProperties}>
       <div className="unit-face">
         <div className="unit-art">
           {unit.art ? <img src={unit.art} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
@@ -201,10 +208,11 @@ function GhostCard({ unit }: { unit: Unit }) {
 }
 
 function UnitCard({
-  unit, mine, selected, targetable, slotClass, slotVars, onClick,
+  unit, yours, watching, selected, targetable, slotClass, slotVars, onClick,
 }: {
   unit: Unit
-  mine: boolean
+  yours: boolean
+  watching: boolean
   selected: boolean
   targetable: boolean
   slotClass: string
@@ -246,7 +254,12 @@ function UnitCard({
       <div
         className={[
           'unit',
-          mine ? 'unit-mine' : 'unit-foe',
+          // Colour is the SIDE, never "mine" -- otherwise the guest sees their
+          // own units in the host's colour while their nameplate is the other,
+          // and a spectator sees both armies as the enemy.
+          unit.owner === 'host' ? 'unit-host' : 'unit-guest',
+          yours ? 'is-yours' : '',
+          watching ? 'is-inert' : '',
           selected ? 'is-selected' : '',
           targetable ? 'is-target' : '',
           unit.moved && unit.acted ? 'is-spent' : '',

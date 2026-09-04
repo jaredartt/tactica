@@ -422,8 +422,22 @@ form .btn.primary { width: 100%; margin-top: 10px; }
               box-shadow 0.2s, border-color 0.2s;
 }
 
-.unit-mine { border-color: var(--you); }
-.unit-foe  { border-color: var(--foe); }
+/* Border colour is the side, the same way the nameplates are coloured, so a
+   card means the same thing to both players and to anyone watching. Which
+   units are YOURS is a separate signal: a soft ring in your own colour. */
+.unit-host  { --side: var(--you); }
+.unit-guest { --side: var(--foe); }
+.unit-host, .unit-guest { border-color: var(--side); }
+
+.unit.is-yours {
+  box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10),
+              0 0 0 3px color-mix(in srgb, var(--side) 20%, transparent);
+}
+
+/* A spectator can look at everything and touch nothing. */
+.board.is-watching .tile,
+.board.is-watching .unit { cursor: default; }
+.board.is-watching .tile-move { box-shadow: none; background: var(--tile-a); }
 
 /* Both layers occupy the same cell and cross-fade. */
 .unit-face, .unit-detail { grid-area: 1 / 1; transition: opacity 0.16s ease; }

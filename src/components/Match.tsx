@@ -103,7 +103,7 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
           >
             {match.code}
           </button>
-          {mySide === null && <span className="pill spectating">spectating</span>}
+          {mySide === null && <span className="pill spectating">watching</span>}
         </div>
       </header>
 
@@ -111,7 +111,11 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
         <div className={`timerbar ${urgent ? 'urgent' : ''}`}>
           <div className="timerfill" style={{ width: `${pct * 100}%` }} />
           <span className="timertext">
-            {isMyTurn ? 'Your turn' : mySide ? 'Opponent thinking' : `${s.turn === 'host' ? match.host_name : match.guest_name} thinking`}
+            {isMyTurn
+              ? 'Your turn'
+              : mySide
+                ? 'Opponent thinking'
+                : `${s.turn === 'host' ? match.host_name : match.guest_name} to act`}
             {' · '}
             {Math.max(0, Math.ceil(remaining ?? 0))}s
           </span>
@@ -163,7 +167,9 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
                     </span>
                   </>
                 ) : (
-                  <span className="hint">You are watching. Chat on the left.</span>
+                  <span className="hint">
+                    Spectating — you can chat, but the board isn&rsquo;t yours to touch.
+                  </span>
                 )}
               </div>
             </>

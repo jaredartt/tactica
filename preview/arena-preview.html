@@ -142,8 +142,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
   transition: transform .16s cubic-bezier(.2,.8,.3,1), box-shadow .2s, border-color .2s;
 }
-.unit.mine { border-color: var(--you); }
-.unit.foe  { border-color: var(--foe); }
+/* Border colour is the SIDE, matching the nameplates, so a card means the
+   same thing to both players and to anyone watching. Which units are yours is
+   a separate signal: a soft ring in your own colour. */
+.unit.unit-host  { --side: var(--you); }
+.unit.unit-guest { --side: var(--foe); }
+.unit.unit-host, .unit.unit-guest { border-color: var(--side); }
+.unit.is-yours {
+  box-shadow: 0 2px 8px rgba(14,14,20,.10),
+              0 0 0 3px color-mix(in srgb, var(--side) 20%, transparent);
+}
+.board.is-watching .tile, .board.is-watching .unit { cursor: default; }
+.board.is-watching .tile.move { box-shadow: none; background: var(--tile-a); }
+
+.viewtoggle { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; overflow: hidden; }
+.viewtoggle button {
+  border: 0; background: none; padding: 4px 12px; font-size: 11.5px;
+  color: var(--muted); letter-spacing: .02em;
+}
+.viewtoggle button[aria-pressed="true"] { background: var(--ink); color: #fff; }
 
 .unit-face, .unit-detail { grid-area: 1 / 1; transition: opacity .16s ease; }
 .unit-face { display: flex; flex-direction: column; gap: 5px; padding: 8px; min-height: 0; }
@@ -239,9 +256,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   animation: riseaway .9s ease-out forwards .14s;
 }
 .dmg-late { animation-delay: .52s; }
-.ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
-.ghost .unit { animation: vanish .55s ease-in forwards .2s; border-color: var(--line-2) !important; }
-.ghost-late .unit { animation-delay: .58s; }
+.unit-ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
+.unit-ghost .unit { animation: vanish .55s ease-in forwards .2s; border-color: var(--line-2) !important; }
+.unit-ghost-late .unit { animation-delay: .58s; }
 
 /* You click an enemy to attack it, so your cursor is on the very card about to
    recoil -- and the hover panel would cover the damage number. While an
@@ -283,7 +300,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .unit-crosshair { animation: none !important; }
   .unit-slot[class*="fx-"] { animation: none !important; }
   .dmg { animation: none !important; opacity: 1; transform: translateY(-18px); }
-  .ghost { display: none; }
+  .unit-ghost { display: none; }
   .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
   .unit { transform: scale(1) !important; }
   .unit-slot:hover .unit { transform: scale(1.9) !important; }
@@ -294,7 +311,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <div class="note">
     <b>PREVIEW</b>
     <span>Both sides on one screen, no network. In the real build this is two browsers talking through Supabase.</span>
-    <span style="color:#0e0e14">Hover a card — it leans toward your cursor and opens its portrait and stats. Click a blue-edged unit, then a lit tile to move or a marked enemy to strike.</span>
+    <span style="color:#0e0e14">Hover a card — it leans toward your cursor and opens its portrait and stats. Click one of your units, then a lit tile to move or a marked enemy to strike.</span>
+    <span class="viewtoggle" role="group" aria-label="View as">
+      <button id="asPlayer" aria-pressed="true">Playing</button>
+      <button id="asSpectator" aria-pressed="false">Watching</button>
+    </span>
   </div>
 
   <header class="matchbar">
@@ -376,7 +397,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
   const at = (x, y) => game.units.find((u) => u.x === x && u.y === y);
   const sel = () => game.units.find((u) => u.id === game.selected) || null;
-  const mySide = 'host';
+  let mySide = 'host';   // null = spectating
 
   function say(text) { game.log.push({ t: game.turnNumber, text }); }
 
@@ -467,10 +488,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
     render();
   }
 
-  function opponentPlays() {
-    if (game.turn !== 'guest' || game.winner) return;
-    const mine = game.units.filter((u) => u.owner === 'guest');
-    const foes = game.units.filter((u) => u.owner === 'host');
+  // Plays whichever side the viewer is not. When you are spectating that is
+  // both of them, so the match plays itself and you just watch.
+  function botPlays() {
+    const side = game.turn;
+    if (game.winner || side === mySide) return;
+    const mine = game.units.filter((u) => u.owner === side);
+    const foes = game.units.filter((u) => u.owner !== side);
     for (const u of mine) {
       if (!foes.length) break;
       let best = foes[0];
@@ -505,8 +529,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   function render() {
     const canMove = reachable(), canHit = targets();
-    board.className = 'board' + (game.burst ? ' fx-playing' : '');
-    board.querySelectorAll('.tile, .unit-slot, .dmg, .ghost').forEach((n) => n.remove());
+    board.className = 'board' + (game.burst ? ' fx-playing' : '') +
+                      (mySide === null ? ' is-watching' : '');
+    board.querySelectorAll('.tile, .unit-slot, .dmg, .unit-ghost').forEach((n) => n.remove());
 
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const key = x + ',' + y, lit = canMove.has(key);
@@ -515,7 +540,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       el.style.cssText = 'left:' + x * (TILE + GAP) + 'px;top:' + y * (TILE + GAP) +
                          'px;width:' + TILE + 'px;height:' + TILE + 'px';
       if (lit) { el.innerHTML = '<span class="dot"></span>'; el.onclick = () => move(x, y); }
-      else el.onclick = () => { game.selected = null; render(); };
+      else el.onclick = () => { if (mySide !== null) { game.selected = null; render(); } };
       board.appendChild(el);
     }
 
@@ -541,7 +566,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       const mine = u.owner === mySide;
       const isTarget = canHit.has(u.id);
       const card = document.createElement('div');
-      card.className = 'unit ' + (mine ? 'mine' : 'foe') +
+      card.className = 'unit ' + (u.owner === 'host' ? 'unit-host' : 'unit-guest') +
+        (mine ? ' is-yours' : '') +
         (u.id === game.selected ? ' selected' : '') +
         (isTarget ? ' target' : '') +
         (u.moved && u.acted ? ' spent' : '');
@@ -583,6 +609,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       };
       card.onclick = (e) => {
         e.stopPropagation();
+        if (mySide === null) return;          // spectators touch nothing
         if (isTarget) attack(u.id);
         else { game.selected = game.selected === u.id ? null : u.id; render(); }
       };
@@ -597,9 +624,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
                            'px;width:' + TILE + 'px;height:' + TILE + 'px';
       const ghost = (unit, pos, late) => {
         const g = document.createElement('div');
-        g.className = 'ghost unit-slot' + (late ? ' ghost-late' : '');
+        g.className = 'unit-ghost unit-slot' + (late ? ' unit-ghost-late' : '');
         g.style.cssText = place(pos);
-        g.innerHTML = '<div class="unit" style="--accent:' + unit.accent + ';--wash:' + unit.accent + '26">' +
+        g.innerHTML = '<div class="unit ' + (unit.owner === 'host' ? 'unit-host' : 'unit-guest') +
+          '" style="--accent:' + unit.accent + ';--wash:' + unit.accent + '26">' +
           '<div class="unit-face"><div class="unit-art"><span class="unit-initial">' +
           unit.name[0] + '</span></div><div class="unit-name">' + unit.name + '</div></div></div>';
         board.appendChild(g);
@@ -618,6 +646,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       if (b2.counter > 0) num(b2.counter, b2.atkAt, true);
     }
 
+    $('npHost').innerHTML  = 'jared' + (mySide === 'host' ? '<em>you</em>' : '');
+    $('npGuest').innerHTML = 'opponent';
     $('npHost').className = 'nameplate host' + (game.turn === 'host' && !game.winner ? ' active' : '');
     $('npGuest').className = 'nameplate guest' + (game.turn === 'guest' && !game.winner ? ' active' : '');
 
@@ -638,11 +668,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
         (game.winner === 'host' ? 'jared wins — that is you.' : 'opponent wins.') +
         '</div><button class="btn ghost" id="again">Play again</button>';
       $('again').onclick = () => location.reload();
+    } else if (mySide === null) {
+      bar.innerHTML = '<span class="hint">Spectating — you can chat, but the board isn\u2019t yours to touch.</span>';
     } else {
       const yours = game.turn === mySide;
       bar.innerHTML =
         '<button class="btn primary" id="endturn"' + (yours ? '' : ' disabled') + '>End turn</button>' +
-        '<button class="btn ghost" disabled>Resign</button>' +
+        '<button class="btn ghost">Resign</button>' +
         '<span class="hint">' + (yours
           ? 'Click a unit, then a lit tile to move or a marked enemy to strike.'
           : 'Waiting for your opponent.') + '</span>';
@@ -655,9 +687,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const pct = game.winner ? 0 : Math.max(0, Math.min(1, left / TURN_SECONDS));
     $('timerfill').style.width = pct * 100 + '%';
     $('timerbar').classList.toggle('urgent', !game.winner && left <= 8);
+    const who = game.turn === 'host' ? 'jared' : 'opponent';
     $('timertext').textContent = game.winner
       ? 'Match over'
-      : (game.turn === mySide ? 'Your turn' : 'Opponent thinking') +
+      : (mySide === null ? who + ' to act'
+                         : game.turn === mySide ? 'Your turn' : 'Opponent thinking') +
         ' · ' + Math.max(0, Math.ceil(left)) + 's';
     if (!game.winner && left <= 0) {
       endTurn((game.turn === 'host' ? 'jared' : 'opponent') + ' ran out of time.');
@@ -668,9 +702,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   setInterval(() => {
     if (game.turn !== lastTurn) {
       lastTurn = game.turn;
-      if (game.turn === 'guest') setTimeout(opponentPlays, 900);
+      if (game.turn !== mySide) setTimeout(botPlays, 900);
     }
   }, 200);
+
+  const setView = (side) => {
+    mySide = side;
+    game.selected = null;
+    $('asPlayer').setAttribute('aria-pressed', String(side !== null));
+    $('asSpectator').setAttribute('aria-pressed', String(side === null));
+    render();
+  };
+  $('asPlayer').onclick = () => setView('host');
+  $('asSpectator').onclick = () => setView(null);
 
   $('chatform').onsubmit = (e) => {
     e.preventDefault();
