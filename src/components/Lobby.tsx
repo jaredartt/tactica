@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { createMatch, joinMatch, sweepMatches } from '../lib/api'
-import type { MatchRow, Profile } from '../lib/types'
+import { tierOf, type LadderRow, type MatchRow, type Profile } from '../lib/types'
 
 interface Card {
   id: string
@@ -15,7 +15,7 @@ interface Card {
   art_url: string | null
 }
 
-type Panel = 'none' | 'join' | 'spectate' | 'roster'
+type Panel = 'none' | 'join' | 'spectate' | 'roster' | 'ladder'
 
 interface Props {
   profile: Profile
@@ -26,6 +26,7 @@ export function Lobby({ profile, onEnter }: Props) {
   const [panel, setPanel] = useState<Panel>('none')
   const [rooms, setRooms] = useState<MatchRow[]>([])
   const [roster, setRoster] = useState<Card[]>([])
+  const [ladder, setLadder] = useState<LadderRow[]>([])
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -59,6 +60,17 @@ export function Lobby({ profile, onEnter }: Props) {
       .then(({ data }) => data && setRoster(data as Card[]))
   }, [panel, roster.length])
 
+  useEffect(() => {
+    if (panel !== 'ladder') return
+    supabase
+      .from('leaderboard')
+      .select('*')
+      .order('lp', { ascending: false })
+      .order('wins', { ascending: false })
+      .limit(50)
+      .then(({ data }) => data && setLadder(data as LadderRow[]))
+  }, [panel])
+
   async function run(fn: () => Promise<{ id: string }>) {
     setBusy(true)
     setErr(null)
@@ -80,7 +92,15 @@ export function Lobby({ profile, onEnter }: Props) {
       <header className="menu-head">
         <h1 className="wordmark small">CROWN NEMESIS</h1>
         <div className="menu-who">
-          <span className="muted">{profile.username}</span>
+          <span className="muted">
+            {profile.username}
+            {profile.games > 0 && (
+              <>
+                {' · '}
+                <b className="ownrank">{tierOf(profile.lp)} {profile.lp}</b>
+              </>
+            )}
+          </span>
           <button className="linkbtn" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>
@@ -113,6 +133,13 @@ export function Lobby({ profile, onEnter }: Props) {
           note="Every card in the game"
           active={panel === 'roster'}
           onClick={() => setPanel(panel === 'roster' ? 'none' : 'roster')}
+        />
+        <MenuTile
+          className="mt-ladder"
+          label="Ladder"
+          note={profile.games > 0 ? `You are ${tierOf(profile.lp)} on ${profile.lp} LP` : 'Play a match to be ranked'}
+          active={panel === 'ladder'}
+          onClick={() => setPanel(panel === 'ladder' ? 'none' : 'ladder')}
         />
       </nav>
 
@@ -167,6 +194,47 @@ export function Lobby({ profile, onEnter }: Props) {
               )
             })}
           </ul>
+        </section>
+      )}
+
+      {panel === 'ladder' && (
+        <section className="menu-panel">
+          {ladder.length === 0 && <p className="muted">Nobody has finished a match yet.</p>}
+          {ladder.length > 0 && (
+            <table className="ladder">
+              <thead>
+                <tr>
+                  <th className="num">#</th>
+                  <th>Player</th>
+                  <th>Tier</th>
+                  <th className="num">LP</th>
+                  <th className="num">W</th>
+                  <th className="num">L</th>
+                  <th className="num">Streak</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ladder.map((r, i) => (
+                  <tr key={r.id} className={r.id === profile.id ? 'is-you' : ''}>
+                    <td className="num rank">{i + 1}</td>
+                    <td>{r.username}</td>
+                    <td><span className={`tier t-${r.tier.toLowerCase()}`}>{r.tier}</span></td>
+                    <td className="num lp">{r.lp}</td>
+                    <td className="num">{r.wins}</td>
+                    <td className="num">{r.losses}</td>
+                    <td className={`num streak ${r.streak > 0 ? 'hot' : r.streak < 0 ? 'cold' : ''}`}>
+                      {r.streak > 0 ? `${r.streak}W` : r.streak < 0 ? `${-r.streak}L` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="muted tiny laddernote">
+            Points scale with who you beat: taking down someone far above you is worth
+            about 40, beating a beginner about 4, and losing to one costs the same 40.
+            Once you reach a tier you cannot fall out of it this season.
+          </p>
         </section>
       )}
 

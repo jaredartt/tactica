@@ -3,10 +3,15 @@ import { Board } from './Board'
 import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
-import { endTurn, forceTimeout, leaveMatch, resignMatch, submitAttack, submitMove } from '../lib/api'
+import { endTurn, forceTimeout, leaveMatch, requestRematch, resignMatch, submitAttack, submitMove } from '../lib/api'
 import { TURN_SECONDS, type Profile, type Side } from '../lib/types'
 
-export function Match({ matchId, profile, onLeave }: { matchId: string; profile: Profile; onLeave: () => void }) {
+export function Match({ matchId, profile, onLeave, onGoTo }: {
+  matchId: string
+  profile: Profile
+  onLeave: () => void
+  onGoTo: (id: string) => void
+}) {
   function leave() {
     // Tell the server first so an emptied room disappears at once rather than
     // waiting for the sweep. Closing the tab instead is covered by the sweep.
@@ -21,6 +26,7 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
   const [selected, setSelected] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
+  const [askedRematch, setAskedRematch] = useState(false)
   const firedFor = useRef<string>('')
 
   useEffect(() => {
@@ -56,6 +62,17 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
       forceTimeout(match.id).then(refresh)
     }
   }, [remaining, match, state?.turnNumber, refresh])
+
+  // The rematch is signalled by the finished room pointing at a new one, which
+  // arrives over the realtime subscription we are already holding. Whoever
+  // asked second created it; both sides get here the same way.
+  useEffect(() => {
+    const next = match?.next_match_id
+    if (next && next !== matchId) {
+      leaveMatch(matchId)
+      onGoTo(next)
+    }
+  }, [match?.next_match_id, matchId, onGoTo])
 
   // Clear the selection whenever the turn flips.
   useEffect(() => setSelected(null), [state?.turn, state?.turnNumber])
@@ -155,10 +172,30 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
 
               <div className="actionbar">
                 {s.winner ? (
-                  <div className="verdict">
-                    {(s.winner === 'host' ? match.host_name : match.guest_name) ?? 'Someone'} wins
-                    {s.winner === mySide ? ' — that is you.' : '.'}
-                  </div>
+                  <>
+                    <div className="verdict">
+                      {(s.winner === 'host' ? match.host_name : match.guest_name) ?? 'Someone'} wins
+                      {s.winner === mySide ? ' — that is you.' : '.'}
+                    </div>
+                    <button
+                      className="btn primary"
+                      disabled={askedRematch}
+                      onClick={() =>
+                        guard(async () => {
+                          const next = await requestRematch(match.id)
+                          if (next) onGoTo(next)
+                          else setAskedRematch(true)
+                        })
+                      }
+                    >
+                      {askedRematch ? 'Waiting for them…' : 'Rematch'}
+                    </button>
+                    <span className="hint">
+                      {askedRematch
+                        ? 'It starts the moment they accept. Sides swap.'
+                        : 'Both of you have to want it.'}
+                    </span>
+                  </>
                 ) : mySide ? (
                   <>
                     <button className="btn primary" onClick={() => guard(() => endTurn(match.id))} disabled={!isMyTurn}>

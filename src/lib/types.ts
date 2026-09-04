@@ -61,6 +61,9 @@ export interface MatchRow {
   winner: Side | null
   created_at: string
   updated_at: string
+  rematch_host: boolean
+  rematch_guest: boolean
+  next_match_id: string | null
 }
 
 export interface Message {
@@ -76,6 +79,35 @@ export interface Profile {
   id: string
   username: string
   is_admin: boolean
+  lp: number
+  wins: number
+  losses: number
+  games: number
+  streak: number
 }
+
+export interface LadderRow {
+  id: string
+  username: string
+  lp: number
+  tier: string
+  wins: number
+  losses: number
+  games: number
+  streak: number
+}
+
+/** Mirrors tier_of() in 0004_ladder.sql. Display only -- the server owns the
+ *  floors -- but if you change the thresholds, change them in both places. */
+export const TIERS = [
+  { at: 1500, name: 'Crown' },
+  { at: 1200, name: 'Diamond' },
+  { at: 900, name: 'Platinum' },
+  { at: 600, name: 'Gold' },
+  { at: 300, name: 'Silver' },
+  { at: 0, name: 'Bronze' },
+] as const
+
+export const tierOf = (lp: number) => TIERS.find((t) => lp >= t.at)!.name
 
 export const TURN_SECONDS = 30

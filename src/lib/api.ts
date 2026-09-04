@@ -75,3 +75,11 @@ export async function sweepMatches() {
   const { error } = await supabase.rpc('sweep_matches')
   if (error) console.warn('sweep_matches:', error.message)
 }
+
+/** Ask for a rematch. Returns the new match id once BOTH players have asked,
+ *  null while you are still waiting for the other one. */
+export async function requestRematch(matchId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('request_rematch', { p_match: matchId })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as string | null) ?? null
+}

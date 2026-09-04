@@ -145,6 +145,31 @@ A consequence worth knowing: finished matches are removed once both players
 leave. If you want results kept, that wants its own table rather than leaving
 dead rooms lying around.
 
+### Rating and the ladder
+
+Two numbers per player, doing different jobs.
+
+**`mmr` is hidden** — plain Elo, starting at 1000, K=40 for a player's first ten
+games then K=20. It lives in its own table whose RLS lets you read your own row
+and nobody else's. It decides how much a result is worth.
+
+**`lp` is the ladder** — what people see and argue about. Both gain and loss are
+scaled by the *same* Elo expectation, so beating someone far above you is worth
+about 40 and beating a beginner about 4, while losing to that beginner costs 40.
+
+LP is zero-sum, and that is not decoration. **There is no matchmaking here** —
+players pick each other by room code, so nothing stops two friends playing all
+evening. If a win paid more than a loss cost, they would both climb forever and
+the leaderboard would measure stamina. The "ladder mostly climbs" feeling comes
+from **tier floors** instead: reach Gold and you cannot drop out of Gold this
+season. That is a bounded, deliberate leak rather than an open one.
+
+Tiers: Bronze 0 · Silver 300 · Gold 600 · Platinum 900 · Diamond 1200 · Crown 1500.
+
+`finish_match()` is the only place a result is ever recorded, it refuses to rate
+a match twice, and it is revoked from clients. Results are written to
+`match_results`, which is why they survive the room being swept.
+
 ### Current placeholder rules
 
 Deliberately thin. 5×5 grid, two units a side, mirrored so it's fair. Per
@@ -198,7 +223,11 @@ src/styles.css                      the whole look
    `cards.art_url` is already wired through to the board.
 4. **Real mechanics.** Terrain, facing, abilities, initiative — whatever the
    game turns out to be. This is the part that should change the most.
-5. **Reconnect polish, rematch button, match history.**
+5. **Placement games.** The first few results move a rating a lot but award LP
+   from game one; hiding LP until five games are played would place people more
+   honestly.
+6. **Seasons in the UI.** `start_new_season()` exists and is admin-only; nothing
+   calls it yet.
 
 ## Deliberate limitations
 

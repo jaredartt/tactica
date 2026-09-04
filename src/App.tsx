@@ -36,6 +36,14 @@ export default function App() {
   if (loading) return <div className="center-stage"><p className="muted">…</p></div>
   if (!session) return <Auth />
   if (!profile) return <div className="center-stage"><p className="muted">Setting up your profile…</p></div>
-  if (matchId) return <Match matchId={matchId} profile={profile} onLeave={() => setMatchId(null)} />
+  if (matchId)
+    return (
+      <Match
+        matchId={matchId}
+        profile={profile}
+        onLeave={() => setMatchId(null)}
+        onGoTo={setMatchId}
+      />
+    )
   return <Lobby profile={profile} onEnter={setMatchId} />
 }
