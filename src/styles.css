@@ -531,6 +531,13 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 
+/* NOTE: these classes are namespaced `unit-ghost`, not `ghost`. `.btn.ghost`
+   is the quiet button variant, and a bare `.ghost` rule silently applied
+   `position:absolute; pointer-events:none` to the Resign button -- which moved
+   it under the hint text and made it unclickable. Keep effect classes
+   prefixed with what they belong to.
+   -------------------------------------------------------------------------- */
+
 /* ---------- the exchange -------------------------------------------------
    An attack is the most consequential thing that happens on this board, so
    it gets the most motion: the attacker lunges, the target recoils and sheds
@@ -582,12 +589,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .dmg-late { animation-delay: 0.52s; }
 
-.ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
-.ghost-card {
+.unit-ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
+.unit-ghost-card {
   animation: vanish 0.55s ease-in forwards 0.2s;
   border-color: var(--line-2) !important;
 }
-.ghost-late .ghost-card { animation-delay: 0.58s; }
+.unit-ghost-late .unit-ghost-card { animation-delay: 0.58s; }
 
 /* You click an enemy to attack it, so your cursor is sitting on the very card
    that is about to recoil -- and the hover panel would cover the damage number
@@ -615,7 +622,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .unit-crosshair, .menu-bg { animation: none !important; }
   .unit-slot[class*="fx-"] { animation: none !important; }
   .dmg { animation: none !important; opacity: 1; transform: translateY(-18px); }
-  .ghost { display: none; }
+  .unit-ghost { display: none; }
   .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
   /* keep the hover zoom -- it is how the stats are read -- but drop the lean */
   .unit { transform: scale(1) !important; }

@@ -168,12 +168,12 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
       {blow && (
         <>
           {blow.killedTgt && (
-            <div className="ghost" style={at(blow.tgtAt)}>
+            <div className="unit-ghost" style={at(blow.tgtAt)}>
               <GhostCard unit={blow.tgtUnit} />
             </div>
           )}
           {blow.killedAtk && (
-            <div className="ghost ghost-late" style={at(blow.atkAt)}>
+            <div className="unit-ghost unit-ghost-late" style={at(blow.atkAt)}>
               <GhostCard unit={blow.atkUnit} />
             </div>
           )}
@@ -189,7 +189,7 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
 
 function GhostCard({ unit }: { unit: Unit }) {
   return (
-    <div className="unit ghost-card" style={{ '--accent': unit.accent } as React.CSSProperties}>
+    <div className="unit unit-ghost-card" style={{ '--accent': unit.accent } as React.CSSProperties}>
       <div className="unit-face">
         <div className="unit-art">
           {unit.art ? <img src={unit.art} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
