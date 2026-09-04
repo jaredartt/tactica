@@ -274,12 +274,12 @@ begin
            'hp', c.hp, 'maxHp', c.hp, 'atk', c.attack, 'mov', c.move,
            'rng', c.range, 'accent', c.accent, 'art', c.art_url,
            'ability', c.ability,
-           'x', 6, 'y', lanes[idx], 'moved', false, 'acted', false);
+           'x', 4, 'y', lanes[idx], 'moved', false, 'acted', false);
   end loop;
 
   st := jsonb_build_object(
     'v', 1,
-    'board', jsonb_build_object('w', 7, 'h', 5),
+    'board', jsonb_build_object('w', 5, 'h', 5),
     'turn', 'host',
     'turnNumber', 0,
     'units', units,

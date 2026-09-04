@@ -113,7 +113,7 @@ The whole board lives in one `jsonb` column, `matches.state`:
 ```jsonc
 {
   "v": 1,
-  "board": { "w": 7, "h": 5 },
+  "board": { "w": 5, "h": 5 },
   "turn": "host",              // whose turn: "host" | "guest"
   "turnNumber": 4,
   "units": [ { "id": "h1", "owner": "host", "name": "Vanguard",
@@ -130,7 +130,7 @@ changing a shape, not a schema.
 
 ### Current placeholder rules
 
-Deliberately thin. 7×5 grid, two units a side, mirrored so it's fair. Per
+Deliberately thin. 5×5 grid, two units a side, mirrored so it's fair. Per
 turn each of your units may move once (Manhattan distance ≤ its `mov`, no
 stacking) and attack once (Manhattan distance ≤ its `rng`, damage = `atk`,
 flat). Attacking ends that unit's turn. Lose all units and you lose. 30
