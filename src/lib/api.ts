@@ -55,3 +55,23 @@ export async function serverNow(): Promise<number> {
   if (error || !data) return Date.now()
   return new Date(data as string).getTime()
 }
+
+/** "I am still in this room." No-op for spectators -- only players hold a
+ *  room open, so a match watched by nobody who is playing gets swept. */
+export async function touchMatch(matchId: string) {
+  const { error } = await supabase.rpc('touch_match', { p_match: matchId })
+  if (error) console.warn('touch_match:', error.message)
+}
+
+/** Deliberate exit. Deletes the room outright if it just emptied. */
+export async function leaveMatch(matchId: string) {
+  const { error } = await supabase.rpc('leave_match', { p_match: matchId })
+  if (error) console.warn('leave_match:', error.message)
+}
+
+/** Safety net for tabs that were closed rather than left. Safe for anyone to
+ *  call: it can only remove rooms no player has touched in the grace window. */
+export async function sweepMatches() {
+  const { error } = await supabase.rpc('sweep_matches')
+  if (error) console.warn('sweep_matches:', error.message)
+}

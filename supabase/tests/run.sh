@@ -29,6 +29,11 @@ sleep 1
 
 psql -q -v ON_ERROR_STOP=1 -o /dev/null -c "create extension if not exists pgcrypto;"
 psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/tests/00_supabase_stub.sql 2>/dev/null
-psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/migrations/0001_init.sql 2>/dev/null
-psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/tests/01_rules.sql 2>&1 \
-  | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ERROR|---'
+for m in supabase/migrations/*.sql; do
+  psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$m" 2>/dev/null
+done
+
+for t in supabase/tests/0[1-9]*.sql; do
+  psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 \
+    | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ERROR|---'
+done

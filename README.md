@@ -128,6 +128,23 @@ One blob means one realtime message moves the board *and* the battle log
 together, so they can never disagree. It also means changing the game means
 changing a shape, not a schema.
 
+### Rooms clean themselves up
+
+Nothing in the schema knew whether a human was actually sitting in a room, so
+abandoned ones lived forever. Each **player** (not spectator) heartbeats every
+ten seconds into `match_presence`, against a 45-second grace — three misses
+before a room counts as empty, which survives a refresh or a phone waking up.
+
+Leaving deliberately calls `leave_match()`, which drops the room at once if it
+just emptied. `sweep_matches()` is the safety net for closed tabs and crashes;
+the lobby calls it before listing, so it can never advertise a room you cannot
+join. Both only ever remove rooms no player has touched inside the grace
+window, so a live game is never at risk.
+
+A consequence worth knowing: finished matches are removed once both players
+leave. If you want results kept, that wants its own table rather than leaving
+dead rooms lying around.
+
 ### Current placeholder rules
 
 Deliberately thin. 5×5 grid, two units a side, mirrored so it's fair. Per
@@ -187,7 +204,5 @@ src/styles.css                      the whole look
 
 - The board does not flip for the guest; both players see the host on the
   left. Fine for now, worth revisiting when the map gets bigger.
-- Abandoned rooms stay in the table. Once you have real traffic, add a
-  scheduled job to close matches idle for more than an hour.
 - Chat is unmoderated and unfiltered. Before you put this in front of a
   Discord, add at minimum a per-user rate limit.

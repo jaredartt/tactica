@@ -83,7 +83,7 @@ select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
 
 select t_raises(format('select public.submit_move(%L,''g1'',5,1)', :'mid'),
                 'not your unit', 'cannot move the opponent''s unit');
-select t_raises(format('select public.submit_move(%L,''h1'',6,4)', :'mid'),
+select t_raises(format('select public.submit_move(%L,''h1'',4,4)', :'mid'),
                 'too far', 'move range is enforced');
 select t_raises(format('select public.submit_move(%L,''h1'',9,9)', :'mid'),
                 'off the board', 'board bounds are enforced');
@@ -98,11 +98,17 @@ select t_ok((select (u->>'x')::int from public.matches m,
 select t_raises(format('select public.submit_move(%L,''h1'',3,1)', :'mid'),
                 'already moved', 'one move per unit per turn');
 
--- attack across the board (range 6, distance from (2,1) to (6,1) is 4)
+-- attack across the board (range 6, distance from (2,1) to (4,1) is 2)
 select public.submit_attack(:'mid', 'h1', 'g1');
 select t_ok((select (u->>'hp')::int from public.matches m,
              jsonb_array_elements(m.state->'units') u
              where m.id=:'mid' and u->>'id'='g1') = 6, 'damage applied');
+select t_ok((select (u->>'hp')::int from public.matches m,
+             jsonb_array_elements(m.state->'units') u
+             where m.id=:'mid' and u->>'id'='h1') = 6,
+            'equal reach means the defender counters');
+select t_ok((select (state->'fx'->>'counter')::int from public.matches where id=:'mid') = 4,
+            'the exchange is recorded in fx for the clients to animate');
 select t_raises(format('select public.submit_attack(%L,''h1'',''g1'')', :'mid'),
                 'already attacked', 'one attack per unit per turn');
 select t_raises(format('select public.submit_attack(%L,''h2'',''h1'')', :'mid'),

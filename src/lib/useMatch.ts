@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase'
-import { serverNow } from './api'
+import { serverNow, touchMatch } from './api'
 import type { MatchRow, Message } from './types'
 
 /**
@@ -55,10 +55,18 @@ export function useMatch(matchId: string | null) {
       )
       .subscribe()
 
+    // Heartbeat: this is what keeps the room from being swept. Sent
+    // immediately so a freshly opened room is never a candidate, then every
+    // ten seconds against a 45-second grace -- three misses before a room is
+    // considered empty, which survives a refresh or a phone waking up.
+    touchMatch(matchId)
+    const beat = setInterval(() => touchMatch(matchId), 10_000)
+
     const poll = setInterval(pull, 5000)
     return () => {
       supabase.removeChannel(channel)
       clearInterval(poll)
+      clearInterval(beat)
     }
   }, [matchId, pull])
 

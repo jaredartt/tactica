@@ -3,10 +3,17 @@ import { Board } from './Board'
 import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
-import { endTurn, forceTimeout, resignMatch, submitAttack, submitMove } from '../lib/api'
+import { endTurn, forceTimeout, leaveMatch, resignMatch, submitAttack, submitMove } from '../lib/api'
 import { TURN_SECONDS, type Profile, type Side } from '../lib/types'
 
 export function Match({ matchId, profile, onLeave }: { matchId: string; profile: Profile; onLeave: () => void }) {
+  function leave() {
+    // Tell the server first so an emptied room disappears at once rather than
+    // waiting for the sweep. Closing the tab instead is covered by the sweep.
+    leaveMatch(matchId)
+    onLeave()
+  }
+
   const { match, refresh } = useMatch(matchId)
   const messages = useMessages(matchId)
   const clockOffset = useServerClock()
@@ -80,7 +87,7 @@ export function Match({ matchId, profile, onLeave }: { matchId: string; profile:
   return (
     <div className="match">
       <header className="matchbar">
-        <button className="linkbtn" onClick={onLeave}>
+        <button className="linkbtn" onClick={leave}>
           ← Lobby
         </button>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { createMatch, joinMatch } from '../lib/api'
+import { createMatch, joinMatch, sweepMatches } from '../lib/api'
 import type { MatchRow, Profile } from '../lib/types'
 
 interface Card {
@@ -31,6 +31,9 @@ export function Lobby({ profile, onEnter }: Props) {
   const [err, setErr] = useState<string | null>(null)
 
   async function loadRooms() {
+    // Clear out rooms nobody is sitting in before showing the list, so the
+    // lobby never advertises a room you cannot actually join.
+    await sweepMatches()
     const { data } = await supabase
       .from('matches')
       .select('*')
