@@ -51,12 +51,32 @@ create a project at supabase.com, paste `supabase/migrations/0001_init.sql`
 into its SQL editor and run it, then copy the project URL and publishable key
 from Project Settings → API into `.env.local` — see `.env.example`.
 
-### Deploy (when you want a link to share)
+### It is deployed
 
-Vercel or Netlify, both free: import the repo, framework preset **Vite**, and
-add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as environment variables.
-Then add the deployed URL under Supabase → **Authentication → URL
-Configuration → Redirect URLs**.
+**https://jaredartt.github.io/tactica/** — open it on any device, phone included.
+
+Served by GitHub Pages from the `gh-pages` branch, which holds the built
+output only. The repo is public because Pages requires that on the free plan;
+nothing secret is in it. The publishable key is compiled into the bundle,
+which is what that key is for — Row Level Security is the thing actually
+protecting your data.
+
+To ship a change:
+
+```bash
+./deploy.sh
+```
+
+That builds and force-pushes `dist/` to `gh-pages`. The live site updates about
+a minute later. Needs Node, so until Node is installed on this Mac, ask Claude
+to run it.
+
+### Running it locally instead
+
+Needs Node on the machine itself (nodejs.org, LTS, the .pkg installer — it
+asks for your Mac password). Then `npm install && npm run dev` and
+<http://localhost:5173>. The dev server is much faster to iterate against than
+redeploying, so it is worth doing once you are changing code often.
 
 ---
 
