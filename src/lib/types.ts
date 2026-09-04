@@ -25,6 +25,18 @@ export interface LogEntry {
   text: string
 }
 
+/** Structured record of the last attack, written by the database so the
+ *  clients can animate it without parsing the log text. */
+export interface Fx {
+  seq: number
+  atk: string
+  tgt: string
+  dmg: number
+  killedTgt: boolean
+  counter: number
+  killedAtk: boolean
+}
+
 export interface MatchState {
   v: number
   board: { w: number; h: number }
@@ -33,6 +45,7 @@ export interface MatchState {
   units: Unit[]
   log: LogEntry[]
   winner: Side | null
+  fx?: Fx
 }
 
 export interface MatchRow {

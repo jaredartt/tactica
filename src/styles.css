@@ -130,27 +130,104 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 :focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
 
-/* ---------- lobby --------------------------------------------------------- */
+/* ---------- the menu -------------------------------------------------------
+   A skewed mosaic, in the spirit of Smash Ultimate's main menu: a few large
+   blocks of flat colour, leaning, that respond hard to being pointed at.
+   Held back to this palette and to a white ground so it still belongs to the
+   rest of the game.
+   -------------------------------------------------------------------------- */
 
-.lobby { width: 100%; max-width: 720px; }
-.lobby-head { display: flex; justify-content: space-between; align-items: flex-start; }
-.lobby-actions { display: flex; gap: 12px; margin: 30px 0 8px; flex-wrap: wrap; }
-.joinform { display: flex; gap: 8px; }
-.codeinput {
-  width: 168px; font-family: var(--display); font-weight: 900;
-  letter-spacing: 0.1em; text-transform: uppercase; text-align: center;
+.menu {
+  position: relative; min-height: 100%;
+  max-width: 1000px; margin: 0 auto; padding: 34px 28px 60px;
 }
 
-.section {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--ink); margin: 36px 0 12px;
+/* Slow diagonal drift behind everything, barely there. */
+.menu-bg {
+  position: fixed; inset: -20% -30%; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(
+    -22deg, var(--paper) 0 62px, var(--paper-2) 62px 124px);
+  opacity: 0.9;
+  animation: drift 24s linear infinite;
+}
+@keyframes drift { to { transform: translateX(124px); } }
+
+.menu-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; margin-bottom: 26px;
+}
+.menu-who { display: flex; align-items: baseline; gap: 14px; }
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: 168px 168px;
+  gap: 14px;
+}
+.mt-host     { grid-column: 1 / 3; grid-row: 1 / 3; }
+.mt-join     { grid-column: 3 / 5; grid-row: 1; }
+.mt-spectate { grid-column: 3;     grid-row: 2; }
+.mt-roster   { grid-column: 4;     grid-row: 2; }
+
+.mtile {
+  position: relative; overflow: hidden;
+  border: 0; border-radius: 6px; padding: 0;
+  cursor: pointer; color: #fff;
+  transform: skewX(-8deg) translateZ(0);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1),
+              box-shadow 0.18s, filter 0.18s;
+  box-shadow: 0 2px 10px rgba(14, 14, 20, 0.10);
+}
+.mtile::after {                       /* the lit edge on hover */
+  content: ''; position: absolute; inset: 0; border-radius: 6px;
+  box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.9);
+  transition: box-shadow 0.18s; pointer-events: none;
+}
+.mtile:hover:not(:disabled),
+.mtile:focus-visible { transform: skewX(-8deg) scale(1.035); filter: saturate(1.12); }
+.mtile:hover:not(:disabled) { box-shadow: 0 14px 34px rgba(14, 14, 20, 0.20); }
+.mtile:hover:not(:disabled)::after,
+.mtile.is-active::after { box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92); }
+.mtile:active:not(:disabled) { transform: skewX(-8deg) scale(1.005); }
+.mtile:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.mtile-inner {
+  transform: skewX(8deg);            /* undo the lean for the text */
+  display: flex; flex-direction: column; justify-content: flex-end;
+  gap: 4px; height: 100%; padding: 20px 22px; text-align: left;
+}
+.mtile-label {
+  font-family: var(--display); font-weight: 900; font-size: 21px;
+  line-height: 1.05; letter-spacing: -0.01em;
+}
+.mt-host .mtile-label { font-size: 30px; }
+.mtile-note { font-size: 12px; opacity: 0.82; }
+
+.mt-host     { background: var(--you); }
+.mt-join     { background: var(--foe); }
+.mt-spectate { background: #7c3aed; }
+.mt-roster   { background: #f59e0b; }
+
+.menu-err { margin-top: 16px; }
+
+.menu-panel {
+  margin-top: 22px; padding: 22px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--paper);
+}
+.menu-panel .joinform { justify-content: center; }
+
+/* ---------- room list ------------------------------------------------------ */
+
+.joinform { display: flex; gap: 10px; }
+.codeinput {
+  width: 190px; font-family: var(--display); font-weight: 900; font-size: 18px;
+  letter-spacing: 0.14em; text-transform: uppercase; text-align: center;
 }
 
 .roomlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .roomlist li {
   display: flex; align-items: center; gap: 14px;
-  background: var(--paper); border: 1px solid var(--line);
-  border-radius: 12px; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px;
   transition: border-color 0.15s;
 }
 .roomlist li:hover { border-color: var(--line-2); }
@@ -166,6 +243,42 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .pill.waiting { color: var(--foe); border-color: rgba(255, 46, 147, 0.35); }
 .pill.active { color: var(--you); border-color: rgba(47, 75, 255, 0.35); }
+
+/* ---------- roster --------------------------------------------------------- */
+
+.rosterlist {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+.rcard {
+  display: flex; gap: 12px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 14px;
+}
+.rcard-art {
+  width: 58px; height: 58px; flex: none; border-radius: 10px;
+  display: grid; place-items: center; overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 16%, #ffffff);
+  font-family: var(--display); font-weight: 900; font-size: 22px; color: var(--accent);
+}
+.rcard-art img { width: 100%; height: 100%; object-fit: cover; }
+.rcard-body { min-width: 0; }
+.rcard-body h3 {
+  margin: 0 0 4px; font-family: var(--display); font-weight: 900;
+  font-size: 12px; letter-spacing: 0.02em;
+}
+.rcard-stats { margin: 0 0 5px; display: flex; flex-wrap: wrap; gap: 3px 12px; }
+.rcard-stats > div { display: flex; align-items: baseline; gap: 4px; }
+.rcard-stats dt { font-size: 9px; letter-spacing: 0.08em; color: #b3b3c4; }
+.rcard-stats dd { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.rcard-body p { margin: 0; font-size: 11px; line-height: 1.45; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .menu-grid { grid-template-columns: repeat(2, 1fr); grid-template-rows: 150px 120px 120px; }
+  .mt-host { grid-column: 1 / 3; grid-row: 1; }
+  .mt-join { grid-column: 1 / 3; grid-row: 2; }
+  .mt-spectate { grid-column: 1; grid-row: 3; }
+  .mt-roster { grid-column: 2; grid-row: 3; }
+}
 
 /* ---------- match layout -------------------------------------------------- */
 
@@ -354,19 +467,29 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 .unit-detail {
   opacity: 0; pointer-events: none;
-  display: flex; flex-direction: column; gap: 5px;
-  padding: 9px 9px 8px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 6px 7px 7px;
   border-radius: 15px;
   background: var(--paper);
   overflow: hidden;
 }
 
+.unit-detail-art {
+  height: 30px; width: 100%; flex: none;
+  border-radius: 7px; overflow: hidden;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--accent) 15%, #ffffff);
+}
+.unit-detail-art img { width: 100%; height: 100%; object-fit: cover; }
+.unit-detail-art .unit-initial { font-size: 17px; }
+
 .unit-detail-name {
-  font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--accent);
+  font-size: 7.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px 7px; }
 .unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
 .unit-stats dt { font-size: 6.5px; letter-spacing: 0.1em; color: #b3b3c4; }
 .unit-stats dd {
@@ -374,14 +497,16 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 
 .unit-ability {
-  margin: 0; font-size: 6.5px; line-height: 1.45; color: var(--muted);
-  border-top: 1px solid var(--line); padding-top: 4px;
+  margin: 0; font-size: 6px; line-height: 1.4; color: var(--muted);
+  border-top: 1px solid var(--line); padding-top: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ---------- states -------------------------------------------------------- */
 
 .unit-slot:hover .unit {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.7);
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
   box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
 }
 .unit-slot:hover .unit-face,
@@ -406,6 +531,64 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 
+/* ---------- the exchange -------------------------------------------------
+   An attack is the most consequential thing that happens on this board, so
+   it gets the most motion: the attacker lunges, the target recoils and sheds
+   a damage number, and if the defender can reach back, the whole thing
+   replays in reverse half a beat later.
+   -------------------------------------------------------------------------- */
+
+@keyframes lunge {
+  0%   { transform: translate(0, 0); }
+  35%  { transform: translate(var(--lx, 0), var(--ly, 0)); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes recoil {
+  0%, 100% { transform: translate(0, 0); }
+  20%  { transform: translate(3px, -2px); }
+  45%  { transform: translate(-4px, 2px); }
+  70%  { transform: translate(2px, -1px); }
+}
+@keyframes riseaway {
+  0%   { opacity: 0; transform: translateY(6px)   scale(0.8); }
+  22%  { opacity: 1; transform: translateY(-12px) scale(1.12); }
+  100% { opacity: 0; transform: translateY(-44px) scale(1); }
+}
+@keyframes vanish {
+  0%   { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.55) rotate(-8deg); }
+}
+
+.unit-slot.fx-strike      { animation: lunge 0.34s cubic-bezier(0.3, 0, 0.2, 1); }
+.unit-slot.fx-hurt        { animation: recoil 0.32s ease-out 0.12s; }
+.unit-slot.fx-strike-late { animation: lunge 0.34s cubic-bezier(0.3, 0, 0.2, 1) 0.38s; }
+.unit-slot.fx-hurt-late   { animation: recoil 0.32s ease-out 0.5s; }
+
+/* A slot can be both striker and victim across the two halves of an
+   exchange; the later half wins, which is the order they happen in. */
+.unit-slot.fx-hurt.fx-strike-late { animation: recoil 0.32s ease-out 0.12s,
+                                               lunge 0.34s cubic-bezier(0.3, 0, 0.2, 1) 0.38s; }
+.unit-slot.fx-strike.fx-hurt-late { animation: lunge 0.34s cubic-bezier(0.3, 0, 0.2, 1),
+                                               recoil 0.32s ease-out 0.5s; }
+
+.dmg {
+  position: absolute; pointer-events: none; z-index: 20;
+  display: grid; place-items: start center;
+  font-family: var(--display); font-weight: 900; font-size: 22px;
+  color: var(--danger);
+  text-shadow: 0 2px 10px #fff, 0 0 4px #fff;
+  opacity: 0;
+  animation: riseaway 0.9s ease-out forwards 0.14s;
+}
+.dmg-late { animation-delay: 0.52s; }
+
+.ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
+.ghost-card {
+  animation: vanish 0.55s ease-in forwards 0.2s;
+  border-color: var(--line-2) !important;
+}
+.ghost-late .ghost-card { animation-delay: 0.58s; }
+
 /* ---------- responsive / motion ------------------------------------------ */
 
 @media (max-width: 1100px) { .stage { grid-template-columns: 220px 1fr 240px; } }
@@ -417,11 +600,14 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .unit-crosshair { animation: none !important; }
+  .unit-crosshair, .menu-bg { animation: none !important; }
+  .unit-slot[class*="fx-"] { animation: none !important; }
+  .dmg { animation: none !important; opacity: 1; transform: translateY(-18px); }
+  .ghost { display: none; }
   .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
   /* keep the hover zoom -- it is how the stats are read -- but drop the lean */
   .unit { transform: scale(1) !important; }
-  .unit-slot:hover .unit { transform: scale(1.7) !important; }
+  .unit-slot:hover .unit { transform: scale(1.9) !important; }
 }
 
 /* ---------- password fields ---------------------------------------------- */

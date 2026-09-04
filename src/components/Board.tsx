@@ -1,9 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Side, Unit } from '../lib/types'
 
 const TILE = 104
 const GAP = 10
-const MAX_TILT = 16 // degrees the card leans toward the cursor
+const MAX_TILT = 16   // degrees the card leans toward the cursor
+const FX_MS = 1200   // how long an exchange stays on screen (the counter
+                     // lands partway through, via CSS animation-delay)
 
 interface Props {
   state: MatchState
@@ -18,9 +20,52 @@ interface Props {
 const manhattan = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
 
+interface Blow {
+  seq: number
+  atk: string
+  tgt: string
+  dmg: number
+  counter: number
+  killedTgt: boolean
+  killedAtk: boolean
+  atkAt: { x: number; y: number }
+  tgtAt: { x: number; y: number }
+  atkUnit: Unit
+  tgtUnit: Unit
+}
+
 export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, onAttack }: Props) {
   const { w, h } = state.board
   const selected = state.units.find((u) => u.id === selectedId) ?? null
+
+  // The board a moment ago. A killed unit is gone from `state.units` by the
+  // time we hear about it, so the only place its last position still exists
+  // is the previous render's copy.
+  const before = useRef<Unit[]>(state.units)
+  const lastSeq = useRef<number>(state.fx?.seq ?? 0)
+  const [blow, setBlow] = useState<Blow | null>(null)
+
+  useEffect(() => {
+    const fx = state.fx
+    const prev = before.current
+    before.current = state.units
+    if (!fx || fx.seq === lastSeq.current) return
+    lastSeq.current = fx.seq
+
+    const a = prev.find((u) => u.id === fx.atk)
+    const t = prev.find((u) => u.id === fx.tgt)
+    if (!a || !t) return
+
+    setBlow({
+      seq: fx.seq, atk: fx.atk, tgt: fx.tgt,
+      dmg: fx.dmg, counter: fx.counter,
+      killedTgt: fx.killedTgt, killedAtk: fx.killedAtk,
+      atkAt: { x: a.x, y: a.y }, tgtAt: { x: t.x, y: t.y },
+      atkUnit: a, tgtUnit: t,
+    })
+    const id = setTimeout(() => setBlow(null), FX_MS)
+    return () => clearTimeout(id)
+  }, [state])
 
   const occupied = useMemo(() => new Set(state.units.map((u) => `${u.x},${u.y}`)), [state.units])
 
@@ -45,13 +90,24 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
     return s
   }, [selected, mySide, isMyTurn, state.units])
 
+  const at = (p: { x: number; y: number }) => ({
+    left: p.x * (TILE + GAP),
+    top: p.y * (TILE + GAP),
+    width: TILE,
+    height: TILE,
+  })
+
+  // Which way the attacker leans when it strikes.
+  const lungeVars = (from: { x: number; y: number }, to: { x: number; y: number }) =>
+    ({
+      '--lx': `${Math.sign(to.x - from.x) * 15}px`,
+      '--ly': `${Math.sign(to.y - from.y) * 15}px`,
+    }) as React.CSSProperties
+
   return (
     <div
       className="board"
-      style={{
-        width: w * TILE + (w - 1) * GAP,
-        height: h * TILE + (h - 1) * GAP,
-      }}
+      style={{ width: w * TILE + (w - 1) * GAP, height: h * TILE + (h - 1) * GAP }}
       onClick={() => onSelect(null)}
     >
       {Array.from({ length: w * h }, (_, i) => {
@@ -75,42 +131,91 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
         )
       })}
 
-      {state.units.map((u) => (
-        <UnitCard
-          key={u.id}
-          unit={u}
-          mine={u.owner === mySide}
-          selected={u.id === selectedId}
-          targetable={targets.has(u.id)}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (targets.has(u.id)) onAttack(u.id)
-            else onSelect(u.id === selectedId ? null : u.id)
-          }}
-        />
-      ))}
+      {state.units.map((u) => {
+        const striking = blow?.atk === u.id
+        const struck = blow?.tgt === u.id
+        return (
+          <UnitCard
+            key={u.id}
+            unit={u}
+            mine={u.owner === mySide}
+            selected={u.id === selectedId}
+            targetable={targets.has(u.id)}
+            slotClass={[
+              striking ? 'fx-strike' : '',
+              struck && !blow?.killedTgt ? 'fx-hurt' : '',
+              // the counterattack is the same exchange, half a beat later
+              struck && blow!.counter > 0 ? 'fx-strike-late' : '',
+              striking && blow!.counter > 0 && !blow!.killedAtk ? 'fx-hurt-late' : '',
+            ].join(' ')}
+            slotVars={
+              striking && blow
+                ? lungeVars(blow.atkAt, blow.tgtAt)
+                : struck && blow
+                  ? lungeVars(blow.tgtAt, blow.atkAt)
+                  : undefined
+            }
+            onClick={(e) => {
+              e.stopPropagation()
+              if (targets.has(u.id)) onAttack(u.id)
+              else onSelect(u.id === selectedId ? null : u.id)
+            }}
+          />
+        )
+      })}
+
+      {/* Everything below is transient: it exists only while an exchange plays. */}
+      {blow && (
+        <>
+          {blow.killedTgt && (
+            <div className="ghost" style={at(blow.tgtAt)}>
+              <GhostCard unit={blow.tgtUnit} />
+            </div>
+          )}
+          {blow.killedAtk && (
+            <div className="ghost ghost-late" style={at(blow.atkAt)}>
+              <GhostCard unit={blow.atkUnit} />
+            </div>
+          )}
+          <div className="dmg" style={at(blow.tgtAt)}>-{blow.dmg}</div>
+          {blow.counter > 0 && (
+            <div className="dmg dmg-late" style={at(blow.atkAt)}>-{blow.counter}</div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function GhostCard({ unit }: { unit: Unit }) {
+  return (
+    <div className="unit ghost-card" style={{ '--accent': unit.accent } as React.CSSProperties}>
+      <div className="unit-face">
+        <div className="unit-art">
+          {unit.art ? <img src={unit.art} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
+        </div>
+        <div className="unit-name">{unit.name}</div>
+      </div>
     </div>
   )
 }
 
 function UnitCard({
-  unit,
-  mine,
-  selected,
-  targetable,
-  onClick,
+  unit, mine, selected, targetable, slotClass, slotVars, onClick,
 }: {
   unit: Unit
   mine: boolean
   selected: boolean
   targetable: boolean
+  slotClass: string
+  slotVars?: React.CSSProperties
   onClick: (e: React.MouseEvent) => void
 }) {
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
-  // The card leans toward the pointer. Writing the angles to CSS variables
-  // rather than to `transform` lets the stylesheet own the scale and the
-  // resting state, so hover, selection and tilt compose instead of fighting.
+  // The card leans toward the pointer. The angles go to CSS variables rather
+  // than straight to `transform`, so the lean composes with the hover scale
+  // instead of overwriting it.
   function lean(e: React.MouseEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect()
     const px = (e.clientX - r.left) / r.width - 0.5
@@ -118,16 +223,25 @@ function UnitCard({
     e.currentTarget.style.setProperty('--ry', `${(px * MAX_TILT * 2).toFixed(1)}deg`)
     e.currentTarget.style.setProperty('--rx', `${(-py * MAX_TILT * 2).toFixed(1)}deg`)
   }
-
   function settle(e: React.MouseEvent<HTMLDivElement>) {
     e.currentTarget.style.setProperty('--ry', '0deg')
     e.currentTarget.style.setProperty('--rx', '0deg')
   }
 
+  const portrait = unit.art
+    ? <img src={unit.art} alt="" />
+    : <span className="unit-initial">{unit.name[0]}</span>
+
   return (
     <div
-      className="unit-slot"
-      style={{ left: unit.x * (TILE + GAP), top: unit.y * (TILE + GAP), width: TILE, height: TILE }}
+      className={`unit-slot ${slotClass}`.trim()}
+      style={{
+        left: unit.x * (TILE + GAP),
+        top: unit.y * (TILE + GAP),
+        width: TILE,
+        height: TILE,
+        ...slotVars,
+      }}
     >
       <div
         className={[
@@ -143,17 +257,15 @@ function UnitCard({
         onClick={onClick}
       >
         <div className="unit-face">
-          <div className="unit-art">
-            {unit.art ? <img src={unit.art} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
-          </div>
+          <div className="unit-art">{portrait}</div>
           <div className="unit-name">{unit.name}</div>
-          <div className="unit-hpbar">
-            <span style={{ width: `${hpPct}%` }} />
-          </div>
+          <div className="unit-hpbar"><span style={{ width: `${hpPct}%` }} /></div>
         </div>
 
-        {/* Revealed on hover, once the card is big enough to read. */}
+        {/* Opens on hover, once the card is large enough to read. Keeps the
+            illustration, because that is how you recognise the card. */}
         <div className="unit-detail">
+          <div className="unit-detail-art">{portrait}</div>
           <div className="unit-detail-name">{unit.name}</div>
           <dl className="unit-stats">
             <div><dt>HP</dt><dd>{unit.hp}/{unit.maxHp}</dd></div>
