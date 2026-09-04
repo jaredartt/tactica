@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Side, Unit } from '../lib/types'
 
-const TILE = 104
-const GAP = 10
+// No pixel sizes here on purpose. The board is a CSS grid that fills whatever
+// space it is given and keeps its aspect ratio, so a 5x5 arena fits a phone
+// and a monitor without either one measuring anything.
 const MAX_TILT = 16   // degrees the card leans toward the cursor
 const FX_MS = 1200   // how long an exchange stays on screen (the counter
                      // lands partway through, via CSS animation-delay)
@@ -93,24 +94,21 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
     return s
   }, [selected, mySide, isMyTurn, state.units])
 
-  const at = (p: { x: number; y: number }) => ({
-    left: p.x * (TILE + GAP),
-    top: p.y * (TILE + GAP),
-    width: TILE,
-    height: TILE,
-  })
+  const at = (p: { x: number; y: number }) =>
+    ({ gridColumn: p.x + 1, gridRow: p.y + 1 }) as React.CSSProperties
 
-  // Which way the attacker leans when it strikes.
+  // Which way the attacker leans when it strikes. A percentage, not pixels,
+  // so the lunge is the same fraction of a tile at any board size.
   const lungeVars = (from: { x: number; y: number }, to: { x: number; y: number }) =>
     ({
-      '--lx': `${Math.sign(to.x - from.x) * 15}px`,
-      '--ly': `${Math.sign(to.y - from.y) * 15}px`,
+      '--lx': `${Math.sign(to.x - from.x) * 16}%`,
+      '--ly': `${Math.sign(to.y - from.y) * 16}%`,
     }) as React.CSSProperties
 
   return (
     <div
       className={`board${blow ? ' fx-playing' : ''}${watching(mySide) ? ' is-watching' : ''}`}
-      style={{ width: w * TILE + (w - 1) * GAP, height: h * TILE + (h - 1) * GAP }}
+      style={{ '--cols': w, '--rows': h } as React.CSSProperties}
       onClick={() => onSelect(null)}
     >
       {Array.from({ length: w * h }, (_, i) => {
@@ -122,7 +120,6 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
           <div
             key={key}
             className={['tile', canMove ? 'tile-move' : ''].join(' ')}
-            style={{ left: x * (TILE + GAP), top: y * (TILE + GAP), width: TILE, height: TILE }}
             onClick={(e) => {
               e.stopPropagation()
               if (watching(mySide)) return
@@ -243,13 +240,7 @@ function UnitCard({
   return (
     <div
       className={`unit-slot ${slotClass}`.trim()}
-      style={{
-        left: unit.x * (TILE + GAP),
-        top: unit.y * (TILE + GAP),
-        width: TILE,
-        height: TILE,
-        ...slotVars,
-      }}
+      style={{ gridColumn: unit.x + 1, gridRow: unit.y + 1, ...slotVars }}
     >
       <div
         className={[

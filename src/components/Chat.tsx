@@ -7,9 +7,10 @@ interface Props {
   profile: Profile
   messages: Message[]
   role: 'player' | 'spectator'
+  open: boolean
 }
 
-export function Chat({ matchId, profile, messages, role }: Props) {
+export function Chat({ matchId, profile, messages, role, open }: Props) {
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
@@ -35,7 +36,7 @@ export function Chat({ matchId, profile, messages, role }: Props) {
   }
 
   return (
-    <aside className="side side-left">
+    <aside className={`side side-left${open ? ' is-open' : ''}`}>
       <h2 className="side-title">Chat</h2>
       <div className="side-body">
         {messages.length === 0 && <p className="muted tiny">Spectators can talk here too.</p>}

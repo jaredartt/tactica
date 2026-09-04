@@ -27,6 +27,10 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const [err, setErr] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   const [askedRematch, setAskedRematch] = useState(false)
+  // Which rail is showing. Only meaningful on a narrow screen, where the two
+  // side panels become tabs instead of columns -- there is no room for both,
+  // and a phone should never have to scroll a match.
+  const [rail, setRail] = useState<'chat' | 'log'>('log')
   const firedFor = useRef<string>('')
 
   useEffect(() => {
@@ -44,6 +48,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
 
   const state = match?.state
   const isMyTurn = Boolean(match && mySide && match.status === 'active' && state?.turn === mySide)
+  const selectedUnit = state?.units.find((u) => u.id === selected) ?? null
 
   const remaining = useMemo(() => {
     if (!match?.turn_deadline || match.status !== 'active') return null
@@ -132,9 +137,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
       </header>
 
       {match.status === 'active' && (
-        <div className={`timerbar ${urgent ? 'urgent' : ''}`}>
-          <div className="timerfill" style={{ width: `${pct * 100}%` }} />
-          <span className="timertext">
+        <div className={`turnbar ${urgent ? 'urgent' : ''}`}>
+          <div className="timerbar">
+            <div className="timerfill" style={{ width: `${pct * 100}%` }} />
+          </div>
+          <div className="timertext">
             {isMyTurn
               ? 'Your turn'
               : mySide
@@ -142,12 +149,18 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                 : `${s.turn === 'host' ? match.host_name : match.guest_name} to act`}
             {' · '}
             {Math.max(0, Math.ceil(remaining ?? 0))}s
-          </span>
+          </div>
         </div>
       )}
 
       <div className="stage">
-        <Chat matchId={match.id} profile={profile} messages={messages} role={mySide ? 'player' : 'spectator'} />
+        <Chat
+          matchId={match.id}
+          profile={profile}
+          messages={messages}
+          role={mySide ? 'player' : 'spectator'}
+          open={rail === 'chat'}
+        />
 
         <main className="center">
           {match.status === 'waiting' ? (
@@ -160,7 +173,8 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
             </div>
           ) : (
             <>
-              <Board
+              <div className="arena">
+                <Board
                 state={s}
                 mySide={mySide}
                 isMyTurn={isMyTurn}
@@ -168,7 +182,26 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                 onSelect={setSelected}
                 onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
                 onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
-              />
+                />
+              </div>
+
+              {/* Hover is how you read a card on a desktop, and phones do not
+                  have it. Tapping already selects, so the selection doubles as
+                  the way to inspect -- which helps on desktop too, since you
+                  can read a unit while planning instead of only while pointing
+                  at it. */}
+              {selectedUnit && (
+                <div className="unitbar" style={{ '--accent': selectedUnit.accent } as React.CSSProperties}>
+                  <span className="unitbar-name">{selectedUnit.name}</span>
+                  <span className="unitbar-stats">
+                    <b>{selectedUnit.hp}</b>/{selectedUnit.maxHp} HP
+                    <i /><b>{selectedUnit.atk}</b> ATK
+                    <i /><b>{selectedUnit.mov}</b> MOV
+                    <i /><b>{selectedUnit.rng}</b> RNG
+                  </span>
+                  {selectedUnit.ability && <span className="unitbar-ability">{selectedUnit.ability}</span>}
+                </div>
+              )}
 
               <div className="actionbar">
                 {s.winner ? (
@@ -221,7 +254,16 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
           {err && <div className="toast">{err}</div>}
         </main>
 
-        <BattleLog log={s.log} />
+        <BattleLog log={s.log} open={rail === 'log'} />
+
+        <nav className="railtabs" role="tablist" aria-label="Side panels">
+          <button role="tab" aria-selected={rail === 'chat'} onClick={() => setRail('chat')}>
+            Chat{messages.length > 0 ? ` (${messages.length})` : ''}
+          </button>
+          <button role="tab" aria-selected={rail === 'log'} onClick={() => setRail('log')}>
+            Battle log
+          </button>
+        </nav>
       </div>
     </div>
   )
