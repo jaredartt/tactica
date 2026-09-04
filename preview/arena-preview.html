@@ -167,21 +167,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 .unit-detail {
-  opacity: 0; pointer-events: none; display: flex; flex-direction: column; gap: 5px;
-  padding: 9px 9px 8px; border-radius: 15px; background: var(--paper); overflow: hidden;
+  opacity: 0; pointer-events: none; display: flex; flex-direction: column; gap: 3px;
+  padding: 6px 7px 7px; border-radius: 15px; background: var(--paper); overflow: hidden;
 }
-.unit-detail-name { font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
-.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.unit-detail-art {
+  height: 30px; width: 100%; flex: none; border-radius: 7px; overflow: hidden;
+  display: grid; place-items: center; background: var(--wash);
+}
+.unit-detail-art span { font-family: var(--display); font-weight: 900; font-size: 17px; color: var(--accent); }
+.unit-detail-name {
+  font-size: 7.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px 7px; }
 .unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
 .unit-stats dt { font-size: 6.5px; letter-spacing: .1em; color: #b3b3c4; }
 .unit-stats dd { margin: 0; font-size: 9px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .unit-ability {
-  margin: 0; font-size: 6.5px; line-height: 1.45; color: var(--muted);
-  border-top: 1px solid var(--line); padding-top: 4px;
+  margin: 0; font-size: 6px; line-height: 1.4; color: var(--muted);
+  border-top: 1px solid var(--line); padding-top: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
 .unit-slot:hover .unit {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.7);
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
   box-shadow: 0 20px 42px rgba(14,14,20,.22);
 }
 .unit-slot:hover .unit-face, .unit-slot:hover .unit-hp { opacity: 0; }
@@ -196,6 +205,54 @@ button { font: inherit; color: inherit; cursor: pointer; }
   animation: pulse 1.1s ease-in-out infinite; pointer-events: none;
 }
 @keyframes pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+
+/* ---- the exchange ---- */
+@keyframes lunge {
+  0% { transform: translate(0,0); } 35% { transform: translate(var(--lx,0), var(--ly,0)); }
+  100% { transform: translate(0,0); }
+}
+@keyframes recoil {
+  0%,100% { transform: translate(0,0); } 20% { transform: translate(3px,-2px); }
+  45% { transform: translate(-4px,2px); } 70% { transform: translate(2px,-1px); }
+}
+@keyframes riseaway {
+  0%   { opacity: 0; transform: translateY(6px)   scale(.8); }
+  22%  { opacity: 1; transform: translateY(-12px) scale(1.12); }
+  100% { opacity: 0; transform: translateY(-44px) scale(1); }
+}
+@keyframes vanish {
+  0% { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(.55) rotate(-8deg); }
+}
+.unit-slot.fx-strike      { animation: lunge .34s cubic-bezier(.3,0,.2,1); }
+.unit-slot.fx-hurt        { animation: recoil .32s ease-out .12s; }
+.unit-slot.fx-strike-late { animation: lunge .34s cubic-bezier(.3,0,.2,1) .38s; }
+.unit-slot.fx-hurt-late   { animation: recoil .32s ease-out .5s; }
+.unit-slot.fx-hurt.fx-strike-late { animation: recoil .32s ease-out .12s, lunge .34s cubic-bezier(.3,0,.2,1) .38s; }
+.unit-slot.fx-strike.fx-hurt-late { animation: lunge .34s cubic-bezier(.3,0,.2,1), recoil .32s ease-out .5s; }
+
+.dmg {
+  position: absolute; pointer-events: none; z-index: 20;
+  display: grid; place-items: start center;
+  font-family: var(--display); font-weight: 900; font-size: 22px; color: var(--danger);
+  text-shadow: 0 2px 10px #fff, 0 0 4px #fff; opacity: 0;
+  animation: riseaway .9s ease-out forwards .14s;
+}
+.dmg-late { animation-delay: .52s; }
+.ghost { position: absolute; pointer-events: none; z-index: 15; display: grid; place-items: center; }
+.ghost .unit { animation: vanish .55s ease-in forwards .2s; border-color: var(--line-2) !important; }
+.ghost-late .unit { animation-delay: .58s; }
+
+/* You click an enemy to attack it, so your cursor is on the very card about to
+   recoil -- and the hover panel would cover the damage number. While an
+   exchange resolves the board ignores hover, so you can watch it. */
+.board.fx-playing .unit-slot:hover .unit {
+  transform: rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) scale(1);
+  box-shadow: 0 2px 8px rgba(14,14,20,.10);
+}
+.board.fx-playing .unit-slot:hover .unit-face,
+.board.fx-playing .unit-slot:hover .unit-hp { opacity: 1; }
+.board.fx-playing .unit-detail { opacity: 0 !important; }
 
 /* ---- action bar ---- */
 .actionbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
@@ -224,9 +281,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .unit-crosshair { animation: none !important; }
+  .unit-slot[class*="fx-"] { animation: none !important; }
+  .dmg { animation: none !important; opacity: 1; transform: translateY(-18px); }
+  .ghost { display: none; }
   .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
   .unit { transform: scale(1) !important; }
-  .unit-slot:hover .unit { transform: scale(1.7) !important; }
+  .unit-slot:hover .unit { transform: scale(1.9) !important; }
 }
 </style>
 
@@ -234,7 +294,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <div class="note">
     <b>PREVIEW</b>
     <span>Both sides on one screen, no network. In the real build this is two browsers talking through Supabase.</span>
-    <span style="color:#0e0e14">Hover a card — it leans toward your cursor and opens its stats. Click a blue-edged unit, then a lit tile to move or a marked enemy to strike.</span>
+    <span style="color:#0e0e14">Hover a card — it leans toward your cursor and opens its portrait and stats. Click a blue-edged unit, then a lit tile to move or a marked enemy to strike.</span>
   </div>
 
   <header class="matchbar">
@@ -295,7 +355,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   });
 
   const game = {
-    turn: 'host', turnNumber: 1, selected: null, winner: null,
+    turn: 'host', turnNumber: 1, selected: null, winner: null, burst: null, burstTimer: 0,
     deadline: Date.now() + TURN_SECONDS * 1000,
     units: [
       mk('h1', 'host',  'vanguard', 0, 1),
@@ -344,18 +404,53 @@ button { font: inherit; color: inherit; cursor: pointer; }
     render();
   }
 
+  // One exchange, same rules the database enforces: the defender strikes back
+  // only if it survived, the attacker is inside its range, and its own reach
+  // is at least as long as the attacker's.
+  function resolveAttack(u, t) {
+    const d = dist(u, t);
+    const before = { atk: { ...u }, tgt: { ...t } };
+    t.hp -= u.atk;
+    u.acted = true; u.moved = true;
+    const killedTgt = t.hp <= 0;
+
+    let counter = 0, killedAtk = false;
+    if (!killedTgt && d <= t.rng && t.rng >= u.rng) {
+      counter = t.atk;
+      u.hp -= counter;
+      killedAtk = u.hp <= 0;
+    }
+
+    game.burst = {
+      atk: u.id, tgt: t.id, dmg: u.atk, counter, killedTgt, killedAtk,
+      atkAt: { x: u.x, y: u.y }, tgtAt: { x: t.x, y: t.y },
+      atkUnit: before.atk, tgtUnit: before.tgt,
+    };
+    clearTimeout(game.burstTimer);
+    game.burstTimer = setTimeout(() => { game.burst = null; render(); }, 1200);
+
+    if (killedTgt) game.units = game.units.filter((z) => z.id !== t.id);
+    if (killedAtk) game.units = game.units.filter((z) => z.id !== u.id);
+
+    say(u.name + ' hits ' + t.name + ' for ' + u.atk + (killedTgt ? ' — destroyed.' : '.'));
+    if (counter > 0) {
+      say(t.name + ' counters for ' + counter +
+          (killedAtk ? ' — ' + u.name + ' destroyed.' : '.'));
+    }
+
+    const hostLeft  = game.units.some((z) => z.owner === 'host');
+    const guestLeft = game.units.some((z) => z.owner === 'guest');
+    if (!guestLeft || !hostLeft) {
+      game.winner = guestLeft ? 'guest' : 'host';
+      say((game.winner === 'host' ? 'jared' : 'opponent') + ' wins.');
+      game.deadline = Infinity;
+    }
+  }
+
   function attack(targetId) {
     const u = sel(); const t = game.units.find((z) => z.id === targetId);
     if (!u || !t) return;
-    t.hp -= u.atk; u.acted = true; u.moved = true;
-    const dead = t.hp <= 0;
-    if (dead) game.units = game.units.filter((z) => z.id !== t.id);
-    say(u.name + ' hits ' + t.name + ' for ' + u.atk + (dead ? ' — destroyed.' : '.'));
-    if (!game.units.some((z) => z.owner !== u.owner)) {
-      game.winner = u.owner;
-      say((u.owner === 'host' ? 'jared' : 'opponent') + ' wins.');
-      game.deadline = Infinity;
-    }
+    resolveAttack(u, t);
     game.selected = null;
     render();
   }
@@ -394,13 +489,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
         if (step.x !== u.x || step.y !== u.y) { u.x = step.x; u.y = step.y; say(u.name + ' advances.'); }
       }
       if (dist(u, best) <= u.rng && game.units.includes(best)) {
-        best.hp -= u.atk;
-        const dead = best.hp <= 0;
-        if (dead) game.units = game.units.filter((z) => z.id !== best.id);
-        say(u.name + ' hits ' + best.name + ' for ' + u.atk + (dead ? ' — destroyed.' : '.'));
-        if (!game.units.some((z) => z.owner === 'host')) {
-          game.winner = 'guest'; say('opponent wins.'); game.deadline = Infinity; render(); return;
-        }
+        resolveAttack(u, best);
+        if (game.winner) { render(); return; }
       }
     }
     setTimeout(() => endTurn(null), 700);
@@ -415,7 +505,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   function render() {
     const canMove = reachable(), canHit = targets();
-    board.querySelectorAll('.tile, .unit-slot').forEach((n) => n.remove());
+    board.className = 'board' + (game.burst ? ' fx-playing' : '');
+    board.querySelectorAll('.tile, .unit-slot, .dmg, .ghost').forEach((n) => n.remove());
 
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const key = x + ',' + y, lit = canMove.has(key);
@@ -429,10 +520,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
 
     for (const u of game.units) {
+      const b = game.burst;
+      const fxCls = !b ? '' : [
+        b.atk === u.id ? 'fx-strike' : '',
+        b.tgt === u.id && !b.killedTgt ? 'fx-hurt' : '',
+        b.tgt === u.id && b.counter > 0 ? 'fx-strike-late' : '',
+        b.atk === u.id && b.counter > 0 && !b.killedAtk ? 'fx-hurt-late' : '',
+      ].filter(Boolean).join(' ');
+
       const slot = document.createElement('div');
-      slot.className = 'unit-slot';
+      slot.className = ('unit-slot ' + fxCls).trim();
       slot.style.cssText = 'left:' + u.x * (TILE + GAP) + 'px;top:' + u.y * (TILE + GAP) +
                            'px;width:' + TILE + 'px;height:' + TILE + 'px';
+      if (b && (b.atk === u.id || b.tgt === u.id)) {
+        const from = b.atk === u.id ? b.atkAt : b.tgtAt;
+        const to   = b.atk === u.id ? b.tgtAt : b.atkAt;
+        slot.style.setProperty('--lx', Math.sign(to.x - from.x) * 15 + 'px');
+        slot.style.setProperty('--ly', Math.sign(to.y - from.y) * 15 + 'px');
+      }
       const mine = u.owner === mySide;
       const isTarget = canHit.has(u.id);
       const card = document.createElement('div');
@@ -450,6 +555,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
             Math.max(0, (u.hp / u.maxHp) * 100) + '%"></span></div>' +
         '</div>' +
         '<div class="unit-detail">' +
+          '<div class="unit-detail-art"><span>' + u.name[0] + '</span></div>' +
           '<div class="unit-detail-name">' + u.name + '</div>' +
           '<dl class="unit-stats">' +
             '<div><dt>HP</dt><dd>' + u.hp + '/' + u.maxHp + '</dd></div>' +
@@ -482,6 +588,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
       };
       slot.appendChild(card);
       board.appendChild(slot);
+    }
+
+    // Transient: only on screen while an exchange plays.
+    const b2 = game.burst;
+    if (b2) {
+      const place = (p) => 'left:' + p.x * (TILE + GAP) + 'px;top:' + p.y * (TILE + GAP) +
+                           'px;width:' + TILE + 'px;height:' + TILE + 'px';
+      const ghost = (unit, pos, late) => {
+        const g = document.createElement('div');
+        g.className = 'ghost unit-slot' + (late ? ' ghost-late' : '');
+        g.style.cssText = place(pos);
+        g.innerHTML = '<div class="unit" style="--accent:' + unit.accent + ';--wash:' + unit.accent + '26">' +
+          '<div class="unit-face"><div class="unit-art"><span class="unit-initial">' +
+          unit.name[0] + '</span></div><div class="unit-name">' + unit.name + '</div></div></div>';
+        board.appendChild(g);
+      };
+      if (b2.killedTgt) ghost(b2.tgtUnit, b2.tgtAt, false);
+      if (b2.killedAtk) ghost(b2.atkUnit, b2.atkAt, true);
+
+      const num = (v, pos, late) => {
+        const d = document.createElement('div');
+        d.className = 'dmg' + (late ? ' dmg-late' : '');
+        d.style.cssText = place(pos);
+        d.textContent = '-' + v;
+        board.appendChild(d);
+      };
+      num(b2.dmg, b2.tgtAt, false);
+      if (b2.counter > 0) num(b2.counter, b2.atkAt, true);
     }
 
     $('npHost').className = 'nameplate host' + (game.turn === 'host' && !game.winner ? ' active' : '');

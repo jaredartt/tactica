@@ -589,6 +589,18 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .ghost-late .ghost-card { animation-delay: 0.58s; }
 
+/* You click an enemy to attack it, so your cursor is sitting on the very card
+   that is about to recoil -- and the hover panel would cover the damage number
+   and the hit. While an exchange resolves, the board stops responding to hover
+   so you can actually watch it. */
+.board.fx-playing .unit-slot:hover .unit {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
+  box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
+}
+.board.fx-playing .unit-slot:hover .unit-face,
+.board.fx-playing .unit-slot:hover .unit-hp { opacity: 1; }
+.board.fx-playing .unit-detail { opacity: 0 !important; }
+
 /* ---------- responsive / motion ------------------------------------------ */
 
 @media (max-width: 1100px) { .stage { grid-template-columns: 220px 1fr 240px; } }

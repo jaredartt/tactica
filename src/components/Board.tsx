@@ -106,7 +106,7 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
 
   return (
     <div
-      className="board"
+      className={`board${blow ? ' fx-playing' : ''}`}
       style={{ width: w * TILE + (w - 1) * GAP, height: h * TILE + (h - 1) * GAP }}
       onClick={() => onSelect(null)}
     >
