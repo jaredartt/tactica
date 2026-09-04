@@ -216,7 +216,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .center {
   position: relative; min-height: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 28px; padding: 44px 20px 24px; overflow: auto;
+  gap: 20px; padding: 26px 20px 20px; overflow: auto;
 }
 
 .waiting { text-align: center; display: grid; gap: 18px; justify-items: center; }

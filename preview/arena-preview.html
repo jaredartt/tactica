@@ -111,85 +111,88 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .center {
   position: relative; min-height: 0; overflow: auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 28px; padding: 44px 20px 24px;
+  gap: 20px; padding: 26px 20px 20px;
 }
 
-/* ---- the arena ---- */
-.arena { perspective: 1500px; perspective-origin: 50% 34%; display: grid; place-items: start center; }
-.arena-scene { position: relative; display: grid; place-items: start center; }
-.board { position: relative; transform-style: preserve-3d; transform-origin: 50% 0%; }
+/* ---- the arena: flat grid, 3D only in the cards ---- */
+.board { position: relative; }
 .tile {
-  position: absolute; border-radius: 6px; background: var(--tile-a);
-  transition: background 0.18s, box-shadow 0.18s;
+  position: absolute; border-radius: 12px; background: var(--tile-a);
+  transition: background .18s, box-shadow .18s;
 }
-.tile.b { background: var(--tile-b); }
 .tile.move {
-  background: rgba(47,75,255,.12); cursor: pointer;
-  box-shadow: inset 0 0 0 1.5px rgba(47,75,255,.55);
+  background: rgba(47,75,255,.10); cursor: pointer;
+  box-shadow: inset 0 0 0 1.5px rgba(47,75,255,.5);
 }
-.tile.move:hover { background: rgba(47,75,255,.24); }
+.tile.move:hover { background: rgba(47,75,255,.22); }
 .tile .dot {
-  position: absolute; inset: 50% auto auto 50%; width: 8px; height: 8px;
-  margin: -4px 0 0 -4px; border-radius: 50%; background: var(--you);
+  position: absolute; inset: 50% auto auto 50%; width: 9px; height: 9px;
+  margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--you);
 }
 
-.unit-anchor { position: absolute; transform-style: preserve-3d; pointer-events: none; }
-.unit-shadow {
-  position: absolute; left: 50%; bottom: 8px; width: 58px; height: 18px; margin-left: -29px;
-  background: radial-gradient(closest-side, rgba(14,14,20,.22), transparent); filter: blur(3px);
-  transition: transform 0.22s cubic-bezier(.2,.8,.3,1), opacity 0.22s;
-}
+.unit-slot { position: absolute; display: grid; place-items: center; perspective: 800px; }
+.unit-slot:hover { z-index: 10; }
+
 .unit {
-  position: absolute; left: 50%; bottom: 6px; margin-left: -36px;
-  width: 72px; height: 90px; pointer-events: auto; cursor: pointer;
-  transform-origin: 50% 100%;
-  transform: rotateX(var(--tilt)) translateY(0) scale(1);
-  transition: transform 0.22s cubic-bezier(.2,.8,.3,1), box-shadow 0.22s, filter 0.22s;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 6px 6px 7px; border-radius: 12px;
-  background: var(--paper); border: 1.5px solid var(--line-2);
-  box-shadow: 0 4px 14px rgba(14,14,20,.10);
-  animation: breathe 3.8s ease-in-out infinite;
-}
-@keyframes breathe {
-  0%, 100% { transform: rotateX(var(--tilt)) translateY(0) scale(1); }
-  50%      { transform: rotateX(var(--tilt)) translateY(-4px) scale(1.005); }
+  position: relative; width: 92px; height: 92px; display: grid;
+  border-radius: 16px; background: var(--paper);
+  border: 1.5px solid var(--line-2);
+  box-shadow: 0 2px 8px rgba(14,14,20,.10);
+  cursor: pointer;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
+  transition: transform .16s cubic-bezier(.2,.8,.3,1), box-shadow .2s, border-color .2s;
 }
 .unit.mine { border-color: var(--you); }
 .unit.foe  { border-color: var(--foe); }
-.unit-anchor:hover .unit {
-  animation: none;
-  transform: rotateX(var(--tilt)) translateY(-18px) scale(1.08);
-  box-shadow: 0 22px 34px rgba(14,14,20,.18); z-index: 5;
-}
-.unit-anchor:hover .unit-shadow { transform: scale(.76); opacity: .45; }
-.unit.selected {
-  animation: none;
-  transform: rotateX(var(--tilt)) translateY(-14px) scale(1.06);
-  box-shadow: 0 18px 30px rgba(14,14,20,.18), 0 0 0 3px rgba(47,75,255,.22);
-}
-.unit.target { animation: none; cursor: crosshair; border-color: var(--danger); }
-.unit.target:hover { box-shadow: 0 22px 34px rgba(14,14,20,.18), 0 0 0 3px rgba(255,59,48,.25); }
-.unit.spent { filter: grayscale(1) opacity(.55); animation: none; }
+
+.unit-face, .unit-detail { grid-area: 1 / 1; transition: opacity .16s ease; }
+.unit-face { display: flex; flex-direction: column; gap: 5px; padding: 8px; min-height: 0; }
 
 .unit-art {
-  width: 100%; flex: 1; min-height: 0; border-radius: 7px; overflow: hidden;
+  flex: 1; min-height: 0; width: 100%; border-radius: 10px; overflow: hidden;
   display: grid; place-items: center; background: var(--wash);
 }
-.unit-initial { font-family: var(--display); font-weight: 900; font-size: 21px; color: var(--accent); line-height: 1; }
+.unit-initial { font-family: var(--display); font-weight: 900; font-size: 26px; color: var(--accent); line-height: 1; }
 .unit-name {
-  font-size: 8px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 8.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .unit-hpbar { width: 100%; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .unit-hpbar span { display: block; height: 100%; background: var(--good); transition: width .35s ease; }
 .unit-hp {
-  position: absolute; top: -8px; right: -8px; min-width: 21px; height: 21px; padding: 0 5px;
-  border-radius: 999px; background: var(--ink); color: #fff;
-  font-size: 10px; display: grid; place-items: center; font-variant-numeric: tabular-nums;
+  position: absolute; top: 6px; right: 6px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 999px; background: var(--ink); color: #fff; font-size: 10px;
+  display: grid; place-items: center; font-variant-numeric: tabular-nums;
+  transition: opacity .16s ease;
 }
+
+.unit-detail {
+  opacity: 0; pointer-events: none; display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 9px 8px; border-radius: 15px; background: var(--paper); overflow: hidden;
+}
+.unit-detail-name { font-size: 8px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.unit-stats dt { font-size: 6.5px; letter-spacing: .1em; color: #b3b3c4; }
+.unit-stats dd { margin: 0; font-size: 9px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.unit-ability {
+  margin: 0; font-size: 6.5px; line-height: 1.45; color: var(--muted);
+  border-top: 1px solid var(--line); padding-top: 4px;
+}
+
+.unit-slot:hover .unit {
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.7);
+  box-shadow: 0 20px 42px rgba(14,14,20,.22);
+}
+.unit-slot:hover .unit-face, .unit-slot:hover .unit-hp { opacity: 0; }
+.unit-slot:hover .unit-detail { opacity: 1; }
+
+.unit.selected { box-shadow: 0 6px 18px rgba(14,14,20,.14), 0 0 0 3px rgba(47,75,255,.25); }
+.unit.target { border-color: var(--danger); cursor: crosshair; }
+.unit-slot:hover .unit.target { box-shadow: 0 20px 42px rgba(14,14,20,.22), 0 0 0 3px rgba(255,59,48,.28); }
+.unit.spent { filter: grayscale(1) opacity(.5); }
 .unit-crosshair {
-  position: absolute; inset: -7px; border: 1.5px dashed var(--danger); border-radius: 16px;
+  position: absolute; inset: -6px; border: 1.5px dashed var(--danger); border-radius: 20px;
   animation: pulse 1.1s ease-in-out infinite; pointer-events: none;
 }
 @keyframes pulse { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
@@ -220,8 +223,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .side-left, .side-right { border: 0; border-top: 1px solid var(--line); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .unit, .unit-crosshair { animation: none !important; }
-  .unit, .unit-shadow, .tile, .timerfill { transition: none !important; }
+  .unit-crosshair { animation: none !important; }
+  .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
+  .unit { transform: scale(1) !important; }
+  .unit-slot:hover .unit { transform: scale(1.7) !important; }
 }
 </style>
 
@@ -229,7 +234,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   <div class="note">
     <b>PREVIEW</b>
     <span>Both sides on one screen, no network. In the real build this is two browsers talking through Supabase.</span>
-    <span style="color:#0e0e14">Hover a card. Click a blue-edged unit, then a lit tile to move or a marked enemy to strike.</span>
+    <span style="color:#0e0e14">Hover a card — it leans toward your cursor and opens its stats. Click a blue-edged unit, then a lit tile to move or a marked enemy to strike.</span>
   </div>
 
   <header class="matchbar">
@@ -258,11 +263,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </aside>
 
     <main class="center">
-      <div class="arena">
-        <div class="arena-scene" id="scene">
-          <div class="board" id="board"></div>
-        </div>
-      </div>
+      <div class="board" id="board"></div>
       <div class="actionbar" id="actionbar"></div>
     </main>
 
@@ -277,13 +278,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 (() => {
   'use strict';
 
-  const W = 7, H = 5, TILE = 76, GAP = 8, TILT = 52, TURN_SECONDS = 30;
+  const W = 5, H = 5, TILE = 104, GAP = 10, MAX_TILT = 16, TURN_SECONDS = 30;
 
   // The same placeholder roster the migration seeds, with the saturated
   // accents that read properly against white.
   const ROSTER = {
-    vanguard: { name: 'Vanguard', hp: 14, atk: 4, mov: 3, rng: 1, accent: '#7c3aed' },
-    archer:   { name: 'Archer',    hp: 8, atk: 4, mov: 2, rng: 3, accent: '#f59e0b' },
+    vanguard: { name: 'Vanguard', hp: 14, atk: 4, mov: 3, rng: 1, accent: '#7c3aed',
+                ability: 'Holds the line.' },
+    archer:   { name: 'Archer',    hp: 8, atk: 4, mov: 2, rng: 3, accent: '#f59e0b',
+                ability: 'Strikes from a distance.' },
   };
 
   const mk = (id, owner, card, x, y) => ({
@@ -297,8 +300,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
     units: [
       mk('h1', 'host',  'vanguard', 0, 1),
       mk('h2', 'host',  'archer',   0, 3),
-      mk('g1', 'guest', 'vanguard', 6, 1),
-      mk('g2', 'guest', 'archer',   6, 3),
+      mk('g1', 'guest', 'vanguard', 4, 1),
+      mk('g2', 'guest', 'archer',   4, 3),
     ],
     log: [{ t: 1, text: 'opponent entered the arena.' },
           { t: 1, text: 'Turn 1 — jared to act.' }],
@@ -409,13 +412,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const boardH = H * TILE + (H - 1) * GAP;
   board.style.width = boardW + 'px';
   board.style.height = boardH + 'px';
-  board.style.transform = 'rotateX(' + TILT + 'deg)';
-  $('scene').style.width = boardW + 'px';
-  $('scene').style.height = (boardH * Math.cos(TILT * Math.PI / 180) + 170) + 'px';
 
   function render() {
     const canMove = reachable(), canHit = targets();
-    board.querySelectorAll('.tile, .unit-anchor').forEach((n) => n.remove());
+    board.querySelectorAll('.tile, .unit-slot').forEach((n) => n.remove());
 
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const key = x + ',' + y, lit = canMove.has(key);
@@ -429,10 +429,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     }
 
     for (const u of game.units) {
-      const anchor = document.createElement('div');
-      anchor.className = 'unit-anchor';
-      anchor.style.cssText = 'left:' + u.x * (TILE + GAP) + 'px;top:' + u.y * (TILE + GAP) +
-                             'px;width:' + TILE + 'px;height:' + TILE + 'px';
+      const slot = document.createElement('div');
+      slot.className = 'unit-slot';
+      slot.style.cssText = 'left:' + u.x * (TILE + GAP) + 'px;top:' + u.y * (TILE + GAP) +
+                           'px;width:' + TILE + 'px;height:' + TILE + 'px';
       const mine = u.owner === mySide;
       const isTarget = canHit.has(u.id);
       const card = document.createElement('div');
@@ -440,27 +440,48 @@ button { font: inherit; color: inherit; cursor: pointer; }
         (u.id === game.selected ? ' selected' : '') +
         (isTarget ? ' target' : '') +
         (u.moved && u.acted ? ' spent' : '');
-      card.style.setProperty('--tilt', -TILT + 'deg');
       card.style.setProperty('--accent', u.accent);
-      card.style.setProperty('--wash', u.accent + '29');
-      card.title = u.name + ' — ' + u.hp + '/' + u.maxHp + ' HP · ATK ' + u.atk +
-                   ' · MOV ' + u.mov + ' · RNG ' + u.rng;
+      card.style.setProperty('--wash', u.accent + '26');
       card.innerHTML =
-        '<div class="unit-art"><span class="unit-initial">' + u.name[0] + '</span></div>' +
-        '<div class="unit-name">' + u.name + '</div>' +
-        '<div class="unit-hpbar"><span style="width:' +
-          Math.max(0, (u.hp / u.maxHp) * 100) + '%"></span></div>' +
+        '<div class="unit-face">' +
+          '<div class="unit-art"><span class="unit-initial">' + u.name[0] + '</span></div>' +
+          '<div class="unit-name">' + u.name + '</div>' +
+          '<div class="unit-hpbar"><span style="width:' +
+            Math.max(0, (u.hp / u.maxHp) * 100) + '%"></span></div>' +
+        '</div>' +
+        '<div class="unit-detail">' +
+          '<div class="unit-detail-name">' + u.name + '</div>' +
+          '<dl class="unit-stats">' +
+            '<div><dt>HP</dt><dd>' + u.hp + '/' + u.maxHp + '</dd></div>' +
+            '<div><dt>ATK</dt><dd>' + u.atk + '</dd></div>' +
+            '<div><dt>MOV</dt><dd>' + u.mov + '</dd></div>' +
+            '<div><dt>RNG</dt><dd>' + u.rng + '</dd></div>' +
+          '</dl>' +
+          '<p class="unit-ability">' + u.ability + '</p>' +
+        '</div>' +
         '<div class="unit-hp">' + u.hp + '</div>' +
         (isTarget ? '<div class="unit-crosshair"></div>' : '');
+
+      // Lean toward the pointer. The angles go to CSS variables so the lean
+      // composes with the hover scale instead of replacing it.
+      card.onmousemove = (e) => {
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.setProperty('--ry', (px * MAX_TILT * 2).toFixed(1) + 'deg');
+        card.style.setProperty('--rx', (-py * MAX_TILT * 2).toFixed(1) + 'deg');
+      };
+      card.onmouseleave = () => {
+        card.style.setProperty('--ry', '0deg');
+        card.style.setProperty('--rx', '0deg');
+      };
       card.onclick = (e) => {
         e.stopPropagation();
         if (isTarget) attack(u.id);
         else { game.selected = game.selected === u.id ? null : u.id; render(); }
       };
-      const sh = document.createElement('div');
-      sh.className = 'unit-shadow';
-      anchor.append(card, sh);
-      board.appendChild(anchor);
+      slot.appendChild(card);
+      board.appendChild(slot);
     }
 
     $('npHost').className = 'nameplate host' + (game.turn === 'host' && !game.winner ? ' active' : '');
