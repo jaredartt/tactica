@@ -1,3 +1,13 @@
+-- ############################################################################
+-- HOW TO RUN THIS
+--   1. Paste the WHOLE file into the Supabase SQL editor and press Run.
+--   2. A dark box may appear: "Potential issue detected ... destructive
+--      operations". That is expected -- removing empty rooms is the point of
+--      this file. Click the "Run query" button in that box, NOT "Cancel".
+--      Nothing runs until you click it.
+--   3. The Results pane at the bottom will show whether it worked.
+-- ############################################################################
+
 -- ============================================================================
 -- 0003 -- rooms clean themselves up
 -- ============================================================================
@@ -202,3 +212,13 @@ grant  execute on function public.sweep_matches()    to authenticated;
 -- The rooms that are already stranded have no presence rows, so this clears
 -- them out the first time the file is run.
 select public.sweep_matches();
+
+
+-- ---------------------------------------------------------------------------
+-- Did it work? These three values are the answer -- all true / 0 means yes.
+-- ---------------------------------------------------------------------------
+select
+  to_regclass('public.match_presence')      is not null as presence_table_created,
+  to_regprocedure('public.sweep_matches()') is not null as sweep_created,
+  to_regprocedure('public.leave_match(uuid)') is not null as leave_created,
+  (select count(*) from public.matches)                 as rooms_left;

@@ -1,3 +1,13 @@
+-- ############################################################################
+-- HOW TO RUN THIS
+--   1. Paste the WHOLE file into the Supabase SQL editor and press Run.
+--   2. A dark box may appear: "Potential issue detected ... destructive
+--      operations". That is expected -- removing empty rooms is the point of
+--      this file. Click the "Run query" button in that box, NOT "Cancel".
+--      Nothing runs until you click it.
+--   3. The Results pane at the bottom will show whether it worked.
+-- ############################################################################
+
 -- ============================================================================
 -- 0004 -- hidden rating, visible ladder, results, rematch
 -- ============================================================================
@@ -486,3 +496,13 @@ begin
    where id = m.id returning * into m;
   return m;
 end $$;
+
+
+-- ---------------------------------------------------------------------------
+-- Did it work? All true means yes.
+-- ---------------------------------------------------------------------------
+select
+  to_regprocedure('public.request_rematch(uuid)') is not null as rematch_created,
+  to_regclass('public.player_rating')             is not null as rating_table_created,
+  to_regclass('public.match_results')             is not null as results_table_created,
+  to_regclass('public.leaderboard')               is not null as leaderboard_created;
