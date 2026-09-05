@@ -92,6 +92,10 @@ export interface MatchRow {
   host_name: string
   guest_name: string | null
   status: MatchStatus
+  /** 1, 2 or 3 when the guest seat is the bot; null when it is a person. */
+  bot: number | null
+  /** Only a match found through the queue moves anybody's number. */
+  ranked: boolean
   state: MatchState
   turn_deadline: string | null
   winner: Side | null
@@ -171,5 +175,11 @@ export const TURN_SECONDS = 30
 export const DEPLOY_SECONDS = 90
 export const DECK_SIZE = 4
 export const AWAY_TURNS = 3
+
+export const BOT_LEVELS = [
+  { level: 1, name: 'CALM', note: 'Plays roughly. Walks into counters and will let you take a free hit.' },
+  { level: 2, name: 'SHARP', note: 'Plays properly. Trades when the trade is good and rarely wastes a turn.' },
+  { level: 3, name: 'RUTHLESS', note: 'Counts what comes back, and will not stand where you can reach it.' },
+] as const
 
 export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)

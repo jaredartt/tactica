@@ -18,6 +18,9 @@ begin
   select id, code into mid, c from public.create_match();
   perform set_config('app.uid', '22222222-2222-2222-2222-222222222222', false);
   perform public.join_match(c);
+  -- Only the queue rates anything now, and the queue is 06's problem. Mark it
+  -- ranked by hand so this file can go on testing the rating maths itself.
+  update public.matches set ranked = true where id = mid;
   -- the loser resigns
   if p_winner = 'bob' then
     perform set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
@@ -88,6 +91,7 @@ select id as rm from public.create_match() \gset
 select code as rc from public.matches where id = :'rm' \gset
 select set_config('app.uid', '22222222-2222-2222-2222-222222222222', false);
 select public.join_match(:'rc');
+update public.matches set ranked = true where id = :'rm';
 select public.resign_match(:'rm');
 
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);

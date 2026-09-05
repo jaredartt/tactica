@@ -218,6 +218,13 @@ their own units and drop it anywhere on their own half; dropping onto one of
 your own swaps the pair. Press Ready; the match starts when both have, or when
 the clock runs out.
 
+**Modes.** Ranked is the only thing that moves your LP: you queue, and the
+server pairs you with the nearest rating it can find, widening what it will
+accept the longer you wait. Hosting a room, joining a code, playing the bot and
+rematches are all off the record entirely. Practice has three difficulties; the
+bot has no account, plays through the same `cn_move`/`cn_attack` the client
+does, and decides one action per call so you watch it think.
+
 **A turn** is 30 seconds. Each of your units may move once and act once;
 attacking also ends that unit's movement. Lose all four and you lose.
 

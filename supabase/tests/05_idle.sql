@@ -25,6 +25,9 @@ $$;
 create or replace function t_away(p_m uuid) returns text
 language sql stable as $$ select state->>'away' from public.matches where id = p_m $$;
 
+-- rated, so the abandonment assertion below has a result row to look at
+update public.matches set ranked = true where id = :'mid';
+
 select set_config('app.uid', 'cccccccc-0000-0000-0000-000000000001', false);
 select t_ok(t_idle(:'mid','host') = 0 and t_away(:'mid') is null, 'a fresh match has nobody away');
 

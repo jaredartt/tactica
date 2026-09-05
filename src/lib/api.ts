@@ -113,3 +113,35 @@ export async function setReady(matchId: string) {
 export async function claimWin(matchId: string) {
   return unwrap(await supabase.rpc('claim_win', { p_match: matchId }).single())
 }
+
+/** Practice against the machine. A real room with a real board -- the bot
+ *  plays through the same Postgres functions your clicks do. */
+export async function createBotMatch(level: number): Promise<MatchRow> {
+  return unwrap(await supabase.rpc('create_bot_match', { p_level: level }).single())
+}
+
+/** Ask the bot for its next single action. Safe for anyone to call: the server
+ *  refuses unless it really is a bot match and really is the bot's turn. */
+export async function botStep(matchId: string) {
+  const { error } = await supabase.rpc('bot_step', { p_match: matchId })
+  if (error) console.warn('bot_step:', error.message)
+}
+
+export interface QueueState {
+  match: string | null
+  waiting: number
+}
+
+/** Keeps you in the ranked queue and looks for an opponent. Called every
+ *  couple of seconds while the queue screen is open; stop calling and you
+ *  drop out on your own after twenty-five seconds. */
+export async function rankedTick(): Promise<QueueState> {
+  const { data, error } = await supabase.rpc('ranked_tick')
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return data as QueueState
+}
+
+export async function leaveRanked() {
+  const { error } = await supabase.rpc('leave_ranked')
+  if (error) console.warn('leave_ranked:', error.message)
+}

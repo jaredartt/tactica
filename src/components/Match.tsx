@@ -4,7 +4,7 @@ import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
-  claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch,
+  botStep, claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch,
   resignMatch, setReady, submitAttack, submitMove,
 } from '../lib/api'
 import { DEPLOY_SECONDS, TURN_SECONDS, reachText, type Profile, type Side } from '../lib/types'
@@ -57,7 +57,12 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const theirSide: Side | null = mySide === 'host' ? 'guest' : mySide === 'guest' ? 'host' : null
   // They have missed three of their own turns in a row. Nothing has been
   // decided by that -- it only puts a button in front of the other player.
-  const theyAreAway = Boolean(theirSide && state?.away === theirSide && match?.status === 'active')
+  const theyAreAway = Boolean(
+    theirSide && state?.away === theirSide && match?.status === 'active' && match?.bot == null,
+  )
+  const botTurn = Boolean(
+    match?.bot != null && match.status === 'active' && state?.turn === 'guest' && !state?.winner,
+  )
 
   const onClock = match?.status === 'active' || deploying
   const clockLength = deploying ? DEPLOY_SECONDS : TURN_SECONDS
@@ -78,6 +83,17 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
       forceTimeout(match.id).then(refresh)
     }
   }, [remaining, match, onClock, state?.turnNumber, refresh])
+
+  // The bot plays one action per call, on a delay, so you watch it think
+  // instead of finding its whole turn already done. Every step is a fresh
+  // decision made by the server against the board as it now stands -- there is
+  // no plan held anywhere on this side. `updated_at` changing is what schedules
+  // the next one, so the chain stops on its own the moment the turn flips back.
+  useEffect(() => {
+    if (!botTurn || !match) return
+    const id = setTimeout(() => botStep(match.id).then(refresh), 650)
+    return () => clearTimeout(id)
+  }, [botTurn, match?.id, match?.updated_at, refresh])
 
   // The rematch is signalled by the finished room pointing at a new one, which
   // arrives over the realtime subscription we are already holding. Whoever
@@ -157,6 +173,8 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
               ? mySide
                 ? iAmReady ? 'Waiting for your opponent' : 'Place your units'
                 : 'Both sides are deploying'
+              : botTurn
+                ? `${match.guest_name} is thinking`
               : isMyTurn
                 ? 'Your turn'
                 : mySide
