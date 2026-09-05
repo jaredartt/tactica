@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { Logo } from './Logo'
 
 function EyeIcon({ open }: { open: boolean }) {
   return (
@@ -108,6 +109,7 @@ export function Auth() {
   return (
     <div className="center-stage">
       <div className="panel auth">
+        <Logo className="logo logo-hero" title="Crown Nemesis" />
         <h1 className="wordmark">CROWN<br />NEMESIS</h1>
         <p className="muted">A competitive tactics arena.</p>
 

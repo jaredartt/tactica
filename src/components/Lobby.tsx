@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { createMatch, joinMatch, sweepMatches } from '../lib/api'
 import { tierOf, type LadderRow, type MatchRow, type Profile } from '../lib/types'
+import { Logo } from './Logo'
 
 interface Card {
   id: string
@@ -90,7 +91,10 @@ export function Lobby({ profile, onEnter }: Props) {
       <div className="menu-bg" aria-hidden="true" />
 
       <header className="menu-head">
-        <h1 className="wordmark small">CROWN NEMESIS</h1>
+        <div className="brand">
+          <Logo className="logo" title="Crown Nemesis" />
+          <h1 className="wordmark small">CROWN NEMESIS</h1>
+        </div>
         <div className="menu-who">
           <span className="muted">
             {profile.username}

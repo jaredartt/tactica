@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Auth } from './components/Auth'
 import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
+import { Logo } from './components/Logo'
 import { useAuth } from './lib/useAuth'
 import { configured } from './lib/supabase'
 
@@ -33,7 +34,12 @@ export default function App() {
     )
   }
 
-  if (loading) return <div className="center-stage"><p className="muted">…</p></div>
+  if (loading)
+    return (
+      <div className="center-stage">
+        <Logo className="logo logo-hero is-waiting" title="Crown Nemesis" />
+      </div>
+    )
   if (!session) return <Auth />
   if (!profile) return <div className="center-stage"><p className="muted">Setting up your profile…</p></div>
   if (matchId)

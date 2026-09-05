@@ -78,6 +78,26 @@ code {
 .wordmark { margin: 0 0 6px; font-size: 27px; letter-spacing: -0.01em; line-height: 1.1; }
 .wordmark.small { font-size: 16px; }
 
+/* ---------- the mark ------------------------------------------------------
+   Every edge in it is at 45 degrees, which is the same geometry as the board,
+   so it sits next to the arena rather than on top of it. Sized in one place
+   per context; the SVG itself carries no dimensions. */
+.logo { display: block; height: auto; width: 28px; }
+.logo-hero { width: 60px; margin: 0 0 20px; }
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .wordmark { margin: 0; }
+.brand .logo { flex: none; width: 30px; }
+
+/* The only thing on screen while the session is being checked, so it breathes
+   rather than sitting there looking stalled. */
+.logo.is-waiting { animation: logobreathe 1.5s ease-in-out infinite; }
+@keyframes logobreathe {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) { .logo.is-waiting { animation: none; } }
+
 /* ---------- controls ------------------------------------------------------ */
 
 label { display: block; margin: 16px 0; }
