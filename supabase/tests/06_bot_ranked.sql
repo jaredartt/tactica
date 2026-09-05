@@ -23,8 +23,13 @@ select t_ok((select guest_name from public.matches where id=:'bm') = 'SHARP', 'i
 select t_ok((select status from public.matches where id=:'bm') = 'deploying', 'you still get to deploy');
 select t_ok((select (state->'ready'->>'guest')::boolean from public.matches where id=:'bm'),
             'and it is ready before you start');
-select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'bm') = 8,
-            'both armies are on the board');
+select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'bm') = 0,
+            'no army is in the readable row while you deploy');
+select t_ok(t_dcount(:'bm','host') = 4 and t_dcount(:'bm','guest') = 4,
+            'both armies exist privately, the bot''s included');
+select t_ok((select user_id is null from public.match_deploy
+              where match_id=:'bm' and side='guest'),
+            'the bot''s row belongs to nobody, so it is invisible to everyone');
 
 -- nobody can walk into the bot's seat
 select set_config('app.uid', 'f0000000-0000-0000-0000-000000000002', false);

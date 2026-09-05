@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { MatchRow } from './types'
+import type { MatchRow, Unit } from './types'
 
 /**
  * Every one of these is a call to a Postgres function that validates the move
@@ -92,14 +92,30 @@ export async function setDeck(deck: string[]): Promise<string[]> {
   return data as string[]
 }
 
-/** Move one of your units during deployment. Dropping onto one of your own
- *  swaps the two. */
-export async function deployUnit(matchId: string, unitId: string, x: number, y: number) {
-  return unwrap(
-    await supabase
-      .rpc('deploy_unit', { p_match: matchId, p_unit: unitId, p_x: x, p_y: y })
-      .single(),
-  )
+/**
+ * Move one of your units during deployment. Dropping onto one of your own
+ * swaps the two.
+ *
+ * Returns YOUR four and nothing else, because during this phase the two armies
+ * are not in the match row -- your opponent's positions are somewhere you have
+ * no permission to look, which is the only way to stop someone reading them
+ * out of the network tab and setting up against what they saw.
+ */
+export async function deployUnit(
+  matchId: string, unitId: string, x: number, y: number,
+): Promise<Unit[]> {
+  const { data, error } = await supabase
+    .rpc('deploy_unit', { p_match: matchId, p_unit: unitId, p_x: x, p_y: y })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data ?? []) as Unit[]
+}
+
+/** Your own half of a deployment in progress. Null once the match has started,
+ *  when both armies are on the board for real. */
+export async function myDeploy(matchId: string): Promise<Unit[] | null> {
+  const { data, error } = await supabase.rpc('my_deploy', { p_match: matchId })
+  if (error) { console.warn('my_deploy:', error.message); return null }
+  return (data as Unit[] | null) ?? null
 }
 
 /** Lock your half in. The match starts when both players have. */

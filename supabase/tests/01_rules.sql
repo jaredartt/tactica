@@ -68,20 +68,26 @@ select public.join_match(:'mcode');
 
 select t_ok((select status from public.matches where id=:'mid') = 'deploying',
             'joining opens the deployment phase, not the match');
-select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 8,
-            'four units a side are on the board from the start');
-select t_ok((select count(*) = 4 from public.matches m, jsonb_array_elements(m.state->'units') u
-              where m.id=:'mid' and u->>'owner'='host' and (u->>'y')::int >= 3),
+
+-- The whole point: while you are arranging your four, NOBODY's four are in the
+-- row every signed-in player can read.
+select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 0,
+            'no army is in the readable match row during deployment');
+select t_ok(t_dcount(:'mid','host') = 4 and t_dcount(:'mid','guest') = 4,
+            'both armies exist, one private row each');
+select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
+              where d.match_id=:'mid' and d.side='host' and (u->>'y')::int >= 3),
             'the host army starts on the host half');
-select t_ok((select count(*) = 4 from public.matches m, jsonb_array_elements(m.state->'units') u
-              where m.id=:'mid' and u->>'owner'='guest' and (u->>'y')::int < 3),
+select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
+              where d.match_id=:'mid' and d.side='guest' and (u->>'y')::int < 3),
             'the guest army starts on the guest half');
-select t_ok(t_get(:'mid','g1','name') = 'Titan', 'the guest fields the deck they chose');
-select t_ok(t_get(:'mid','h2','name') = 'Archer', 'the host fields the deck they chose');
-select t_ok((select count(*) = 0 from public.matches m,
-                 jsonb_array_elements(m.state->'units') u,
+select t_ok(t_dget(:'mid','guest','g1','name') = 'Titan', 'the guest fields the deck they chose');
+select t_ok(t_dget(:'mid','host','h2','name') = 'Archer', 'the host fields the deck they chose');
+select t_ok((select count(*) = 0 from public.match_deploy d,
+                 jsonb_array_elements(d.units) u, public.matches m,
                  jsonb_array_elements(m.state->'obstacles') o
-              where m.id=:'mid' and u->>'x'=o->>'x' and u->>'y'=o->>'y'),
+              where d.match_id=:'mid' and m.id=:'mid'
+                and u->>'x'=o->>'x' and u->>'y'=o->>'y'),
             'nobody is standing in a tree');
 
 select t_raises(format('select public.submit_move(%L,''g1'',1,1)', :'mid'),
@@ -96,11 +102,12 @@ select t_raises(format('select public.deploy_unit(%L,''g1'',9,9)', :'mid'),
 
 select t_trees(:'mid', '[]'::jsonb);
 select public.deploy_unit(:'mid', 'g1', 2, 2);
-select t_ok(t_get(:'mid','g1','x') = '2' and t_get(:'mid','g1','y') = '2', 'unit deployed');
+select t_ok(t_dget(:'mid','guest','g1','x') = '2' and t_dget(:'mid','guest','g1','y') = '2',
+            'unit deployed');
 
-select t_place(:'mid', 'g2', 4, 2);
+select t_dplace(:'mid', 'guest', 'g2', 4, 2);
 select public.deploy_unit(:'mid', 'g1', 4, 2);
-select t_ok(t_get(:'mid','g1','x') = '4' and t_get(:'mid','g2','x') = '2',
+select t_ok(t_dget(:'mid','guest','g1','x') = '4' and t_dget(:'mid','guest','g2','x') = '2',
             'dropping onto your own unit swaps the two');
 
 select t_trees(:'mid', '[{"id":"t1","x":1,"y":1,"hp":30,"maxHp":30}]'::jsonb);
@@ -124,6 +131,8 @@ select t_raises(format('select public.deploy_unit(%L,''g1'',3,1)', :'mid'),
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
 select public.set_ready(:'mid');
 select t_ok((select status from public.matches where id=:'mid') = 'active', 'both ready starts the match');
+select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 8,
+            'and that is the moment both armies appear on the board');
 select t_ok((select state->>'phase' from public.matches where id=:'mid') = 'battle', 'phase is battle');
 select t_ok((select turn_deadline > now() from public.matches where id=:'mid'), 'turn clock started');
 select t_ok((select state->>'turn' from public.matches where id=:'mid') = 'host', 'host acts first');
@@ -231,6 +240,11 @@ select t_norows(format('update public.matches set state = ''{}''::jsonb where id
                 'clients cannot write match state directly');
 select t_raises('insert into public.cards (name) values (''Cheat'')',
                 'policy', 'non-admins cannot add cards');
+-- bob is the guest in both rooms, so he should see guest rows and, however
+-- he asks, never a host one.
+select t_ok((select count(*) from public.match_deploy where side = 'host') = 0
+        and (select count(*) from public.match_deploy where side = 'guest') > 0,
+            'a player sees their own deployment and never the other side''s');
 select t_norows('update public.profiles set username = ''alice2'' where id = ''11111111-1111-1111-1111-111111111111''',
                 'cannot edit another player''s profile');
 

@@ -4,10 +4,13 @@ import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
-  botStep, claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch,
-  resignMatch, setReady, submitAttack, submitMove,
+  botStep, claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, myDeploy,
+  requestRematch, resignMatch, setReady, submitAttack, submitMove,
 } from '../lib/api'
-import { DEPLOY_SECONDS, TURN_SECONDS, reachText, type Profile, type Side } from '../lib/types'
+import {
+  DEPLOY_SECONDS, TURN_SECONDS, reachText,
+  type MatchState, type Profile, type Side, type Unit,
+} from '../lib/types'
 
 export function Match({ matchId, profile, onLeave, onGoTo }: {
   matchId: string
@@ -33,7 +36,15 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   // Which rail is showing. Only meaningful on a narrow screen, where the two
   // side panels become tabs instead of columns -- there is no room for both,
   // and a phone should never have to scroll a match.
-  const [rail, setRail] = useState<'chat' | 'log'>('log')
+  // null means neither is showing. On a phone the rails are a sheet that slides
+  // over the board rather than a column beside it, and the board is what you
+  // came for -- so nothing covers it until you ask.
+  const [rail, setRail] = useState<'chat' | 'log' | null>(null)
+  // Your own four during deployment. They are not in the match row -- the row
+  // is readable by everyone, and a setup you can read is a setup you can play
+  // against -- so they arrive through a function that will only ever hand you
+  // your own side.
+  const [myUnits, setMyUnits] = useState<Unit[] | null>(null)
   const firedFor = useRef<string>('')
 
   useEffect(() => {
@@ -52,7 +63,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const state = match?.state
   const deploying = match?.status === 'deploying'
   const isMyTurn = Boolean(match && mySide && match.status === 'active' && state?.turn === mySide)
-  const selectedUnit = state?.units.find((u) => u.id === selected) ?? null
+  // What the board draws. During deployment that is your half and the trees;
+  // the other half is genuinely empty, because nothing else has been sent.
+  const shown: MatchState | undefined =
+    state && match?.status === 'deploying' ? { ...state, units: myUnits ?? [] } : state
+  const selectedUnit = shown?.units.find((u) => u.id === selected) ?? null
   const iAmReady = Boolean(mySide && state?.ready?.[mySide])
   const theirSide: Side | null = mySide === 'host' ? 'guest' : mySide === 'guest' ? 'host' : null
   // They have missed three of their own turns in a row. Nothing has been
@@ -83,6 +98,13 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
       forceTimeout(match.id).then(refresh)
     }
   }, [remaining, match, onClock, state?.turnNumber, refresh])
+
+  useEffect(() => {
+    if (!matchId || match?.status !== 'deploying') { setMyUnits(null); return }
+    let alive = true
+    myDeploy(matchId).then((u) => { if (alive) setMyUnits(u) })
+    return () => { alive = false }
+  }, [matchId, match?.status])
 
   // The bot plays one action per call, on a delay, so you watch it think
   // instead of finding its whole turn already done. Every step is a fresh
@@ -208,7 +230,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
             <>
               <div className="arena">
                 <Board
-                  state={s}
+                  state={shown ?? s}
                   mySide={mySide}
                   isMyTurn={isMyTurn}
                   deploying={Boolean(deploying && !iAmReady)}
@@ -216,7 +238,9 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   onSelect={setSelected}
                   onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
                   onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
-                  onDeploy={(id, x, y) => guard(() => deployUnit(match.id, id, x, y))}
+                  onDeploy={(id, x, y) =>
+                    guard(async () => setMyUnits(await deployUnit(match.id, id, x, y)))
+                  }
                 />
               </div>
 
@@ -301,8 +325,8 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                       </button>
                       <span className="hint">
                         {iAmReady
-                          ? 'Your half is locked in. The match starts when they are ready too.'
-                          : 'Pick a unit, then a lit tile on your half. Dropping onto one of your own swaps them.'}
+                          ? 'Locked in. It starts when they are ready too.'
+                          : 'Pick a unit, then a lit tile. Drop on your own to swap.'}
                       </span>
                     </>
                   ) : (
@@ -318,13 +342,13 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                     </button>
                     <span className="hint">
                       {isMyTurn
-                        ? 'Click a unit, then a lit tile to move or a marked enemy to strike.'
+                        ? 'Pick a unit, then a lit tile or a marked enemy.'
                         : 'Waiting for your opponent.'}
                     </span>
                   </>
                 ) : (
                   <span className="hint">
-                    Spectating — you can chat, but the board isn&rsquo;t yours to touch.
+                    Spectating — you can chat, but the board isn&rsquo;t yours.
                   </span>
                 )}
               </div>
@@ -336,10 +360,18 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
         <BattleLog log={s.log} open={rail === 'log'} />
 
         <nav className="railtabs" role="tablist" aria-label="Side panels">
-          <button role="tab" aria-selected={rail === 'chat'} onClick={() => setRail('chat')}>
+          <button
+            role="tab"
+            aria-selected={rail === 'chat'}
+            onClick={() => setRail((r) => (r === 'chat' ? null : 'chat'))}
+          >
             Chat{messages.length > 0 ? ` (${messages.length})` : ''}
           </button>
-          <button role="tab" aria-selected={rail === 'log'} onClick={() => setRail('log')}>
+          <button
+            role="tab"
+            aria-selected={rail === 'log'}
+            onClick={() => setRail((r) => (r === 'log' ? null : 'log'))}
+          >
             Battle log
           </button>
         </nav>

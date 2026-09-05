@@ -123,3 +123,31 @@ begin
     perform t_place(p_m, u, i - 1, case when left(u,1) = 'h' then 5 else 0 end);
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- During deployment the two armies are not in the match row at all -- that is
+-- the point of it -- so reading and rigging them needs its own set.
+-- ---------------------------------------------------------------------------
+create or replace function t_dep(p_m uuid, p_side text) returns jsonb
+language sql stable as $$
+  select units from public.match_deploy where match_id = p_m and side = p_side;
+$$;
+
+create or replace function t_dcount(p_m uuid, p_side text) returns int
+language sql stable as $$ select jsonb_array_length(t_dep(p_m, p_side)) $$;
+
+create or replace function t_dget(p_m uuid, p_side text, p_u text, p_key text) returns text
+language sql stable as $$
+  select u->>p_key from public.match_deploy d, jsonb_array_elements(d.units) u
+   where d.match_id = p_m and d.side = p_side and u->>'id' = p_u;
+$$;
+
+create or replace function t_dplace(p_m uuid, p_side text, p_u text, p_x int, p_y int)
+returns void language sql as $$
+  update public.match_deploy set units = (
+    select jsonb_agg(case when u->>'id' = p_u
+             then jsonb_set(jsonb_set(u, '{x}', to_jsonb(p_x)), '{y}', to_jsonb(p_y))
+             else u end)
+      from jsonb_array_elements(units) u)
+   where match_id = p_m and side = p_side;
+$$;

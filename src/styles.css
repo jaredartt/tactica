@@ -985,30 +985,44 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .nameplate em { margin-left: 5px; }
   .roomcode { font-size: 11px; padding: 5px 10px; }
 
-  .stage { display: flex; flex-direction: column; min-height: 0; }
-  .center { order: 0; flex: 1 1 auto; padding: 14px 10px 10px; gap: 12px; }
+  /* The board is the whole point, so on a phone nothing shares the screen with
+     it. Chat and the log become a sheet that slides OVER the board when you
+     ask for one, and neither is open to begin with -- a rail parked next to
+     the arena was taking a third of the height and leaving a board you could
+     not read. */
+  .stage {
+    position: relative;
+    display: flex; flex-direction: column; min-height: 0;
+    --tabs-h: 44px;
+  }
+  .center { order: 0; flex: 1 1 auto; padding: 12px 10px 8px; gap: 10px; }
   .railtabs { order: 1; }
-  .side { order: 2; }
 
   .railtabs {
-    display: flex; flex: none;
-    border-top: 1px solid var(--line);
+    display: flex; flex: none; height: var(--tabs-h);
+    border-top: 1px solid var(--line); background: var(--paper);
+    position: relative; z-index: 21;
   }
   .railtabs button {
-    flex: 1; padding: 11px 8px; border: 0; background: none;
+    flex: 1; padding: 0 8px; border: 0; background: none;
     font: inherit; font-size: 12px; color: var(--muted); cursor: pointer;
     border-bottom: 2px solid transparent;
   }
   .railtabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--you); }
 
-  /* Only the chosen rail is mounted on screen, at a fixed share of the
-     viewport, so the board keeps the rest. Its contents scroll; the page
-     does not. */
-  .side { display: none; flex: none; height: 30dvh; }
+  .side {
+    position: absolute; left: 0; right: 0; bottom: var(--tabs-h); z-index: 20;
+    display: none; height: 54dvh;
+    background: var(--paper); border-top: 1px solid var(--line);
+    box-shadow: 0 -14px 34px rgba(14, 14, 20, 0.14);
+    animation: sheetup 0.22s cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
   .side.is-open { display: flex; }
-  .side-left, .side-right { border: 0; }
+  .side-left, .side-right { border-left: 0; border-right: 0; }
   .side-title { display: none; }
   .side-body { padding: 10px 14px; }
+  @keyframes sheetup { from { transform: translateY(100%); } }
+  @media (prefers-reduced-motion: reduce) { .side { animation: none; } }
 
   /* Fixed, not minimum: on a phone the rail below eats enough of the screen
      that the arena is height-bound, so any change here really does resize the
@@ -1021,7 +1035,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .awaybar { gap: 8px 10px; padding: 7px 8px 7px 12px; font-size: 12px; border-radius: 10px; }
   .unitbar-ability { display: none; }
   .actionbar { gap: 8px; }
-  .actionbar .hint { flex: 1 1 100%; text-align: center; }
+  .actionbar { gap: 8px 10px; }
+  .actionbar .hint {
+    flex: 1 1 100%; text-align: center; font-size: 11px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .btn { padding: 9px 14px; }
   .btn { padding: 10px 15px; }
 }
 
