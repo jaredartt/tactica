@@ -4,12 +4,24 @@ export interface Unit {
   id: string
   owner: Side
   cardId: string
+  slug: string
   name: string
   hp: number
   maxHp: number
-  atk: number
   mov: number
-  rng: number
+  /** Attack reach, in tiles, counting a diagonal as one. An Archer is 2..2 --
+   *  it cannot shoot something standing next to it. */
+  rmin: number
+  rmax: number
+  /** Counter reach. Separate from the attack reach on purpose: it is the only
+   *  thing that decides whether a defender strikes back. */
+  crmin: number
+  crmax: number
+  dmin: number
+  dmax: number
+  burns: boolean
+  heals: boolean
+  burned: boolean
   accent: string
   art: string | null
   ability: string
@@ -19,27 +31,44 @@ export interface Unit {
   acted: boolean
 }
 
+/** A tree. Blocks feet and arrows, has 30 HP, and can be cut down. */
+export interface Obstacle {
+  id: string
+  x: number
+  y: number
+  hp: number
+  maxHp: number
+}
+
 export interface LogEntry {
   n: number
   turn: number
   text: string
 }
 
-/** Structured record of the last attack, written by the database so the
+/** Structured record of the last exchange, written by the database so the
  *  clients can animate it without parsing the log text. */
 export interface Fx {
   seq: number
   atk: string
   tgt: string
   dmg: number
+  heal: number
   killedTgt: boolean
   counter: number
   killedAtk: boolean
+  burnAtk: number
+  burnTgt: number
+  newBurn: boolean
+  tree: boolean
 }
 
 export interface MatchState {
   v: number
   board: { w: number; h: number }
+  phase: 'deploy' | 'battle'
+  ready: Record<Side, boolean>
+  obstacles: Obstacle[]
   turn: Side
   turnNumber: number
   units: Unit[]
@@ -48,6 +77,8 @@ export interface MatchState {
   fx?: Fx
 }
 
+export type MatchStatus = 'waiting' | 'deploying' | 'active' | 'finished'
+
 export interface MatchRow {
   id: string
   code: string
@@ -55,7 +86,7 @@ export interface MatchRow {
   guest_id: string | null
   host_name: string
   guest_name: string | null
-  status: 'waiting' | 'active' | 'finished'
+  status: MatchStatus
   state: MatchState
   turn_deadline: string | null
   winner: Side | null
@@ -75,6 +106,26 @@ export interface Message {
   created_at: string
 }
 
+export interface Card {
+  id: string
+  slug: string
+  name: string
+  hp: number
+  mov: number
+  rmin: number
+  rmax: number
+  crmin: number
+  crmax: number
+  dmin: number
+  dmax: number
+  burns: boolean
+  heals: boolean
+  ability: string
+  accent: string
+  art_url: string | null
+  sort: number
+}
+
 export interface Profile {
   id: string
   username: string
@@ -84,6 +135,7 @@ export interface Profile {
   losses: number
   games: number
   streak: number
+  deck: string[] | null
 }
 
 export interface LadderRow {
@@ -111,3 +163,7 @@ export const TIERS = [
 export const tierOf = (lp: number) => TIERS.find((t) => lp >= t.at)!.name
 
 export const TURN_SECONDS = 30
+export const DEPLOY_SECONDS = 90
+export const DECK_SIZE = 4
+
+export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)

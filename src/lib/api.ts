@@ -83,3 +83,26 @@ export async function requestRematch(matchId: string): Promise<string | null> {
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
   return (data as string | null) ?? null
 }
+
+/** Save your four. The server re-checks the count, the duplicates and that
+ *  every card is really in the roster. */
+export async function setDeck(deck: string[]): Promise<string[]> {
+  const { data, error } = await supabase.rpc('set_deck', { p_deck: deck })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return data as string[]
+}
+
+/** Move one of your units during deployment. Dropping onto one of your own
+ *  swaps the two. */
+export async function deployUnit(matchId: string, unitId: string, x: number, y: number) {
+  return unwrap(
+    await supabase
+      .rpc('deploy_unit', { p_match: matchId, p_unit: unitId, p_x: x, p_y: y })
+      .single(),
+  )
+}
+
+/** Lock your half in. The match starts when both players have. */
+export async function setReady(matchId: string) {
+  return unwrap(await supabase.rpc('set_ready', { p_match: matchId }).single())
+}

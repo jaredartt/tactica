@@ -1,22 +1,13 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { createMatch, joinMatch, sweepMatches } from '../lib/api'
-import { tierOf, type LadderRow, type MatchRow, type Profile } from '../lib/types'
+import { createMatch, joinMatch, setDeck, sweepMatches } from '../lib/api'
+import {
+  DECK_SIZE, reachText, tierOf,
+  type Card, type LadderRow, type MatchRow, type Profile,
+} from '../lib/types'
 import { Logo } from './Logo'
 
-interface Card {
-  id: string
-  name: string
-  hp: number
-  attack: number
-  move: number
-  range: number
-  ability: string
-  accent: string
-  art_url: string | null
-}
-
-type Panel = 'none' | 'join' | 'spectate' | 'roster' | 'ladder'
+type Panel = 'none' | 'join' | 'spectate' | 'roster' | 'ladder' | 'deck'
 
 interface Props {
   profile: Profile
@@ -31,6 +22,10 @@ export function Lobby({ profile, onEnter }: Props) {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // The deck being edited. Starts from what is saved, or from whatever the
+  // server would field on your behalf if you have never chosen.
+  const [deck, setDeckDraft] = useState<string[]>(profile.deck ?? [])
+  const [savedDeck, setSavedDeck] = useState<string[]>(profile.deck ?? [])
 
   async function loadRooms() {
     // Clear out rooms nobody is sitting in before showing the list, so the
@@ -39,7 +34,7 @@ export function Lobby({ profile, onEnter }: Props) {
     const { data } = await supabase
       .from('matches')
       .select('*')
-      .in('status', ['waiting', 'active'])
+      .in('status', ['waiting', 'deploying', 'active'])
       .order('created_at', { ascending: false })
       .limit(20)
     if (data) setRooms(data as MatchRow[])
@@ -52,12 +47,12 @@ export function Lobby({ profile, onEnter }: Props) {
   }, [])
 
   useEffect(() => {
-    if (panel !== 'roster' || roster.length) return
+    if ((panel !== 'roster' && panel !== 'deck') || roster.length) return
     supabase
       .from('cards')
       .select('*')
       .eq('is_active', true)
-      .order('name')
+      .order('sort')
       .then(({ data }) => data && setRoster(data as Card[]))
   }, [panel, roster.length])
 
@@ -85,6 +80,28 @@ export function Lobby({ profile, onEnter }: Props) {
   }
 
   const openCount = rooms.filter((r) => r.status === 'waiting' && r.host_id !== profile.id).length
+  const deckSet = savedDeck.length === DECK_SIZE
+  const effectiveDeck = deckSet ? savedDeck : roster.slice(0, DECK_SIZE).map((c) => c.slug)
+
+  function toggleCard(slug: string) {
+    setErr(null)
+    setDeckDraft((d) =>
+      d.includes(slug) ? d.filter((s2) => s2 !== slug)
+      : d.length >= DECK_SIZE ? d
+      : [...d, slug])
+  }
+
+  async function saveDeck() {
+    setBusy(true); setErr(null)
+    try {
+      const saved = await setDeck(deck)
+      setSavedDeck(saved)
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="menu">
@@ -130,6 +147,13 @@ export function Lobby({ profile, onEnter }: Props) {
           note={openCount > 0 ? `${rooms.length} live` : `${rooms.length} live`}
           active={panel === 'spectate'}
           onClick={() => setPanel(panel === 'spectate' ? 'none' : 'spectate')}
+        />
+        <MenuTile
+          className="mt-deck"
+          label="Deck"
+          note={deckSet ? `${DECK_SIZE} chosen` : 'Not chosen yet'}
+          active={panel === 'deck'}
+          onClick={() => setPanel(panel === 'deck' ? 'none' : 'deck')}
         />
         <MenuTile
           className="mt-roster"
@@ -242,6 +266,57 @@ export function Lobby({ profile, onEnter }: Props) {
         </section>
       )}
 
+      {panel === 'deck' && (
+        <section className="menu-panel">
+          <p className="muted deckintro">
+            Four of the six, no repeats. Both armies are on the board before the
+            first turn, and you arrange yours then.
+          </p>
+          <div className="deckgrid">
+            {roster.map((c) => {
+              const picked = deck.includes(c.slug)
+              const n = deck.indexOf(c.slug) + 1
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`dcard${picked ? ' is-picked' : ''}`}
+                  style={{ '--accent': c.accent } as React.CSSProperties}
+                  aria-pressed={picked}
+                  onClick={() => toggleCard(c.slug)}
+                >
+                  <span className="dcard-pick">{picked ? n : ''}</span>
+                  <span className="dcard-art">
+                    {c.art_url ? <img src={c.art_url} alt="" /> : <span>{c.name[0]}</span>}
+                  </span>
+                  <span className="dcard-name">{c.name}</span>
+                  <span className="dcard-stats">
+                    <b>{c.hp} HP</b>
+                    <b>{c.dmin}–{c.dmax} {c.heals ? 'PWR' : 'DMG'}</b>
+                    <b>MOV {c.mov}</b>
+                    <b>RNG {reachText(c.rmin, c.rmax)}</b>
+                  </span>
+                  <span className="dcard-ability">{c.ability}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="deckfoot">
+            <span className="muted tiny">
+              {deck.length}/{DECK_SIZE} chosen
+              {!deckSet && ` — until you save, you field ${effectiveDeck.join(', ')}`}
+            </span>
+            <button
+              className="btn primary"
+              disabled={busy || deck.length !== DECK_SIZE || deck.join() === savedDeck.join()}
+              onClick={saveDeck}
+            >
+              {deck.join() === savedDeck.join() && deckSet ? 'Saved' : 'Save deck'}
+            </button>
+          </div>
+        </section>
+      )}
+
       {panel === 'roster' && (
         <section className="menu-panel">
           <div className="rosterlist">
@@ -254,9 +329,10 @@ export function Lobby({ profile, onEnter }: Props) {
                   <h3>{c.name}</h3>
                   <dl className="rcard-stats">
                     <div><dt>HP</dt><dd>{c.hp}</dd></div>
-                    <div><dt>ATK</dt><dd>{c.attack}</dd></div>
-                    <div><dt>MOV</dt><dd>{c.move}</dd></div>
-                    <div><dt>RNG</dt><dd>{c.range}</dd></div>
+                    <div><dt>{c.heals ? 'PWR' : 'DMG'}</dt><dd>{c.dmin}–{c.dmax}</dd></div>
+                    <div><dt>MOV</dt><dd>{c.mov}</dd></div>
+                    <div><dt>RNG</dt><dd>{reachText(c.rmin, c.rmax)}</dd></div>
+                    <div><dt>CTR</dt><dd>{reachText(c.crmin, c.crmax)}</dd></div>
                   </dl>
                   {c.ability && <p>{c.ability}</p>}
                 </div>

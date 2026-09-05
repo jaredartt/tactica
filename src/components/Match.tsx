@@ -3,8 +3,11 @@ import { Board } from './Board'
 import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
-import { endTurn, forceTimeout, leaveMatch, requestRematch, resignMatch, submitAttack, submitMove } from '../lib/api'
-import { TURN_SECONDS, type Profile, type Side } from '../lib/types'
+import {
+  deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch, resignMatch,
+  setReady, submitAttack, submitMove,
+} from '../lib/api'
+import { DEPLOY_SECONDS, TURN_SECONDS, reachText, type Profile, type Side } from '../lib/types'
 
 export function Match({ matchId, profile, onLeave, onGoTo }: {
   matchId: string
@@ -47,26 +50,30 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
         : null
 
   const state = match?.state
+  const deploying = match?.status === 'deploying'
   const isMyTurn = Boolean(match && mySide && match.status === 'active' && state?.turn === mySide)
   const selectedUnit = state?.units.find((u) => u.id === selected) ?? null
+  const iAmReady = Boolean(mySide && state?.ready?.[mySide])
 
+  const onClock = match?.status === 'active' || deploying
+  const clockLength = deploying ? DEPLOY_SECONDS : TURN_SECONDS
   const remaining = useMemo(() => {
-    if (!match?.turn_deadline || match.status !== 'active') return null
+    if (!match?.turn_deadline || !onClock) return null
     return (new Date(match.turn_deadline).getTime() - (now + clockOffset)) / 1000
-  }, [match?.turn_deadline, match?.status, now, clockOffset])
+  }, [match?.turn_deadline, onClock, now, clockOffset])
 
   // Nobody is running a game server, so the clients enforce the clock by
   // *asking* the database to expire the turn. The function refuses unless the
   // deadline has genuinely passed according to Postgres, so this is safe to
   // call from either player or from a spectator.
   useEffect(() => {
-    if (!match || match.status !== 'active' || remaining === null) return
-    const stamp = `${match.id}:${state?.turnNumber}`
+    if (!match || !onClock || remaining === null) return
+    const stamp = `${match.id}:${match.status}:${state?.turnNumber}`
     if (remaining < -2 && firedFor.current !== stamp) {
       firedFor.current = stamp
       forceTimeout(match.id).then(refresh)
     }
-  }, [remaining, match, state?.turnNumber, refresh])
+  }, [remaining, match, onClock, state?.turnNumber, refresh])
 
   // The rematch is signalled by the finished room pointing at a new one, which
   // arrives over the realtime subscription we are already holding. Whoever
@@ -103,7 +110,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   }
 
   const s = match.state
-  const pct = remaining === null ? 0 : Math.max(0, Math.min(1, remaining / TURN_SECONDS))
+  const pct = remaining === null ? 0 : Math.max(0, Math.min(1, remaining / clockLength))
   const urgent = remaining !== null && remaining <= 8
 
   return (
@@ -136,17 +143,21 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
         </div>
       </header>
 
-      {match.status === 'active' && (
+      {onClock && (
         <div className={`turnbar ${urgent ? 'urgent' : ''}`}>
           <div className="timerbar">
             <div className="timerfill" style={{ width: `${pct * 100}%` }} />
           </div>
           <div className="timertext">
-            {isMyTurn
-              ? 'Your turn'
-              : mySide
-                ? 'Opponent thinking'
-                : `${s.turn === 'host' ? match.host_name : match.guest_name} to act`}
+            {deploying
+              ? mySide
+                ? iAmReady ? 'Waiting for your opponent' : 'Place your units'
+                : 'Both sides are deploying'
+              : isMyTurn
+                ? 'Your turn'
+                : mySide
+                  ? 'Opponent thinking'
+                  : `${s.turn === 'host' ? match.host_name : match.guest_name} to act`}
             {' · '}
             {Math.max(0, Math.ceil(remaining ?? 0))}s
           </div>
@@ -175,13 +186,15 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
             <>
               <div className="arena">
                 <Board
-                state={s}
-                mySide={mySide}
-                isMyTurn={isMyTurn}
-                selectedId={selected}
-                onSelect={setSelected}
-                onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
-                onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
+                  state={s}
+                  mySide={mySide}
+                  isMyTurn={isMyTurn}
+                  deploying={Boolean(deploying && !iAmReady)}
+                  selectedId={selected}
+                  onSelect={setSelected}
+                  onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
+                  onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
+                  onDeploy={(id, x, y) => guard(() => deployUnit(match.id, id, x, y))}
                 />
               </div>
 
@@ -195,9 +208,10 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   <span className="unitbar-name">{selectedUnit.name}</span>
                   <span className="unitbar-stats">
                     <b>{selectedUnit.hp}</b>/{selectedUnit.maxHp} HP
-                    <i /><b>{selectedUnit.atk}</b> ATK
+                    <i /><b>{selectedUnit.dmin}–{selectedUnit.dmax}</b>{' '}
+                    {selectedUnit.heals ? 'PWR' : 'DMG'}
                     <i /><b>{selectedUnit.mov}</b> MOV
-                    <i /><b>{selectedUnit.rng}</b> RNG
+                    <i /><b>{reachText(selectedUnit.rmin, selectedUnit.rmax)}</b> RNG
                   </span>
                   {selectedUnit.ability && <span className="unitbar-ability">{selectedUnit.ability}</span>}
                 </div>
@@ -229,6 +243,28 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                         : 'Both of you have to want it.'}
                     </span>
                   </>
+                ) : deploying ? (
+                  mySide ? (
+                    <>
+                      <button
+                        className="btn primary"
+                        disabled={iAmReady}
+                        onClick={() => guard(() => setReady(match.id))}
+                      >
+                        {iAmReady ? 'Waiting for them…' : 'Ready'}
+                      </button>
+                      <button className="btn ghost" onClick={() => guard(() => resignMatch(match.id))}>
+                        Leave
+                      </button>
+                      <span className="hint">
+                        {iAmReady
+                          ? 'Your half is locked in. The match starts when they are ready too.'
+                          : 'Pick a unit, then a lit tile on your half. Dropping onto one of your own swaps them.'}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="hint">Both sides are placing their units.</span>
+                  )
                 ) : mySide ? (
                   <>
                     <button className="btn primary" onClick={() => guard(() => endTurn(match.id))} disabled={!isMyTurn}>

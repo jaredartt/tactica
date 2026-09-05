@@ -29,11 +29,16 @@ sleep 1
 
 psql -q -v ON_ERROR_STOP=1 -o /dev/null -c "create extension if not exists pgcrypto;"
 psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/tests/00_supabase_stub.sql 2>/dev/null
+HELPERS=supabase/tests/_helpers.sql
 for m in supabase/migrations/*.sql; do
   psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$m" 2>/dev/null
 done
 
+# helpers go in after the migrations, because they lean on the real tables
+psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$HELPERS" 2>/dev/null
+
 for t in supabase/tests/0[1-9]*.sql; do
+  echo "--- $(basename "$t")"
   psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 \
     | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ERROR|---'
 done

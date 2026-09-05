@@ -29,7 +29,7 @@ export function useAuth() {
       for (let i = 0; i < 6 && !cancelled; i++) {
         const { data } = await supabase
           .from('profiles')
-          .select('id, username, is_admin, lp, wins, losses, games, streak')
+          .select('id, username, is_admin, lp, wins, losses, games, streak, deck')
           .eq('id', session.user.id)
           .maybeSingle()
         if (data) {

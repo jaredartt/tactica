@@ -170,13 +170,56 @@ Tiers: Bronze 0 · Silver 300 · Gold 600 · Platinum 900 · Diamond 1200 · Cro
 a match twice, and it is revoked from clients. Results are written to
 `match_results`, which is why they survive the room being swept.
 
-### Current placeholder rules
+### The rules
 
-Deliberately thin. 5×5 grid, two units a side, mirrored so it's fair. Per
-turn each of your units may move once (Manhattan distance ≤ its `mov`, no
-stacking) and attack once (Manhattan distance ≤ its `rng`, damage = `atk`,
-flat). Attacking ends that unit's turn. Lose all units and you lose. 30
-seconds a turn, then it passes automatically.
+**The board.** 6x6. Canonically the guest holds rows 0-2 and the host rows 3-5,
+and each client rotates the board 180 degrees if it has to, so *both* players
+look at their own half from the bottom. A rotation, not a mirror -- reflecting
+would swap left and right and make every diagonal read wrong.
+
+**Distance is two different things, on purpose.** Movement counts steps along
+the grid and has to walk around trees, so a move range is a diamond with bites
+out of it. Reach counts a diagonal as one, so attacks and counters cover a
+square. Slow to close, wide to hit.
+
+**The roster.** Six units; each player brings four, no repeats.
+
+| | HP | MOV | Reach | Counters at | Damage | |
+|---|---|---|---|---|---|---|
+| Swordsman | 90 | 2 | 1 | 1 | 20-30 | |
+| Archer | 80 | 2 | exactly 2 | exactly 2 | 10-20 | |
+| Ninja | 60 | 3 | 1 | 1 | 20-30 | |
+| Titan | 100 | 1 | 1 | 1 | 30-40 | |
+| Mage | 70 | 2 | exactly 2 | 1 and 2 | 15-25 | sets the target burning |
+| Healer | 80 | 2 | 1 and 2 | 1 and 2 | 5-15 | or mends an ally instead |
+
+**Counters.** A defender strikes back when the attacker is standing inside the
+*defender's* counter reach. Nothing compares the two units' strength and there
+is no clause anywhere about archers: an archer shoots at exactly two, a
+swordsman answers at exactly one, so the swordsman cannot reach back -- while a
+second archer, whose counter reach is also exactly two, can. The rule falls out
+of the numbers, which is why every unit you add later gets it for free. A
+counter is free: it never costs the defender its own action.
+
+**Burn.** The Mage sets what it hits alight. A burning unit loses 5 HP every
+time it attacks or counterattacks, for the rest of the match. It lands at the
+end of the exchange, so the unit you just lit is not taxed for the counter it
+makes in that same breath -- it pays from its next swing on.
+
+**Trees.** Three per half, placed when the room is opened: never in a corner,
+never within one tile of another. They stop feet *and* arrows -- a tree within
+half a tile of the line between two units blocks the shot -- and they have 30
+HP, so a lane can be opened by cutting one down. The two halves are rolled
+independently, so the terrain is not mirrored.
+
+**Deployment.** When the second player joins, both armies are already on the
+board in a default formation. For 90 seconds either player may pick up any of
+their own units and drop it anywhere on their own half; dropping onto one of
+your own swaps the pair. Press Ready; the match starts when both have, or when
+the clock runs out.
+
+**A turn** is 30 seconds. Each of your units may move once and act once;
+attacking also ends that unit's movement. Lose all four and you lose.
 
 ---
 
@@ -198,14 +241,28 @@ finding out from a player.
 ## Project layout
 
 ```
-supabase/migrations/0001_init.sql   schema, RLS policies, and ALL game rules
+supabase/migrations/0001_init.sql   schema, RLS policies, the first rules
+supabase/migrations/0005_*.sql      the roster, terrain, deployment, decks
 supabase/tests/                     the rules, played out and asserted
+src/lib/rules.ts                    the client's copy of the geometry (see below)
 src/lib/api.ts                      thin wrappers over the Postgres functions
 src/lib/useMatch.ts                 realtime + poll fallback + server clock
-src/components/Board.tsx            the tilted arena and the unit cards
-src/components/Match.tsx            layout, turn clock, timeout enforcement
+src/components/Board.tsx            the arena, the cards, the trees
+src/components/Match.tsx            layout, clocks, deployment, timeout
+src/components/Lobby.tsx            menu, deck builder, roster, ladder
 src/styles.css                      the whole look
 ```
+
+---
+
+### Why `src/lib/rules.ts` is a duplicate
+
+It decides nothing. Every question it answers -- can this unit reach that tile,
+is that target in range, is a tree in the way -- is asked again by the Postgres
+function before anything moves, and only that answer counts. The copy exists so
+the board can light up the squares you may use *before* you click, which is the
+whole difference between a tactics game and a guessing game. **Change a rule in
+the migration first, then here.**
 
 ---
 
