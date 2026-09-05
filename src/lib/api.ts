@@ -106,3 +106,10 @@ export async function deployUnit(matchId: string, unitId: string, x: number, y: 
 export async function setReady(matchId: string) {
   return unwrap(await supabase.rpc('set_ready', { p_match: matchId }).single())
 }
+
+/** Take the win from an opponent who has gone. The server refuses while their
+ *  browser is still sending its heartbeat, so a reload can never lose you a
+ *  match -- the message it sends back says exactly that. */
+export async function claimWin(matchId: string) {
+  return unwrap(await supabase.rpc('claim_win', { p_match: matchId }).single())
+}

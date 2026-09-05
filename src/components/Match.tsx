@@ -4,8 +4,8 @@ import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
-  deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch, resignMatch,
-  setReady, submitAttack, submitMove,
+  claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, requestRematch,
+  resignMatch, setReady, submitAttack, submitMove,
 } from '../lib/api'
 import { DEPLOY_SECONDS, TURN_SECONDS, reachText, type Profile, type Side } from '../lib/types'
 
@@ -54,6 +54,10 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const isMyTurn = Boolean(match && mySide && match.status === 'active' && state?.turn === mySide)
   const selectedUnit = state?.units.find((u) => u.id === selected) ?? null
   const iAmReady = Boolean(mySide && state?.ready?.[mySide])
+  const theirSide: Side | null = mySide === 'host' ? 'guest' : mySide === 'guest' ? 'host' : null
+  // They have missed three of their own turns in a row. Nothing has been
+  // decided by that -- it only puts a button in front of the other player.
+  const theyAreAway = Boolean(theirSide && state?.away === theirSide && match?.status === 'active')
 
   const onClock = match?.status === 'active' || deploying
   const clockLength = deploying ? DEPLOY_SECONDS : TURN_SECONDS
@@ -203,7 +207,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   the way to inspect -- which helps on desktop too, since you
                   can read a unit while planning instead of only while pointing
                   at it. */}
-              {selectedUnit && (
+              {selectedUnit ? (
                 <div className="unitbar" style={{ '--accent': selectedUnit.accent } as React.CSSProperties}>
                   <span className="unitbar-name">{selectedUnit.name}</span>
                   <span className="unitbar-stats">
@@ -214,6 +218,27 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                     <i /><b>{reachText(selectedUnit.rmin, selectedUnit.rmax)}</b> RNG
                   </span>
                   {selectedUnit.ability && <span className="unitbar-ability">{selectedUnit.ability}</span>}
+                </div>
+              ) : (
+                /* Mounted even when nothing is selected. If it came and went
+                   with the selection it would resize the arena on every tap,
+                   and the board would jump under your thumb. */
+                <div className="unitbar is-empty">
+                  <span className="unitbar-stats">
+                    {mySide ? 'Pick a unit to read it' : 'Pick a unit to read it'}
+                  </span>
+                </div>
+              )}
+
+              {theyAreAway && (
+                <div className="awaybar">
+                  <span>
+                    <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> has not
+                    acted for three turns.
+                  </span>
+                  <button className="btn small" onClick={() => guard(() => claimWin(match.id))}>
+                    Claim the win
+                  </button>
                 </div>
               )}
 

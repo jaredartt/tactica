@@ -446,6 +446,23 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   justify-content: center; max-width: 100%;
   padding: 9px 16px; border: 1px solid var(--line); border-radius: 12px;
   font-size: 13px; color: var(--muted);
+  /* Mounted whether or not anything is selected, at a fixed height. If it came
+     and went with the selection it would resize the arena above it on every
+     tap, and the board would jump under your thumb. */
+  min-height: 62px; align-content: center;
+}
+.unitbar.is-empty { border-style: dashed; }
+.unitbar.is-empty .unitbar-stats { color: #b3b3c4; }
+
+/* Not an accusation and not a verdict -- the fact, and the one thing it
+   unlocks. The button argues back if they are merely reloading. */
+.awaybar {
+  flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  justify-content: center; max-width: 100%;
+  padding: 9px 10px 9px 16px; border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, #ffffff);
+  font-size: 13px; color: var(--ink);
 }
 .unitbar-name {
   font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
@@ -456,7 +473,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   display: inline-block; width: 1px; height: 10px; margin: 0 9px -1px;
   background: var(--line-2);
 }
-.unitbar-ability { flex-basis: 100%; text-align: center; font-size: 12px; }
+.unitbar-ability {
+  flex-basis: 100%; text-align: center; font-size: 12px;
+  /* One line, always. A longer ability wrapping to two would make the strip
+     taller, which is the same resize this is here to prevent. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* ---------- side rails (chat left, log right) ----------------------------- */
 
@@ -575,7 +597,15 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   display: grid; place-items: center;
   perspective: 800px;          /* the depth the lean is rendered against */
 }
-.unit-slot:hover { z-index: 10; }
+/* A touch screen has no hover, but it fakes one: the tap that selects a card
+   also latches :hover, and it stays latched until you tap something else. On a
+   six-wide board that leaves a card blown up to nearly twice size sitting on
+   top of its neighbours. So the whole zoom is gated on a device that really
+   has a pointer -- on a phone the strip under the board is how you read a
+   card, and that is always there. */
+@media (hover: hover) and (pointer: fine) {
+  .unit-slot:hover { z-index: 10; }
+}
 
 .unit {
   position: relative;
@@ -703,15 +733,28 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 /* ---------- states -------------------------------------------------------- */
 
-.unit-slot:hover .unit {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
-  background: transparent; border-color: transparent; box-shadow: none;
-}
-.unit-slot:hover .unit-face,
-.unit-slot:hover .unit-hp { opacity: 0; }
-.unit-slot:hover .unit-detail {
-  opacity: 1;
-  box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
+@media (hover: hover) and (pointer: fine) {
+  .unit-slot:hover .unit {
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
+    background: transparent; border-color: transparent; box-shadow: none;
+  }
+  .unit-slot:hover .unit-face,
+  .unit-slot:hover .unit-hp,
+  .unit-slot:hover .unit-burn { opacity: 0; }
+  .unit-slot:hover .unit-detail {
+    opacity: 1;
+    box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
+  }
+  .unit-slot:hover .unit.is-target .unit-detail {
+    box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22), 0 0 0 3px rgba(255, 59, 48, 0.28);
+  }
+  .board.fx-playing .unit-slot:hover .unit {
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
+    background: var(--paper); border-color: var(--side, var(--line-2));
+    box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
+  }
+  .board.fx-playing .unit-slot:hover .unit-face,
+  .board.fx-playing .unit-slot:hover .unit-hp { opacity: 1; }
 }
 
 .unit.is-selected {
@@ -731,10 +774,6 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   font-size: 13cqw; line-height: 1;
   filter: drop-shadow(0 1px 2px rgba(255, 59, 48, 0.5));
   pointer-events: none;
-}
-.unit-slot:hover .unit-burn { opacity: 0; }
-.unit-slot:hover .unit.is-target .unit-detail {
-  box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22), 0 0 0 3px rgba(255, 59, 48, 0.28);
 }
 
 .unit.is-spent { filter: grayscale(1) opacity(0.5); }
@@ -821,13 +860,6 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    that is about to recoil -- and the hover panel would cover the damage number
    and the hit. While an exchange resolves, the board stops responding to hover
    so you can actually watch it. */
-.board.fx-playing .unit-slot:hover .unit {
-  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
-  background: var(--paper); border-color: var(--side, var(--line-2));
-  box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
-}
-.board.fx-playing .unit-slot:hover .unit-face,
-.board.fx-playing .unit-slot:hover .unit-hp { opacity: 1; }
 .board.fx-playing .unit-detail { opacity: 0 !important; }
 
 /* ---------- responsive / motion ------------------------------------------ */
@@ -870,7 +902,15 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .side-title { display: none; }
   .side-body { padding: 10px 14px; }
 
-  .unitbar { gap: 8px 10px; padding: 7px 12px; font-size: 12px; border-radius: 10px; }
+  /* Fixed, not minimum: on a phone the rail below eats enough of the screen
+     that the arena is height-bound, so any change here really does resize the
+     board. Two rows' worth whether one of them is filled or not. */
+  .unitbar {
+    flex-direction: column; flex-wrap: nowrap; justify-content: center;
+    gap: 2px; padding: 6px 12px; font-size: 12px; border-radius: 10px;
+    height: 54px; min-height: 0; overflow: hidden;
+  }
+  .awaybar { gap: 8px 10px; padding: 7px 8px 7px 12px; font-size: 12px; border-radius: 10px; }
   .unitbar-ability { display: none; }
   .actionbar { gap: 8px; }
   .actionbar .hint { flex: 1 1 100%; text-align: center; }
@@ -900,7 +940,9 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
   /* keep the hover zoom -- it is how the stats are read -- but drop the lean */
   .unit { transform: scale(1) !important; }
-  .unit-slot:hover .unit { transform: scale(1.9) !important; }
+  @media (hover: hover) and (pointer: fine) {
+    .unit-slot:hover .unit { transform: scale(1.9) !important; }
+  }
 }
 
 /* ---------- password fields ---------------------------------------------- */

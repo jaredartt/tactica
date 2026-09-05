@@ -71,6 +71,11 @@ export interface MatchState {
   obstacles: Obstacle[]
   turn: Side
   turnNumber: number
+  /** Consecutive turns each side has let expire without touching a unit. */
+  idle?: Record<Side, number>
+  /** Set once a side reaches three. A fact, not a verdict -- the match keeps
+   *  running and the flag clears the moment they act again. */
+  away?: Side | null
   units: Unit[]
   log: LogEntry[]
   winner: Side | null
@@ -165,5 +170,6 @@ export const tierOf = (lp: number) => TIERS.find((t) => lp >= t.at)!.name
 export const TURN_SECONDS = 30
 export const DEPLOY_SECONDS = 90
 export const DECK_SIZE = 4
+export const AWAY_TURNS = 3
 
 export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)
