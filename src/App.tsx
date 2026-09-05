@@ -4,10 +4,10 @@ import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
 import { Logo } from './components/Logo'
 import { useAuth } from './lib/useAuth'
-import { configured } from './lib/supabase'
+import { configured, supabase } from './lib/supabase'
 
 export default function App() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, profileError, retryProfile } = useAuth()
   const [matchId, setMatchId] = useState<string | null>(
     () => new URLSearchParams(location.search).get('m'),
   )
@@ -41,7 +41,21 @@ export default function App() {
       </div>
     )
   if (!session) return <Auth />
-  if (!profile) return <div className="center-stage"><p className="muted">Setting up your profile…</p></div>
+  if (!profile)
+    return (
+      <div className="center-stage">
+        <div className="panel">
+          <h1 className="wordmark small">{profileError ? 'Not quite ready' : 'One moment'}</h1>
+          <p className="muted">{profileError ?? 'Setting up your profile…'}</p>
+          {profileError && (
+            <div className="actionbar" style={{ marginTop: 18, justifyContent: 'flex-start' }}>
+              <button className="btn" onClick={retryProfile}>Try again</button>
+              <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   if (matchId)
     return (
       <Match
