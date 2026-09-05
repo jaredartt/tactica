@@ -120,6 +120,11 @@ export function Board({ state, mySide, isMyTurn, selectedId, onSelect, onMove, o
           <div
             key={key}
             className={['tile', canMove ? 'tile-move' : ''].join(' ')}
+            // Explicit placement, not auto-flow. The unit cards below are
+            // placed by coordinate, and CSS grid positions definite items
+            // FIRST -- so auto-flowed tiles would skip every occupied cell and
+            // four of them would spill into an implicit sixth row.
+            style={{ gridColumn: x + 1, gridRow: y + 1 }}
             onClick={(e) => {
               e.stopPropagation()
               if (watching(mySide)) return

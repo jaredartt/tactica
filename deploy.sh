@@ -6,10 +6,16 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-npm run build
+# Built outside the project tree on purpose: on a synced/managed folder Vite
+# can be refused permission to empty ./dist, and the build dies on a stale
+# hashed asset it cannot unlink.
+OUT="$(mktemp -d)"
+npx tsc -b
+npx vite build --outDir "$OUT" --emptyOutDir
 
 WORK="$(mktemp -d)"
-cp -R dist/. "$WORK/"
+cp -R "$OUT/." "$WORK/"
+rm -rf "$OUT"
 touch "$WORK/.nojekyll"          # stop Pages running the output through Jekyll
 # The scratch repo has no identity of its own; borrow the project's, and fall
 # back to a placeholder so this works on a machine with no global git config.

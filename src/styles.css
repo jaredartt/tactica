@@ -537,7 +537,8 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .board.is-watching .unit { cursor: default; }
 .board.is-watching .tile-move { box-shadow: none; background: var(--tile-a); }
 
-.unit-face, .unit-detail { grid-area: 1 / 1; transition: opacity 0.16s ease; }
+.unit-face { grid-area: 1 / 1; }
+.unit-face, .unit-detail { transition: opacity 0.16s ease; }
 
 .unit-face {
   display: flex; flex-direction: column; gap: 5cqw;
@@ -576,23 +577,34 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 /* ---------- the detail that opens on hover -------------------------------- */
 
+/* Taller than the card it opens from. Five things (art, name, four stats and
+   a line of rules text) cannot fit in a square at a legible size, which is
+   why they used to collide -- so the panel takes the height it needs and the
+   card's own white square hides underneath it while it is open. */
 .unit-detail {
+  position: absolute;
+  left: 0; top: 50%;
+  width: 100%;
+  transform: translateY(-50%);
+  aspect-ratio: 1 / 1.38;
   opacity: 0; pointer-events: none;
   display: flex; flex-direction: column; gap: 3cqw;
-  padding: 6cqw 7cqw 7cqw;
-  border-radius: 13cqw;
+  padding: 6cqw;
+  border-radius: 11cqw;
   background: var(--paper);
+  border: 1.5px solid var(--side, var(--line-2));
   overflow: hidden;
 }
+.unit.is-target .unit-detail { border-color: var(--danger); }
 
 .unit-detail-art {
-  height: 33cqw; width: 100%; flex: none;
+  height: 38cqw; width: 100%; flex: none;
   border-radius: 7cqw; overflow: hidden;
   display: grid; place-items: center;
   background: color-mix(in srgb, var(--accent) 15%, #ffffff);
 }
 .unit-detail-art img { width: 100%; height: 100%; object-fit: cover; }
-.unit-detail-art .unit-initial { font-size: 19cqw; }
+.unit-detail-art .unit-initial { font-size: 22cqw; }
 
 .unit-detail-name {
   font-size: 8.5cqw; letter-spacing: 0.1em; text-transform: uppercase;
@@ -616,11 +628,14 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 .unit-slot:hover .unit {
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
-  box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
+  background: transparent; border-color: transparent; box-shadow: none;
 }
 .unit-slot:hover .unit-face,
 .unit-slot:hover .unit-hp { opacity: 0; }
-.unit-slot:hover .unit-detail { opacity: 1; }
+.unit-slot:hover .unit-detail {
+  opacity: 1;
+  box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
+}
 
 .unit.is-selected {
   box-shadow: 0 6px 18px rgba(14, 14, 20, 0.14), 0 0 0 3px rgba(47, 75, 255, 0.25);
@@ -628,7 +643,9 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit-slot:has(.is-selected) { z-index: 6; }
 
 .unit.is-target { border-color: var(--danger); cursor: crosshair; }
-.unit-slot:hover .unit.is-target { box-shadow: 0 20px 42px rgba(14,14,20,.22), 0 0 0 3px rgba(255,59,48,.28); }
+.unit-slot:hover .unit.is-target .unit-detail {
+  box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22), 0 0 0 3px rgba(255, 59, 48, 0.28);
+}
 
 .unit.is-spent { filter: grayscale(1) opacity(0.5); }
 
@@ -704,6 +721,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    so you can actually watch it. */
 .board.fx-playing .unit-slot:hover .unit {
   transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
+  background: var(--paper); border-color: var(--side, var(--line-2));
   box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
 }
 .board.fx-playing .unit-slot:hover .unit-face,
@@ -760,6 +778,16 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 @media (max-width: 560px) {
   .side { height: 26dvh; }
   .verdict { font-size: 16px; }
+}
+
+/* iOS Safari zooms the whole page the moment you focus a field whose text is
+   under 16px, and it never zooms back out -- which is why writing one chat
+   message left the buttons off-screen. The fix is the text size, not
+   `user-scalable=no`: pinch-to-zoom stays available, it just stops firing
+   by itself. */
+@media (max-width: 900px), (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+  .side-foot input { padding: 10px 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
