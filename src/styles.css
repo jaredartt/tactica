@@ -695,7 +695,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    up, which a tree is not. */
 .tree {
   position: relative;
-  width: 88%; aspect-ratio: 1;
+  width: 100%; aspect-ratio: 1;
   container-type: inline-size;
   display: grid; place-items: center;
   border-radius: 8%;
@@ -752,9 +752,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .unit-slot:hover { z-index: 10; }
 }
 
+/* A piece owns its whole square. At 88% the tile showed as a ring around
+   every card, which made the board read as pictures sitting on a grid rather
+   than as a grid made of pictures. */
 .unit {
   position: relative;
-  width: 88%; aspect-ratio: 1;
+  width: 100%; aspect-ratio: 1;
   container-type: inline-size;  /* everything INSIDE is sized against this */
   display: grid;
   /* NOT cqw: an element cannot query itself, so cqw here would resolve
@@ -877,9 +880,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   box-shadow: 0 22px 56px rgba(14, 14, 20, 0.30);
   z-index: 20; pointer-events: none;
   display: flex; flex-direction: column; justify-content: space-between;
-  transform: translateY(-50%);
+  /* --brx and --bry are written on .arena by the board's lean handler, so
+     this card tilts by exactly the angles the card under the pointer does. */
+  transform: translateY(-50%) perspective(900px)
+             rotateX(var(--brx, 0deg)) rotateY(var(--bry, 0deg));
   animation: bc-in 0.15s ease-out;
-  transition: opacity 0.14s ease;
+  transition: transform 0.12s ease-out, opacity 0.14s ease;
 }
 .bigcard-left  { left: 0; }
 .bigcard-right { right: 0; }

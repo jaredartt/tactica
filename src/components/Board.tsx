@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import { artUrl, faceUrl } from '../lib/art'
 import { deployTiles, key, ownSide, reachable, targetsFor, willCounter } from '../lib/rules'
@@ -57,6 +57,34 @@ export function Board({
   const at = (p: { x: number; y: number }) =>
     ({ gridColumn: p.x + 1, gridRow: p.y + 1 }) as React.CSSProperties
 
+  // Where every unit was standing last time we drew. A card changes square by
+  // changing which grid cell it is in, which is instant and unreadable, so we
+  // measure before and after and play the difference back: put the card where
+  // it used to be, then let it travel. Ease-out only -- a piece that starts
+  // fast and settles reads as a move, one that starts slow reads as a drag.
+  const seats = useRef(new Map<string, DOMRect>())
+  const slots = useRef(new Map<string, HTMLDivElement>())
+  useLayoutEffect(() => {
+    for (const [id, el] of slots.current) {
+      const to = el.getBoundingClientRect()
+      const from = seats.current.get(id)
+      seats.current.set(id, to)
+      if (!from) continue
+      const dx = from.left - to.left
+      const dy = from.top - to.top
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+      // An exchange already owns this element's transform; do not fight it.
+      if (el.className.includes('fx-')) continue
+      el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0px, 0px)' }],
+        { duration: 260, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      )
+    }
+    for (const id of [...seats.current.keys()]) {
+      if (!slots.current.has(id)) seats.current.delete(id)
+    }
+  })
+
   // The board a moment ago. A killed unit is gone from `state.units` by the
   // time we hear about it, so the only place its last position still exists
   // is the previous render's copy.
@@ -114,7 +142,10 @@ export function Board({
   function clickTile(x: number, y: number) {
     if (watching(mySide)) return
     if (deploying) {
-      if (selected && mine && litTiles.has(key(x, y))) onDeploy(selected.id, x, y)
+      // Placing one ends the placing. Leaving the unit selected left its whole
+      // half lit up as if you still had something in your hand, which is only
+      // true until you put it down.
+      if (selected && mine && litTiles.has(key(x, y))) { onDeploy(selected.id, x, y); onSelect(null) }
       else onSelect(null)
       return
     }
@@ -126,8 +157,10 @@ export function Board({
     if (watching(mySide)) return
     if (deploying) {
       // Dropping one of yours onto another of yours swaps the pair.
-      if (selected && mine && u.owner === mySide && u.id !== selected.id) onDeploy(selected.id, u.x, u.y)
-      else onSelect(u.id === selectedId ? null : u.id)
+      if (selected && mine && u.owner === mySide && u.id !== selected.id) {
+        onDeploy(selected.id, u.x, u.y)
+        onSelect(null)
+      } else onSelect(u.id === selectedId ? null : u.id)
       return
     }
     if (targets.has(u.id)) onAttack(u.id)
@@ -223,6 +256,7 @@ export function Board({
                   : undefined
             }
             onHover={(over) => onHover(over ? u.id : null)}
+            slotRef={(el) => { if (el) slots.current.set(u.id, el); else slots.current.delete(u.id) }}
             onClick={(e) => { e.stopPropagation(); clickUnit(u) }}
           />
         )
@@ -328,6 +362,7 @@ function GhostCard({ unit }: { unit: Unit }) {
 
 function UnitCard({
   unit, slot, yours, watching, selected, target, counters, slotClass, slotVars, onClick, onHover,
+  slotRef,
 }: {
   unit: Unit
   slot: React.CSSProperties
@@ -340,22 +375,36 @@ function UnitCard({
   slotVars?: React.CSSProperties
   onClick: (e: React.MouseEvent) => void
   onHover: (over: boolean) => void
+  slotRef: (el: HTMLDivElement | null) => void
 }) {
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
   // The card leans toward the pointer. The angles go to CSS variables rather
   // than straight to `transform`, so the lean composes with the hover scale
   // instead of overwriting it.
+  // The same two angles go on the card under the pointer and on the arena, so
+  // the big card opening beside the board leans by exactly as much as the
+  // little one you are pointing at. Written straight to the DOM rather than
+  // held in state: this fires on every mouse move, and re-rendering the board
+  // sixty times a second to tilt a card is not a trade worth making.
   function lean(e: React.MouseEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect()
     const px = (e.clientX - r.left) / r.width - 0.5
     const py = (e.clientY - r.top) / r.height - 0.5
-    e.currentTarget.style.setProperty('--ry', `${(px * MAX_TILT * 2).toFixed(1)}deg`)
-    e.currentTarget.style.setProperty('--rx', `${(-py * MAX_TILT * 2).toFixed(1)}deg`)
+    const ry = `${(px * MAX_TILT * 2).toFixed(1)}deg`
+    const rx = `${(-py * MAX_TILT * 2).toFixed(1)}deg`
+    e.currentTarget.style.setProperty('--ry', ry)
+    e.currentTarget.style.setProperty('--rx', rx)
+    const arena = e.currentTarget.closest('.arena') as HTMLElement | null
+    arena?.style.setProperty('--bry', ry)
+    arena?.style.setProperty('--brx', rx)
   }
   function settle(e: React.MouseEvent<HTMLDivElement>) {
     e.currentTarget.style.setProperty('--ry', '0deg')
     e.currentTarget.style.setProperty('--rx', '0deg')
+    const arena = e.currentTarget.closest('.arena') as HTMLElement | null
+    arena?.style.setProperty('--bry', '0deg')
+    arena?.style.setProperty('--brx', '0deg')
   }
 
   const portrait = unit.art
@@ -363,7 +412,7 @@ function UnitCard({
     : <span className="unit-initial">{unit.name[0]}</span>
 
   return (
-    <div className={`unit-slot ${slotClass}`.trim()} style={{ ...slot, ...slotVars }}>
+    <div ref={slotRef} className={`unit-slot ${slotClass}`.trim()} style={{ ...slot, ...slotVars }}>
       <div
         className={[
           'unit',
