@@ -323,12 +323,16 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                 </div>
               )}
 
+              {/* Three missed turns is a fact, not a verdict. The server will
+                  only hand you the win once they have actually dropped -- or
+                  after six -- so the button says what it will try and any
+                  refusal is shown where it was clicked instead of vanishing. */}
               {theyAreAway && (
                 <div className="awaybar">
-                  <span>
-                    <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> has not
-                    acted for three turns.
-                  </span>
+                  <p>
+                    <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> has not acted
+                    for three turns. If they have dropped, the match is yours.
+                  </p>
                   <button className="btn small" onClick={() => guard(() => claimWin(match.id))}>
                     Claim the win
                   </button>

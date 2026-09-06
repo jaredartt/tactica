@@ -31,6 +31,9 @@ export interface Unit {
   sneaks: boolean
   /** Mending also puts a burn out. */
   cures: boolean
+  /** Answers BEFORE the blow it is answering. If the answer kills, the blow
+   *  never lands at all. */
+  parries: boolean
   burned: boolean
   accent: string
   art: string | null
@@ -72,6 +75,8 @@ export interface Fx {
   newBurn: boolean
   /** The mend also put a fire out. */
   cured: boolean
+  /** The counter landed first, so the attack may never have happened. */
+  parry: boolean
   tree: boolean
 }
 
@@ -148,6 +153,7 @@ export interface Card {
   flies: boolean
   sneaks: boolean
   cures: boolean
+  parries: boolean
   ability: string
   accent: string
   /** Relative to the site root, e.g. 'cards/dereo.webp'. Run it through

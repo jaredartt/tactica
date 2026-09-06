@@ -7,7 +7,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('11110000-0000-0000-0000-00000000000a','p@x.com','{"username":"pia"}'),
   ('22220000-0000-0000-0000-00000000000b','q@x.com','{"username":"quin"}');
 
-select t_ok((select count(*) from public.cards where is_active) = 8, 'eight cards in the roster');
+select t_ok((select count(*) from public.cards where is_active) = 10, 'ten cards in the roster');
 select t_ok((select count(*) from public.cards where is_active and art_url is null) = 0,
             'every one of them has art');
 select t_ok((select count(*) from public.cards where is_active and role = '') = 0,
@@ -114,6 +114,68 @@ select t_raises(format('select public.submit_attack(%L,''h4'',''g3'')', :'m'),
                 'out of range', 'Wuzu cannot reach three tiles to answer it');
 
 -- ---- the bot inherits all of it -----------------------------------------
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+-- ---- Lium answers first -------------------------------------------------
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+select public.set_deck(array['lium','himanta','mako','wuzu']);
+select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
+select public.set_deck(array['dione-grifo','dereo','eva','fey']);
+select t_match('22220000-0000-0000-0000-00000000000b',
+               '11110000-0000-0000-0000-00000000000a') as p \gset
+select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
+select t_trees(:'p', '[]'::jsonb);
+select t_park(:'p', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_ok(t_get(:'p','g1','name') = 'Lium', 'the guest fields Lium in slot 1');
+select t_ok(t_get(:'p','g1','parries') = 'true', 'and it carries the flag');
+
+-- an attacker that survives the answer still lands its blow
+select t_reset(:'p'); select t_place(:'p','h1',2,2); select t_place(:'p','g1',2,3);
+select t_hp(:'p','h1',110); select t_full(:'p','g1');
+select public.submit_attack(:'p','h1','g1');
+select t_ok(t_get(:'p','g1','hp')::int < 80, 'a survivor still gets its hit in');
+select t_ok(t_get(:'p','h1','hp')::int < 110, 'and still takes the answer');
+
+-- an attacker the answer kills never lands it at all
+select t_reset(:'p'); select t_place(:'p','h1',2,2); select t_place(:'p','g1',2,3);
+select t_hp(:'p','h1',8); select t_full(:'p','g1');
+select public.submit_attack(:'p','h1','g1');
+select t_ok(not t_alive(:'p','h1'), 'Lium kills the attacker with the answer');
+select t_ok(t_get(:'p','g1','hp')::int = 80,
+            'and the blow it was answering never lands -- Lium is untouched');
+select t_ok(t_fx(:'p','dmg')::int = 0, 'recorded as no damage dealt');
+select t_ok(t_fx(:'p','parry') = 'true', 'and flagged as a parry');
+
+-- ---- Himanta glides ------------------------------------------------------
+select t_reset(:'p');
+select public.end_turn(:'p');                       -- hand the turn to the guest
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+select t_park(:'p', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_ok(t_get(:'p','g2','name') = 'Himanta', 'the guest fields Himanta in slot 2');
+
+select t_trees(:'p', '[{"id":"t1","x":3,"y":4,"hp":30,"maxHp":30}]'::jsonb);
+select t_place(:'p','g2',3,5);       -- Himanta, mov 2, a tree directly ahead
+select t_place(:'p','g3',2,5);       -- and the only way round it blocked
+select public.submit_move(:'p','g2',3,3);
+select t_ok(t_get(:'p','g2','y') = '3',
+            'Himanta crosses a tree a walker would have to go round');
+
+select t_reset(:'p'); select t_place(:'p','g2',3,5); select t_place(:'p','g3',3,3);
+select t_raises(format('select public.submit_move(%L,''g2'',3,3)', :'p'),
+                'cannot reach', 'but it still cannot land on somebody');
+
+select t_reset(:'p'); select t_place(:'p','g2',3,5);
+select t_raises(format('select public.submit_move(%L,''g2'',3,4)', :'p'),
+                'cannot reach', 'nor come down in a tree');
+
+-- it reaches two tiles, which no other flier does
+-- h1 is not on the board any more; it walked into the parry two tests ago
+select t_reset(:'p'); select t_trees(:'p', '[]'::jsonb);
+select t_place(:'p','g2',2,2); select t_place(:'p','h2',2,4);
+select t_full(:'p','h2');
+select public.submit_attack(:'p','g2','h2');
+select t_ok(t_get(:'p','h2','hp')::int < t_get(:'p','h2','maxHp')::int,
+            'and strikes from two tiles away');
+
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 select id as bm from public.create_bot_match(3) \gset
 select public.set_ready(:'bm');

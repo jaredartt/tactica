@@ -141,6 +141,13 @@ export function willCounter(u: Unit, t: Target): boolean {
   return d >= t.unit.crmin && d <= t.unit.crmax
 }
 
+/** And would it hit back FIRST? A parry lands before the blow it answers, so
+ *  a unit that cannot survive it should not swing at all -- which is a
+ *  different warning from "this will cost you something". */
+export function willParry(u: Unit, t: Target): boolean {
+  return willCounter(u, t) && t.kind === 'foe' && t.unit.parries
+}
+
 /** Where a unit may stand during deployment: your half, minus what is there. */
 export function deployTiles(state: MatchState, side: Side): Set<string> {
   const { w, h } = state.board

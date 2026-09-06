@@ -11,7 +11,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('33333333-3333-3333-3333-333333333333', 'carol@x.com', '{"username":"carol"}');
 
 select t_ok((select count(*) from public.profiles) = 3, 'signup trigger created 3 profiles');
-select t_ok((select count(*) from public.cards where is_active) = 8, 'eight units in the roster');
+select t_ok((select count(*) from public.cards where is_active) = 10, 'ten units in the roster');
 
 -- ---- decks --------------------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
