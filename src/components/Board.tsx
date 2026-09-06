@@ -57,32 +57,58 @@ export function Board({
   const at = (p: { x: number; y: number }) =>
     ({ gridColumn: p.x + 1, gridRow: p.y + 1 }) as React.CSSProperties
 
-  // Where every unit was standing last time we drew. A card changes square by
-  // changing which grid cell it is in, which is instant and unreadable, so we
-  // measure before and after and play the difference back: put the card where
-  // it used to be, then let it travel. Ease-out only -- a piece that starts
-  // fast and settles reads as a move, one that starts slow reads as a drag.
-  const seats = useRef(new Map<string, DOMRect>())
+  // A card changes square by changing which grid cell it is in, which is
+  // instant and unreadable, so we play the change back: put the card where it
+  // used to be and let it travel. Ease-out only -- a piece that starts fast
+  // and settles reads as a move, one that starts slow reads as a drag.
+  //
+  // What moved is decided from the units' OWN coordinates, and the distance
+  // from the current tile pitch. Comparing screen rectangles between renders
+  // was wrong: the arena is sized from its container, so anything that changes
+  // the page height -- the strip under the board growing a line, the away
+  // notice appearing, a phone rotating -- shifts every card a few pixels, and
+  // the whole army would slide at once for no reason.
+  //
+  // And nothing legal moves more than two pieces at a time: a turn moves one,
+  // a deployment swap moves two. More than that means the board underneath us
+  // was replaced -- a rematch reusing the same unit ids, a reconnect, a
+  // spectator arriving mid-game -- where the right answer is to appear, not to
+  // fly in from wherever a namesake happened to be standing.
+  const seats = useRef(new Map<string, { x: number; y: number }>())
   const slots = useRef(new Map<string, HTMLDivElement>())
   useLayoutEffect(() => {
-    for (const [id, el] of slots.current) {
-      const to = el.getBoundingClientRect()
-      const from = seats.current.get(id)
-      seats.current.set(id, to)
-      if (!from) continue
-      const dx = from.left - to.left
-      const dy = from.top - to.top
-      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue
+    const live = new Set<string>()
+    const moves: { el: HTMLDivElement; dx: number; dy: number }[] = []
+
+    for (const u of state.units) {
+      live.add(u.id)
+      const was = seats.current.get(u.id)
+      seats.current.set(u.id, { x: u.x, y: u.y })
+      const el = slots.current.get(u.id)
+      if (!el || !was || (was.x === u.x && was.y === u.y)) continue
       // An exchange already owns this element's transform; do not fight it.
       if (el.className.includes('fx-')) continue
-      el.animate(
-        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0px, 0px)' }],
-        { duration: 260, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-      )
+
+      const cell = el.getBoundingClientRect()
+      const gs = el.parentElement ? getComputedStyle(el.parentElement) : null
+      const gapX = parseFloat(gs?.columnGap ?? '0') || 0
+      const gapY = parseFloat(gs?.rowGap ?? '0') || 0
+      moves.push({
+        el,
+        dx: (was.x - u.x) * (cell.width + gapX),
+        dy: (was.y - u.y) * (cell.height + gapY),
+      })
     }
-    for (const id of [...seats.current.keys()]) {
-      if (!slots.current.has(id)) seats.current.delete(id)
+
+    if (moves.length <= 2) {
+      for (const m of moves) {
+        m.el.animate(
+          [{ transform: `translate(${m.dx}px, ${m.dy}px)` }, { transform: 'translate(0px, 0px)' }],
+          { duration: 240, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+        )
+      }
     }
+    for (const id of [...seats.current.keys()]) if (!live.has(id)) seats.current.delete(id)
   })
 
   // The board a moment ago. A killed unit is gone from `state.units` by the
