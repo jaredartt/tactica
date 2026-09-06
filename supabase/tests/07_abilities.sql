@@ -70,12 +70,14 @@ select t_ok(t_fx(:'m','counter')::int = 0, 'no counter is recorded at all');
 
 -- and the pair DO answer anybody else
 select t_reset(:'m'); select t_place(:'m','h4',2,3); select t_hp(:'m','h4',120);
+select t_full(:'m','g1');   -- it has to survive to answer
 select public.submit_attack(:'m','h4','g1');
 select t_ok(t_get(:'m','h4','hp')::int < 120, 'Wuzu takes the answer Mako did not');
 
 -- the pair also answer from two tiles, which almost nothing else does
 select t_reset(:'m'); select t_place(:'m','g1',2,1); select t_place(:'m','h4',2,3);
 select t_set(:'m','h4','rmax','2'::jsonb); select t_hp(:'m','h4',120);
+select t_full(:'m','g1');
 select public.submit_attack(:'m','h4','g1');
 select t_ok(t_get(:'m','h4','hp')::int < 120, 'and from two tiles away');
 

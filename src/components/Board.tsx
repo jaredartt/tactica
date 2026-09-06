@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import { artUrl } from '../lib/art'
 import { reachText } from '../lib/types'
-import { deployTiles, key, ownHalf, reachable, targetsFor, willCounter } from '../lib/rules'
+import { deployTiles, key, ownSide, reachable, targetsFor, willCounter } from '../lib/rules'
 
 // No pixel sizes here on purpose. The board is a CSS grid that fills whatever
 // space it is given and keeps its aspect ratio.
@@ -47,14 +47,13 @@ export function Board({
   const trees: Obstacle[] = state.obstacles ?? []
   const selected = state.units.find((u) => u.id === selectedId) ?? null
 
-  // Both players look at their own half from the bottom, so the guest's board
-  // is the canonical one turned half a circle. A rotation, not a mirror --
-  // reflecting would swap left and right and make every diagonal read wrong.
-  const flip = mySide === 'guest'
-  const vx = (x: number) => (flip ? w - 1 - x : x)
-  const vy = (y: number) => (flip ? h - 1 - y : y)
+  // Nothing is rotated or mirrored. The host holds the left, the guest holds
+  // the right, and both players -- and anyone watching -- look at the same
+  // board with the same square in the same place, so "the tree by your
+  // archer" means one thing to both of them. Which units are yours is carried
+  // by colour, which is what colour was already doing everywhere else.
   const at = (p: { x: number; y: number }) =>
-    ({ gridColumn: vx(p.x) + 1, gridRow: vy(p.y) + 1 }) as React.CSSProperties
+    ({ gridColumn: p.x + 1, gridRow: p.y + 1 }) as React.CSSProperties
 
   // The board a moment ago. A killed unit is gone from `state.units` by the
   // time we hear about it, so the only place its last position still exists
@@ -106,8 +105,8 @@ export function Board({
 
   const lungeVars = (from: { x: number; y: number }, to: { x: number; y: number }) =>
     ({
-      '--lx': `${Math.sign(vx(to.x) - vx(from.x)) * 16}%`,
-      '--ly': `${Math.sign(vy(to.y) - vy(from.y)) * 16}%`,
+      '--lx': `${Math.sign(to.x - from.x) * 16}%`,
+      '--ly': `${Math.sign(to.y - from.y) * 16}%`,
     }) as React.CSSProperties
 
   function clickTile(x: number, y: number) {
@@ -133,6 +132,9 @@ export function Board({
     else onSelect(u.id === selectedId ? null : u.id)
   }
 
+  // A spectator has no ground of their own, so they get the host's reading --
+  // the left is tinted, the right is not -- rather than a board with no
+  // orientation at all.
   const halfSide: Side = mySide ?? 'host'
 
   return (
@@ -155,7 +157,7 @@ export function Board({
             style={at({ x, y })}
             className={[
               'tile',
-              ownHalf(halfSide, y, h) ? 'tile-mine' : 'tile-theirs',
+              ownSide(halfSide, x, w) ? 'tile-mine' : 'tile-theirs',
               lit ? (deploying ? 'tile-deploy' : 'tile-move') : '',
             ].join(' ')}
             onClick={(e) => { e.stopPropagation(); clickTile(x, y) }}
@@ -170,7 +172,7 @@ export function Board({
       <div
         className="halfline"
         aria-hidden="true"
-        style={{ gridColumn: '1 / -1', gridRow: Math.floor(h / 2) + 1 }}
+        style={{ gridRow: '1 / -1', gridColumn: Math.floor(w / 2) + 1 }}
       />
 
       {trees.map((t) => (

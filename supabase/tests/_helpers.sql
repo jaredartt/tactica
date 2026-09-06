@@ -114,15 +114,33 @@ language sql as $$
 $$;
 
 -- Park an army out of the way so a test can reason about two units alone.
+-- Each side goes down its own back column: the two columns are five apart on
+-- a six-wide board, which is further than anything can reach. Counting per
+-- side and not across the whole list matters -- a single counter walked the
+-- guests off the right-hand edge, where nothing could ever be attacked and a
+-- test would silently assert about a unit standing outside the board.
 create or replace function t_park(p_m uuid, p_ids text[]) returns void
 language plpgsql as $$
-declare i int := 0; u text;
+declare hi int := 0; gi int := 0; u text; v_w int;
 begin
+  select (state->'board'->>'w')::int into v_w from public.matches where id = p_m;
   foreach u in array p_ids loop
-    i := i + 1;
-    perform t_place(p_m, u, i - 1, case when left(u,1) = 'h' then 5 else 0 end);
+    if left(u, 1) = 'h'
+      then perform t_place(p_m, u, 0, hi);         hi := hi + 1;
+      else perform t_place(p_m, u, v_w - 1, gi);   gi := gi + 1;
+    end if;
   end loop;
 end $$;
+
+-- Back to full health, whatever card it happens to be. A test that grinds a
+-- unit down over several assertions and then asserts "it took damage" reads
+-- as flaky when what actually happened is that the unit died three lines ago.
+create or replace function t_full(p_m uuid, p_u text) returns void
+language sql as $$
+  select t_set(p_m, p_u, 'hp',
+               (select u->'maxHp' from public.matches m, jsonb_array_elements(m.state->'units') u
+                 where m.id = p_m and u->>'id' = p_u));
+$$;
 
 -- ---------------------------------------------------------------------------
 -- During deployment the two armies are not in the match row at all -- that is

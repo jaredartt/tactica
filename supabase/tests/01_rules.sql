@@ -45,8 +45,8 @@ select t_ok((select count(*) = 0 from public.matches m, jsonb_array_elements(m.s
               where m.id=:'mid'
                 and ((o->>'x')::int in (0,5)) and ((o->>'y')::int in (0,5))),
             'no tree in a corner');
-select t_ok((select count(*) filter (where (o->>'y')::int < 3) = 3
-               and count(*) filter (where (o->>'y')::int >= 3) = 3
+select t_ok((select count(*) filter (where (o->>'x')::int < 3) = 3
+               and count(*) filter (where (o->>'x')::int >= 3) = 3
                from public.matches m, jsonb_array_elements(m.state->'obstacles') o
               where m.id=:'mid'),
             'three trees on each half');
@@ -76,11 +76,11 @@ select t_ok((select jsonb_array_length(state->'units') from public.matches where
 select t_ok(t_dcount(:'mid','host') = 4 and t_dcount(:'mid','guest') = 4,
             'both armies exist, one private row each');
 select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
-              where d.match_id=:'mid' and d.side='host' and (u->>'y')::int >= 3),
-            'the host army starts on the host half');
+              where d.match_id=:'mid' and d.side='host' and (u->>'x')::int < 3),
+            'the host army starts on the left');
 select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
-              where d.match_id=:'mid' and d.side='guest' and (u->>'y')::int < 3),
-            'the guest army starts on the guest half');
+              where d.match_id=:'mid' and d.side='guest' and (u->>'x')::int >= 3),
+            'the guest army starts on the right');
 select t_ok(t_dget(:'mid','guest','g1','name') = 'Wuzu', 'the guest fields the deck they chose');
 select t_ok(t_dget(:'mid','host','h2','name') = 'Dereo', 'the host fields the deck they chose');
 select t_ok((select count(*) = 0 from public.match_deploy d,
@@ -93,29 +93,36 @@ select t_ok((select count(*) = 0 from public.match_deploy d,
 select t_raises(format('select public.submit_move(%L,''g1'',1,1)', :'mid'),
                 'not running', 'no moving until deployment ends');
 
+-- x=2 is the host's column now, whatever the row
 select t_raises(format('select public.deploy_unit(%L,''g1'',2,4)', :'mid'),
                 'not your half', 'you cannot deploy into the opponent half');
-select t_raises(format('select public.deploy_unit(%L,''h1'',1,1)', :'mid'),
+select t_raises(format('select public.deploy_unit(%L,''h1'',5,1)', :'mid'),
                 'not your unit', 'you cannot deploy the opponent army');
 select t_raises(format('select public.deploy_unit(%L,''g1'',9,9)', :'mid'),
                 'off the board', 'deployment stays on the board');
 
+-- Park the guest's four in a known column so the squares used below are
+-- free whatever the opening formation happens to be.
 select t_trees(:'mid', '[]'::jsonb);
-select public.deploy_unit(:'mid', 'g1', 2, 2);
-select t_ok(t_dget(:'mid','guest','g1','x') = '2' and t_dget(:'mid','guest','g1','y') = '2',
+select t_dplace(:'mid','guest','g1',5,0), t_dplace(:'mid','guest','g2',5,1),
+       t_dplace(:'mid','guest','g3',5,4), t_dplace(:'mid','guest','g4',5,5);
+select t_ok(public.deploy_unit(:'mid','g1',3,5) is not null,
+            'the near column of your own side is yours too');
+select public.deploy_unit(:'mid', 'g1', 3, 2);
+select t_ok(t_dget(:'mid','guest','g1','x') = '3' and t_dget(:'mid','guest','g1','y') = '2',
             'unit deployed');
 
 select t_dplace(:'mid', 'guest', 'g2', 4, 2);
 select public.deploy_unit(:'mid', 'g1', 4, 2);
-select t_ok(t_dget(:'mid','guest','g1','x') = '4' and t_dget(:'mid','guest','g2','x') = '2',
+select t_ok(t_dget(:'mid','guest','g1','x') = '4' and t_dget(:'mid','guest','g2','x') = '3',
             'dropping onto your own unit swaps the two');
 
-select t_trees(:'mid', '[{"id":"t1","x":1,"y":1,"hp":30,"maxHp":30}]'::jsonb);
-select t_raises(format('select public.deploy_unit(%L,''g1'',1,1)', :'mid'),
+select t_trees(:'mid', '[{"id":"t1","x":4,"y":1,"hp":30,"maxHp":30}]'::jsonb);
+select t_raises(format('select public.deploy_unit(%L,''g1'',4,1)', :'mid'),
                 'tree', 'you cannot deploy into a tree');
 
 select set_config('app.uid', '33333333-3333-3333-3333-333333333333', false);
-select t_raises(format('select public.deploy_unit(%L,''g1'',3,1)', :'mid'),
+select t_raises(format('select public.deploy_unit(%L,''g1'',4,1)', :'mid'),
                 'spectating', 'spectators cannot deploy');
 select t_raises(format('select public.set_ready(%L)', :'mid'),
                 'spectating', 'spectators cannot press ready');

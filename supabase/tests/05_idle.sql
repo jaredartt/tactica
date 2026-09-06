@@ -72,7 +72,10 @@ select t_timeout(:'m2'); select t_timeout(:'m2');
 select t_timeout(:'m2'); select t_timeout(:'m2');   -- host 2, guest 2
 select t_ok(t_idle(:'m2','host') = 2, 'host has missed two');
 
+-- Clear the ground first: the opening formation is laid out around whatever
+-- trees were rolled, so which squares are free is not fixed until it is.
 select t_trees(:'m2', '[]'::jsonb);
+select t_park(:'m2', array['h1','h2','h3','h4','g1','g2','g3','g4']);
 select t_place(:'m2','h1',0,5);
 select public.submit_move(:'m2','h1',0,4);          -- host does one thing
 select t_timeout(:'m2');                            -- then lets the clock go

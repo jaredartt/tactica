@@ -149,11 +149,13 @@ select t_raises(format('select public.submit_move(%L,''h3'',0,4)', :'mid'),
 
 select t_trees(:'mid', '[{"id":"t1","x":2,"y":2,"hp":30,"maxHp":30}]'::jsonb);
 select t_place(:'mid','h2',2,3); select t_place(:'mid','g1',2,1);
+select t_full(:'mid','g1');
 select t_raises(format('select public.submit_attack(%L,''h2'',''g1'')', :'mid'),
                 'tree is in the way', 'a tree in the line stops the shot');
 select t_trees(:'mid', '[{"id":"t1","x":0,"y":2,"hp":30,"maxHp":30}]'::jsonb);
 select public.submit_attack(:'mid','h2','g1');
-select t_ok(t_get(:'mid','g1','hp')::int < 70, 'a tree off the line does not');
+select t_ok(t_get(:'mid','g1','hp')::int < t_get(:'mid','g1','maxHp')::int,
+            'a tree off the line does not');
 
 select t_reset(:'mid');
 select t_trees(:'mid', '[{"id":"t1","x":2,"y":2,"hp":30,"maxHp":30}]'::jsonb);

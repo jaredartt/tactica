@@ -124,7 +124,12 @@ export function Lobby({ profile, onEnter }: Props) {
     return () => { window.removeEventListener('pagehide', bye); bye() }
   }, [searching])
 
-  const deckSet = savedDeck.length === DECK_SIZE
+  // Mirrors deck_of() in 0005: a card retired from the roster invalidates the
+  // whole deck, and the server quietly fields the default four instead. If the
+  // client did not agree, the deck page would claim a deck was saved while the
+  // match used something else.
+  const live = new Set(roster.map((c) => c.slug))
+  const deckSet = savedDeck.length === DECK_SIZE && savedDeck.every((s) => live.has(s))
   const effectiveDeck = deckSet ? savedDeck : roster.slice(0, DECK_SIZE).map((c) => c.slug)
 
   function toggleCard(slug: string) {

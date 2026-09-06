@@ -18,9 +18,11 @@ export const key = (x: number, y: number) => `${x},${y}`
 export const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 
-/** The host defends the bottom of the canonical board. */
-export const ownHalf = (side: Side, y: number, h: number) =>
-  side === 'host' ? y >= Math.floor(h / 2) : y < Math.floor(h / 2)
+/** The host holds the left of the board, the guest the right. Both players
+ *  see the same board the same way up -- which side is yours is carried by
+ *  colour, not by which end of the screen it is on. Mirrors cn_own_side(). */
+export const ownSide = (side: Side, x: number, w: number) =>
+  side === 'host' ? x < Math.floor(w / 2) : x >= Math.floor(w / 2)
 
 export function occupied(state: MatchState): Set<string> {
   const s = new Set<string>()
@@ -142,11 +144,11 @@ export function willCounter(u: Unit, t: Target): boolean {
 /** Where a unit may stand during deployment: your half, minus what is there. */
 export function deployTiles(state: MatchState, side: Side): Set<string> {
   const { w, h } = state.board
-  const trees = new Set((state.obstacles ?? []).map((o) => key(o.x, o.y)))
+  const wood = new Set((state.obstacles ?? []).map((o) => key(o.x, o.y)))
   const out = new Set<string>()
-  for (let y = 0; y < h; y++) {
-    if (!ownHalf(side, y, h)) continue
-    for (let x = 0; x < w; x++) if (!trees.has(key(x, y))) out.add(key(x, y))
+  for (let x = 0; x < w; x++) {
+    if (!ownSide(side, x, w)) continue
+    for (let y = 0; y < h; y++) if (!wood.has(key(x, y))) out.add(key(x, y))
   }
   return out
 }

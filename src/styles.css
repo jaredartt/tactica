@@ -22,7 +22,9 @@
   --line-2:  #dededf;
 
   --you:     #2f4bff;   /* your side */
-  --foe:     #ff2e93;   /* the other side */
+  --foe:     #f2503c;   /* the other side */
+  /* The two are the ends of the mark's gradient, and now the two ends of the
+     board: the host holds the left in blue, the guest the right in red. */
   --good:    #00c46a;
   --danger:  #ff3b30;
 
@@ -365,7 +367,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
   padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted);
 }
-.pill.waiting { color: var(--foe); border-color: rgba(255, 46, 147, 0.35); }
+.pill.waiting { color: var(--foe); border-color: color-mix(in srgb, var(--foe) 35%, transparent); }
 .pill.active { color: var(--you); border-color: rgba(47, 75, 255, 0.35); }
 
 /* ---------- the ladder ----------------------------------------------------- */
@@ -644,14 +646,14 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   background: var(--tile-a);
   transition: background 0.18s, box-shadow 0.18s;
 }
-/* Your half is a shade warmer than theirs. Both players see their own ground
-   at the bottom -- the guest's board is the same board turned half a circle --
-   so this is the only thing telling you which end is yours at a glance. */
+/* Your half is a shade warmer than theirs. Nothing is rotated any more, so
+   both players see the same board -- and this tint, plus the colour of the
+   cards, is what tells you which side of it is yours. */
 .tile-mine   { background: var(--tile-mine); }
 .halfline {
-  align-self: start; height: 0;
-  margin-top: calc(var(--gap) / -2 - 1px);
-  border-top: 2px dashed var(--line-2);
+  justify-self: start; width: 0;
+  margin-left: calc(var(--gap) / -2 - 1px);
+  border-left: 2px dashed var(--line-2);
   pointer-events: none;
 }
 .tile-theirs { background: var(--tile-a); }
@@ -795,9 +797,12 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35),
               inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
+/* Blue on the left, red on the right -- the same colour as the card's border
+   and its nameplate, so the bar answers "whose is that" as well as "how much
+   is left" without needing a second glance. */
 .unit-hpfill {
   position: absolute; left: 0; top: 0; bottom: 0;
-  background: var(--good);
+  background: var(--side, var(--good));
   transition: width 0.35s ease;
 }
 .unit-hpnum {
