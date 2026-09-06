@@ -4,8 +4,8 @@ import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
-  botStep, claimWin, deployUnit, endTurn, forceTimeout, leaveMatch, myDeploy,
-  requestRematch, resignMatch, setReady, submitAttack, submitMove,
+  botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
+  myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitMove,
 } from '../lib/api'
 import {
   DEPLOY_SECONDS, TURN_SECONDS, reachText,
@@ -32,7 +32,6 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const [selected, setSelected] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
-  const [askedRematch, setAskedRematch] = useState(false)
   // Which rail is showing. Only meaningful on a narrow screen, where the two
   // side panels become tabs instead of columns -- there is no room for both,
   // and a phone should never have to scroll a match.
@@ -70,6 +69,14 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const selectedUnit = shown?.units.find((u) => u.id === selected) ?? null
   const iAmReady = Boolean(mySide && state?.ready?.[mySide])
   const theirSide: Side | null = mySide === 'host' ? 'guest' : mySide === 'guest' ? 'host' : null
+
+  // Read off the row rather than kept in this component: an invitation has to
+  // survive a reload, and both players have to see the same one.
+  const iAsked = Boolean(match && mySide && match[`rematch_${mySide}` as const])
+  const theyAsked = Boolean(match && theirSide && match[`rematch_${theirSide}` as const])
+  const challenged = Boolean(
+    theyAsked && !iAsked && match?.bot == null && !match?.next_match_id && mySide,
+  )
   // They have missed three of their own turns in a row. Nothing has been
   // decided by that -- it only puts a button in front of the other player.
   const theyAreAway = Boolean(
@@ -128,8 +135,29 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
     }
   }, [match?.next_match_id, matchId, onGoTo])
 
+  async function askRematch() {
+    setErr(null)
+    try {
+      const next = await requestRematch(match!.id)
+      if (next) goTo(next)
+      else await refresh()
+    } catch (e) {
+      setErr((e as Error).message)
+      setTimeout(() => setErr(null), 3500)
+    }
+  }
+
   // Clear the selection whenever the turn flips.
   useEffect(() => setSelected(null), [state?.turn, state?.turnNumber])
+
+  /** Leave for another room. Deliberately not wrapped in guard(): guard
+   *  refreshes when it is done, and refreshing the room you have just walked
+   *  out of is what used to drop the old finished match back on top of the new
+   *  one. */
+  function goTo(next: string) {
+    leaveMatch(matchId)
+    onGoTo(next)
+  }
 
   async function guard(fn: () => Promise<unknown>) {
     setErr(null)
@@ -291,23 +319,17 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                       {(s.winner === 'host' ? match.host_name : match.guest_name) ?? 'Someone'} wins
                       {s.winner === mySide ? ' — that is you.' : '.'}
                     </div>
-                    <button
-                      className="btn primary"
-                      disabled={askedRematch}
-                      onClick={() =>
-                        guard(async () => {
-                          const next = await requestRematch(match.id)
-                          if (next) onGoTo(next)
-                          else setAskedRematch(true)
-                        })
-                      }
-                    >
-                      {askedRematch ? 'Waiting for them…' : 'Rematch'}
+                    <button className="btn primary" disabled={iAsked} onClick={askRematch}>
+                      {iAsked ? 'Waiting for them…' : 'Rematch'}
                     </button>
                     <span className="hint">
-                      {askedRematch
-                        ? 'It starts the moment they accept. Sides swap.'
-                        : 'Both of you have to want it.'}
+                      {match.bot != null
+                        ? 'Starts a fresh board against the same opponent.'
+                        : iAsked
+                          ? 'It starts the moment they accept. Sides swap.'
+                          : match.rematch_declined
+                            ? 'They passed on the last one. You can ask again.'
+                            : 'Both of you have to want it.'}
                     </span>
                   </>
                 ) : deploying ? (
@@ -354,7 +376,27 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
               </div>
             </>
           )}
-          {err && <div className="toast">{err}</div>}
+          {/* Deliberately not a modal: no backdrop, nothing dimmed, nothing you are
+          forced to answer before you can look at the board again. It sits over
+          the middle, and if you ignore it the match screen is still yours. */}
+      {challenged && (
+        <div className="challenge" role="status">
+          <p className="challenge-text">
+            <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> wants a rematch!
+          </p>
+          <div className="challenge-acts">
+            <button className="btn primary small" onClick={askRematch}>Let&rsquo;s battle!</button>
+            <button
+              className="btn small"
+              onClick={() => guard(() => declineRematch(match.id))}
+            >
+              Not today
+            </button>
+          </div>
+        </div>
+      )}
+
+      {err && <div className="toast">{err}</div>}
         </main>
 
         <BattleLog log={s.log} open={rail === 'log'} />

@@ -178,3 +178,41 @@ select t_ok((select count(*) from public.matches where ranked and status <> 'fin
             'no ranked match is left running');
 
 \echo '--- bot and ranked: all assertions passed ---'
+
+-- ---- a rematch is an invitation ------------------------------------------
+select set_config('app.uid', 'f0000000-0000-0000-0000-000000000001', false);
+select t_match('f0000000-0000-0000-0000-000000000001',
+               'f0000000-0000-0000-0000-000000000002') as rr \gset
+select public.resign_match(:'rr');
+
+select public.request_rematch(:'rr') is null as asked1 \gset
+select t_ok(:'asked1'::boolean, 'one player asking does not start anything');
+select t_ok((select rematch_host from public.matches where id=:'rr'), 'the ask is on the row');
+
+select set_config('app.uid', 'f0000000-0000-0000-0000-000000000002', false);
+select public.decline_rematch(:'rr');
+select t_ok((select not rematch_host and not rematch_guest and rematch_declined
+               from public.matches where id=:'rr'),
+            'declining clears both asks and says why');
+select t_ok((select next_match_id is null from public.matches where id=:'rr'),
+            'and nothing was created');
+
+-- asking again wipes the note, and the other side accepting starts it
+select set_config('app.uid', 'f0000000-0000-0000-0000-000000000002', false);
+select public.request_rematch(:'rr');
+select t_ok((select not rematch_declined from public.matches where id=:'rr'),
+            'a fresh invitation clears the old refusal');
+select set_config('app.uid', 'f0000000-0000-0000-0000-000000000001', false);
+select public.request_rematch(:'rr') as rr2 \gset
+select t_ok(:'rr2' is not null, 'accepting creates the new room');
+select t_ok((select ranked = false and status = 'deploying'
+               from public.matches where id=:'rr2'::uuid),
+            'unranked, and back at deployment');
+select t_ok((select count(*) = 2 from public.match_deploy where match_id = :'rr2'::uuid),
+            'with both armies placed privately again');
+select t_ok((select host_name from public.matches where id=:'rr2'::uuid) = 'gus',
+            'and the sides swapped');
+
+select set_config('app.uid', 'f0000000-0000-0000-0000-000000000003', false);
+select t_raises(format('select public.decline_rematch(%L)', :'rr'),
+                'spectating', 'a spectator cannot answer for anybody');

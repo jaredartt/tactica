@@ -103,6 +103,8 @@ export interface MatchRow {
   updated_at: string
   rematch_host: boolean
   rematch_guest: boolean
+  /** Somebody said no. Cleared by the next invitation, so it is never final. */
+  rematch_declined: boolean
   next_match_id: string | null
 }
 

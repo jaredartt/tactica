@@ -161,3 +161,10 @@ export async function leaveRanked() {
   const { error } = await supabase.rpc('leave_ranked')
   if (error) console.warn('leave_ranked:', error.message)
 }
+
+/** "Not today." Clears both asks, so whoever invited gets their button back
+ *  instead of waiting on an answer that is never coming. */
+export async function declineRematch(matchId: string) {
+  const { error } = await supabase.rpc('decline_rematch', { p_match: matchId })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+}

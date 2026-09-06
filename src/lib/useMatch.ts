@@ -25,6 +25,10 @@ export function useMatch(matchId: string | null) {
     }
     if (!data) return
     const row = data as MatchRow
+    // A rematch swaps matchId under us while a request is in flight, and the
+    // late answer would otherwise install the OLD finished room over the new
+    // one -- and poison the ordering guard below with its timestamp.
+    if (row.id !== matchId) return
     // Ignore stale rows that arrive out of order.
     if (row.updated_at >= seen.current) {
       seen.current = row.updated_at

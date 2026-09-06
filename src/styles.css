@@ -1146,3 +1146,28 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 14px; flex-wrap: wrap; margin-top: 18px;
 }
+
+/* ---------- the rematch invitation ----------------------------------------
+   A card, not a modal. Nothing behind it is dimmed and nothing is blocked --
+   you can go on reading the board or the log and answer when you feel like
+   it. It is centred because that is where you look when a match ends. */
+.challenge {
+  position: fixed; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 18px 22px; border-radius: 16px;
+  background: var(--paper);
+  border: 1.5px solid var(--line-2);
+  box-shadow: 0 18px 44px rgba(14, 14, 20, 0.20);
+  animation: challengein 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+  width: max-content; min-width: min(88vw, 290px); max-width: min(92vw, 340px);
+  text-align: center;
+}
+.challenge-text { margin: 0; font-size: 14px; line-height: 1.45; }
+.challenge-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+@keyframes challengein {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 14px)) scale(0.94); }
+}
+@media (prefers-reduced-motion: reduce) { .challenge { animation: none; } }
