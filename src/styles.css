@@ -631,7 +631,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    ========================================================================== */
 
 .board {
-  --gap: clamp(4px, 1.1cqmin, 10px);
+  --gap: clamp(2px, 0.55cqmin, 6px);
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
   grid-template-rows: repeat(var(--rows), 1fr);
@@ -642,7 +642,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 
 .tile {
-  border-radius: clamp(6px, 12%, 12px);
+  border-radius: clamp(3px, 8%, 8px);
   background: var(--tile-a);
   transition: background 0.18s, box-shadow 0.18s;
 }
@@ -681,27 +681,49 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    Cover you can cut down. They stop feet and arrows both, which is the only
    reason to walk the long way round anything on this board. */
 .tree-slot { display: grid; place-items: center; }
+/* A crop of the painting, filling the tile the way a unit card does. Cover
+   reads as ground you cannot cross; a glyph read as a piece you could pick
+   up, which a tree is not. */
 .tree {
   position: relative;
-  width: 80%; aspect-ratio: 1;
+  width: 88%; aspect-ratio: 1;
   container-type: inline-size;
   display: grid; place-items: center;
-  border-radius: 18%;
-  background: color-mix(in srgb, var(--wood) 14%, #ffffff);
-  border: 1.5px solid color-mix(in srgb, var(--wood) 35%, #ffffff);
+  border-radius: 8%;
+  overflow: hidden;
+  border: 1.5px solid color-mix(in srgb, var(--wood) 40%, #ffffff);
   transition: transform 0.16s, box-shadow 0.2s, border-color 0.2s;
 }
-.tree svg { width: 62%; height: 62%; fill: var(--wood); }
+.tree img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tree.is-target {
   cursor: crosshair;
   border-color: var(--danger);
   box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.18);
 }
+/* Only ever drawn on a tree somebody has hit. An untouched one is worth 30,
+   always, and the card says so on hover -- six identical bars saying "full"
+   is noise on a board this small. */
 .tree-hp {
-  position: absolute; left: 14%; right: 14%; bottom: 9%;
-  height: 5cqw; border-radius: 2px; background: rgba(14, 14, 20, 0.12); overflow: hidden;
+  position: absolute; left: 9cqw; right: 9cqw; bottom: 7cqw;
+  height: max(9px, 15cqw);
+  background: #000; overflow: hidden;
+  transform: skewX(-14deg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
-.tree-hp span { display: block; height: 100%; background: var(--wood); }
+.tree-hp > span {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: color-mix(in srgb, var(--wood) 32%, #ffc94d);
+}
+.tree-hp > b {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  transform: skewX(14deg);
+  font-family: var(--body); font-weight: 400;
+  font-size: max(7.5px, 11cqw); line-height: 1; color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
 .tree.is-hit { animation: recoil 0.32s ease-out 0.12s; }
 .tree.is-falling { animation: vanish 0.5s ease-in forwards 0.24s; }
 
@@ -729,7 +751,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   /* NOT cqw: an element cannot query itself, so cqw here would resolve
      against the arena and round the card into a circle. A percentage on
      border-radius is relative to the element's own box, which is what we want. */
-  border-radius: 11%;
+  border-radius: 8%;
   background: var(--paper);
   border: 1.5px solid var(--line-2);
   box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
@@ -759,7 +781,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .board.is-watching .tile-deploy { box-shadow: none; background: inherit; }
 
 .unit-face { grid-area: 1 / 1; }
-.unit-face, .unit-detail { transition: opacity 0.16s ease; }
+.unit-face { transition: opacity 0.16s ease; }
 
 /* The art fills the whole card, clipped to the card's own corners. Nothing
    is layered over it except the health bar, so the board reads as a row of
@@ -815,95 +837,147 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
-/* ---------- the detail that opens on hover -------------------------------- */
 
-/* Taller than the card it opens from. Five things (art, name, four stats and
-   a line of rules text) cannot fit in a square at a legible size, which is
-   why they used to collide -- so the panel takes the height it needs and the
-   card's own white square hides underneath it while it is open. */
-.unit-detail {
-  position: absolute;
-  left: 0; top: 50%;
-  width: 100%;
+/* ---------- the card that opens beside the board --------------------------
+
+   The printed card, on screen. The illustration fills it edge to edge; the
+   name sits on a white band cut into the top-left, the health in a coloured
+   block cut into the top-right, and everything the unit can do runs along the
+   bottom. Every band is a rhombus, cut with clip-path rather than skewed, so
+   the text inside stays upright without a counter-transform.
+
+   It opens on the left for your units and on the right for theirs -- .arena
+   spans exactly the gap between the two rails, so an edge of it is outside
+   the board and still clear of the chat and the log. */
+
+.arena { position: relative; }
+
+.bigcard {
+  position: absolute; top: 50%;
+  width: clamp(158px, 22cqw, 280px);
+  aspect-ratio: 1;
+  container-type: inline-size;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--ink);
+  border: 2px solid var(--side, var(--wood));
+  box-shadow: 0 22px 56px rgba(14, 14, 20, 0.30);
+  z-index: 20; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: space-between;
   transform: translateY(-50%);
-  aspect-ratio: 1 / 1.34;
-  opacity: 0; pointer-events: none;
-  display: flex; flex-direction: column; gap: 2.5cqw;
-  padding: 6cqw;
-  border-radius: 11cqw;
+  animation: bc-in 0.15s ease-out;
+  transition: opacity 0.14s ease;
+}
+.bigcard-left  { left: 0; }
+.bigcard-right { right: 0; }
+.bigcard-tree  { --side: var(--wood); }
+
+@keyframes bc-in {
+  from { opacity: 0; transform: translateY(-50%) scale(0.96); }
+  to   { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+.bc-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+/* Just enough shade under the bands that white type never lands on a pale
+   patch of sky. The middle of the picture is left completely alone. */
+.bigcard::before {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(0,0,0,0.20) 0, rgba(0,0,0,0) 26%,
+    rgba(0,0,0,0) 55%, rgba(0,0,0,0.34) 100%);
+}
+.bc-top, .bc-bottom { position: relative; z-index: 2; }
+
+.bc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0; }
+.bc-id {
+  min-width: 0;
   background: var(--paper);
-  border: 1.5px solid var(--side, var(--line-2));
-  overflow: hidden;
+  padding: 3.4cqw 10cqw 3.4cqw 5cqw;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5cqw) 100%, 0 100%);
 }
-.unit.is-target .unit-detail { border-color: var(--danger); }
-
-.unit-detail-art {
-  height: 40cqw; width: 100%; flex: none;
-  border-radius: 7cqw; overflow: hidden;
-  display: grid; place-items: center;
-  background: color-mix(in srgb, var(--accent) 15%, #ffffff);
-}
-.unit-detail-art img { width: 100%; height: 100%; object-fit: cover; }
-.unit-detail-art .unit-initial { font-size: 22cqw; }
-
-.unit-detail-name {
-  flex: none;
-  font-size: 8.5cqw; line-height: 1.1; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--accent); text-align: center;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-.unit-detail-role {
-  flex: none;
-  font-family: var(--body); font-size: 6cqw; line-height: 1;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: #b3b3c4; text-align: center;
-  margin-top: -1.5cqw;
-}
-
-/* Two columns of four numbers. A damage range is the widest thing that can
-   land here ("15-25"), so nothing may wrap -- a wrapped value pushes the
-   ability line off the bottom of the panel. */
-.unit-stats {
-  flex: none; margin: 0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5cqw 5cqw;
-}
-.unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 2cqw; }
-.unit-stats dt { flex: none; font-size: 6.4cqw; letter-spacing: 0.06em; color: #b3b3c4; }
-.unit-stats dd {
-  margin: 0; font-size: 8.6cqw; color: var(--ink);
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-
-.unit-ability {
-  margin: auto 0 0; font-size: 6.4cqw; line-height: 1.35; color: var(--muted);
-  border-top: 1px solid var(--line); padding-top: 2.5cqw;
+/* "Dione & Grifo" does not fit on one line beside a three-digit health block,
+   and a truncated name is worse than a wrapped one. Two lines, then clip. */
+.bc-id h3 {
+  margin: 0; font-family: var(--display); font-weight: 900;
+  font-size: 7.6cqw; line-height: 1.04; letter-spacing: -0.015em;
+  text-transform: uppercase; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow: hidden; overflow-wrap: anywhere;
 }
+.bc-id p {
+  margin: 1.6cqw 0 0; font-family: var(--body);
+  font-size: 4.2cqw; line-height: 1; letter-spacing: 0.16em;
+  text-transform: uppercase; color: #9a9aa8;
+}
+
+/* Wide enough for 120/120 without the digits ever reflowing. */
+.bc-hp {
+  flex: none;
+  background: var(--side, var(--wood)); color: #fff;
+  padding: 3.4cqw 5cqw 3.4cqw 10cqw;
+  clip-path: polygon(6cqw 0, 100% 0, 100% 100%, 0 100%);
+  display: flex; align-items: baseline; gap: 0.6cqw;
+  font-variant-numeric: tabular-nums;
+}
+.bc-hp b { font-family: var(--display); font-weight: 900; font-size: 10.5cqw; line-height: 1; }
+.bc-hp i { font-style: normal; font-family: var(--body); font-size: 4.6cqw; opacity: 0.78; }
+
+.bc-bottom {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 1.8cqw; padding-bottom: 3.4cqw;
+}
+.bc-band {
+  background: var(--side, var(--wood)); color: #fff;
+  padding: 1.9cqw 9cqw 1.9cqw 5cqw;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 4.5cqw) 100%, 0 100%);
+  display: flex; align-items: baseline; gap: 2cqw;
+}
+.bc-band b { font-family: var(--display); font-weight: 900; font-size: 7cqw; line-height: 1; }
+.bc-band span { font-family: var(--body); font-size: 4cqw; letter-spacing: 0.14em; opacity: 0.85; }
+
+.bc-row { display: flex; gap: 1.8cqw; }
+.bc-chip {
+  background: rgba(255, 255, 255, 0.97); color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
+  padding: 1.6cqw 6cqw 1.6cqw 4.5cqw;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 3.4cqw) 100%, 0 100%);
+  display: flex; align-items: baseline; gap: 1.6cqw;
+  font-family: var(--body); font-size: 4cqw; line-height: 1;
+}
+.bc-chip:first-child { padding-left: 5cqw; }
+.bc-chip em { font-style: normal; letter-spacing: 0.12em; color: #9a9aa8; }
+.bc-chip b { font-family: var(--display); font-weight: 900; font-size: 5.2cqw; }
+.bc-chip-burn { background: color-mix(in srgb, var(--danger) 92%, #fff); color: #fff; }
+.bc-chip-burn b { font-size: 4.4cqw; }
+
+.bc-say { display: flex; align-items: stretch; width: 100%; background: rgba(255, 255, 255, 0.96); }
+.bc-glyph { flex: none; width: 13cqw; display: grid; place-items: center; background: var(--side, var(--wood)); }
+.bc-mark { width: 58%; height: auto; fill: #fff; }
+.bc-say p {
+  margin: 0; padding: 2.4cqw 4cqw;
+  font-family: var(--body); font-size: 4.1cqw; line-height: 1.32; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* A touch screen has no pointer to hover with, and the strip under the board
+   already does this job there. */
+@media (hover: none), (pointer: coarse) { .bigcard { display: none; } }
 
 /* ---------- states -------------------------------------------------------- */
 
+/* The card used to swell to nearly twice size to become readable. It does
+   not have to any more -- the readable version opens beside the board -- so
+   hovering only lifts the piece you are pointing at. */
 @media (hover: hover) and (pointer: fine) {
   .unit-slot:hover .unit {
-    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.9);
-    background: transparent; border-color: transparent; box-shadow: none;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1.09);
+    box-shadow: 0 10px 24px rgba(14, 14, 20, 0.22);
   }
-  .unit-slot:hover .unit-face,
-  .unit-slot:hover .unit-burn { opacity: 0; }
-  .unit-slot:hover .unit-detail {
-    opacity: 1;
-    box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22);
-  }
-  .unit-slot:hover .unit.is-target .unit-detail {
-    box-shadow: 0 20px 42px rgba(14, 14, 20, 0.22), 0 0 0 3px rgba(255, 59, 48, 0.28);
-  }
+  .tree:hover { transform: scale(1.06); box-shadow: 0 10px 24px rgba(14, 14, 20, 0.20); }
   .board.fx-playing .unit-slot:hover .unit {
     transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(1);
-    background: var(--paper); border-color: var(--side, var(--line-2));
     box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
   }
-  .board.fx-playing .unit-slot:hover .unit-face { opacity: 1; }
 }
 
 .unit.is-selected {
@@ -1006,10 +1080,9 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit-ghost-late .unit-ghost-card { animation-delay: 0.58s; }
 
 /* You click an enemy to attack it, so your cursor is sitting on the very card
-   that is about to recoil -- and the hover panel would cover the damage number
-   and the hit. While an exchange resolves, the board stops responding to hover
-   so you can actually watch it. */
-.board.fx-playing .unit-detail { opacity: 0 !important; }
+   that is about to recoil. While an exchange resolves, the board stops
+   responding to hover so you can actually watch it. */
+.board.fx-playing .bigcard { opacity: 0; }
 
 /* ---------- responsive / motion ------------------------------------------ */
 
@@ -1105,12 +1178,9 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .unit-slot[class*="fx-"] { animation: none !important; }
   .dmg { animation: none !important; opacity: 1; transform: translateY(-18px); }
   .unit-ghost { display: none; }
-  .unit, .tile, .timerfill, .unit-face, .unit-detail { transition: none !important; }
-  /* keep the hover zoom -- it is how the stats are read -- but drop the lean */
+  .unit, .tile, .timerfill, .unit-face { transition: none !important; }
   .unit { transform: scale(1) !important; }
-  @media (hover: hover) and (pointer: fine) {
-    .unit-slot:hover .unit { transform: scale(1.9) !important; }
-  }
+  .bigcard { animation: none !important; }
 }
 
 /* ---------- password fields ---------------------------------------------- */

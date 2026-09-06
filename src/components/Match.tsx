@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Board } from './Board'
 import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
+import { TreeBigCard, UnitBigCard } from './BigCard'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
   botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
@@ -30,6 +31,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const clockOffset = useServerClock()
 
   const [selected, setSelected] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   // Which rail is showing. Only meaningful on a narrow screen, where the two
@@ -180,6 +182,25 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   }
 
   const s = match.state
+
+  // Your card opens on the left of the board, theirs on the right, so it never
+  // reaches across the middle and never lands on the rail beside it. A tree
+  // belongs to nobody, so it opens on the side of the board it is standing on.
+  const board = shown ?? s
+  const hoverUnit = hovered ? board.units.find((u) => u.id === hovered) : undefined
+  const hoverTree = hovered ? (board.obstacles ?? []).find((o) => o.id === hovered) : undefined
+  const hoverCard = hoverUnit ? (
+    <UnitBigCard
+      unit={hoverUnit}
+      side={hoverUnit.owner === (mySide ?? 'host') ? 'left' : 'right'}
+    />
+  ) : hoverTree ? (
+    <TreeBigCard
+      tree={hoverTree}
+      side={hoverTree.x < Math.floor(board.board.w / 2) ? 'left' : 'right'}
+    />
+  ) : null
+
   const pct = remaining === null ? 0 : Math.max(0, Math.min(1, remaining / clockLength))
   const urgent = remaining !== null && remaining <= 8
 
@@ -257,6 +278,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
           ) : (
             <>
               <div className="arena">
+                {hoverCard}
                 <Board
                   state={shown ?? s}
                   mySide={mySide}
@@ -269,6 +291,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   onDeploy={(id, x, y) =>
                     guard(async () => setMyUnits(await deployUnit(match.id, id, x, y)))
                   }
+                  onHover={setHovered}
                 />
               </div>
 

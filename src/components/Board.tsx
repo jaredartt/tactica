@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
-import { artUrl } from '../lib/art'
-import { reachText } from '../lib/types'
+import { artUrl, faceUrl } from '../lib/art'
 import { deployTiles, key, ownSide, reachable, targetsFor, willCounter } from '../lib/rules'
 
 // No pixel sizes here on purpose. The board is a CSS grid that fills whatever
@@ -19,6 +18,9 @@ interface Props {
   onMove: (x: number, y: number) => void
   onAttack: (targetId: string) => void
   onDeploy: (unitId: string, x: number, y: number) => void
+  /** The unit or tree the pointer is over. The card it opens is drawn beside
+   *  the board, not inside it, so the board reports and Match renders. */
+  onHover: (id: string | null) => void
 }
 
 const watching = (side: Side | null) => side === null
@@ -41,7 +43,7 @@ interface Blow {
 }
 
 export function Board({
-  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDeploy,
+  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDeploy, onHover,
 }: Props) {
   const { w, h } = state.board
   const trees: Obstacle[] = state.obstacles ?? []
@@ -183,6 +185,7 @@ export function Board({
           targetable={targets.has(t.id)}
           shaking={blow?.tgt === t.id}
           falling={blow?.tgt === t.id && blow.killedTgt}
+          onHover={(over) => onHover(over ? t.id : null)}
           onClick={(e) => {
             e.stopPropagation()
             if (targets.has(t.id)) onAttack(t.id)
@@ -219,6 +222,7 @@ export function Board({
                   ? lungeVars(blow.tgtAt, blow.atkAt)
                   : undefined
             }
+            onHover={(over) => onHover(over ? u.id : null)}
             onClick={(e) => { e.stopPropagation(); clickUnit(u) }}
           />
         )
@@ -255,9 +259,10 @@ export function Board({
   )
 }
 
-/** A tree. Drawn from the same 45-degree geometry as everything else. */
+/** A tree. A crop of the painting rather than a glyph, because a tile of
+ *  woodland reads as cover at a glance and an icon reads as a piece. */
 function Tree({
-  tree, style, targetable, shaking, falling, onClick,
+  tree, style, targetable, shaking, falling, onClick, onHover,
 }: {
   tree: Obstacle
   style: React.CSSProperties
@@ -265,6 +270,7 @@ function Tree({
   shaking: boolean
   falling: boolean
   onClick: (e: React.MouseEvent) => void
+  onHover: (over: boolean) => void
 }) {
   const pct = Math.max(0, Math.min(100, (tree.hp / tree.maxHp) * 100))
   return (
@@ -273,14 +279,37 @@ function Tree({
         className={['tree', targetable ? 'is-target' : '', shaking ? 'is-hit' : '',
                     falling ? 'is-falling' : ''].join(' ')}
         onClick={onClick}
-        title={`Tree — ${tree.hp}/${tree.maxHp}`}
+        onMouseEnter={() => onHover(true)}
+        onMouseLeave={() => onHover(false)}
       >
-        <svg viewBox="0 0 32 32" aria-hidden="true">
-          <path d="M16 3 27 15H21l5 7h-7v7h-6v-7H6l5-7H5Z" />
-        </svg>
-        {pct < 100 && <div className="tree-hp"><span style={{ width: `${pct}%` }} /></div>}
+        <img src={`${import.meta.env.BASE_URL}tree.webp`} alt="" />
+        {/* An untouched tree shows no bar. Thirty HP is a fact you read off
+            the card, not something the board has to shout at you six times. */}
+        {pct < 100 && (
+          <div className="tree-hp">
+            <span style={{ width: `${pct}%` }} />
+            <b>{tree.hp}</b>
+          </div>
+        )}
       </div>
     </div>
+  )
+}
+
+/** The zoomed crop, falling back to the whole illustration if the crop is
+ *  not there. onError fires once and then the src is the full picture, so
+ *  this cannot loop. */
+function Portrait({ unit }: { unit: Unit }) {
+  return (
+    <img
+      src={faceUrl(unit.art)!}
+      alt=""
+      onError={(e) => {
+        const el = e.currentTarget
+        const full = artUrl(unit.art)
+        if (full && el.src !== full) el.src = full
+      }}
+    />
   )
 }
 
@@ -290,7 +319,7 @@ function GhostCard({ unit }: { unit: Unit }) {
          style={{ '--accent': unit.accent } as React.CSSProperties}>
       <div className="unit-face">
         <div className="unit-art">
-          {unit.art ? <img src={artUrl(unit.art)!} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
+          {unit.art ? <Portrait unit={unit} /> : <span className="unit-initial">{unit.name[0]}</span>}
         </div>
       </div>
     </div>
@@ -298,7 +327,7 @@ function GhostCard({ unit }: { unit: Unit }) {
 }
 
 function UnitCard({
-  unit, slot, yours, watching, selected, target, counters, slotClass, slotVars, onClick,
+  unit, slot, yours, watching, selected, target, counters, slotClass, slotVars, onClick, onHover,
 }: {
   unit: Unit
   slot: React.CSSProperties
@@ -310,6 +339,7 @@ function UnitCard({
   slotClass: string
   slotVars?: React.CSSProperties
   onClick: (e: React.MouseEvent) => void
+  onHover: (over: boolean) => void
 }) {
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
@@ -329,7 +359,7 @@ function UnitCard({
   }
 
   const portrait = unit.art
-    ? <img src={artUrl(unit.art)!} alt="" />
+    ? <Portrait unit={unit} />
     : <span className="unit-initial">{unit.name[0]}</span>
 
   return (
@@ -350,7 +380,8 @@ function UnitCard({
         ].join(' ')}
         style={{ '--accent': unit.accent } as React.CSSProperties}
         onMouseMove={lean}
-        onMouseLeave={settle}
+        onMouseEnter={() => onHover(true)}
+        onMouseLeave={(e) => { settle(e); onHover(false) }}
         onClick={onClick}
       >
         {/* On the board a card is its picture and nothing else. The name and
@@ -362,20 +393,6 @@ function UnitCard({
             <span className="unit-hpfill" style={{ width: `${hpPct}%` }} />
             <b className="unit-hpnum">{unit.hp}</b>
           </div>
-        </div>
-
-        {/* Opens on hover, once the card is large enough to read. */}
-        <div className="unit-detail">
-          <div className="unit-detail-art">{portrait}</div>
-          <div className="unit-detail-name">{unit.name}</div>
-          {unit.role && <div className="unit-detail-role">{unit.role}</div>}
-          <dl className="unit-stats">
-            <div><dt>HP</dt><dd>{unit.hp}/{unit.maxHp}</dd></div>
-            <div><dt>{unit.heals ? 'PWR' : 'DMG'}</dt><dd>{unit.dmin}–{unit.dmax}</dd></div>
-            <div><dt>MOV</dt><dd>{unit.mov}</dd></div>
-            <div><dt>RNG</dt><dd>{reachText(unit.rmin, unit.rmax)}</dd></div>
-          </dl>
-          {unit.ability && <p className="unit-ability">{unit.ability}</p>}
         </div>
 
         {unit.burned && <div className="unit-burn" title="Burning: loses 5 HP whenever it strikes">🔥</div>}

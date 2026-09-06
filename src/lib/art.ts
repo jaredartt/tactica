@@ -13,3 +13,20 @@ export function artUrl(path: string | null | undefined): string | null {
   if (/^(https?:)?\/\//.test(path) || path.startsWith('/') || path.startsWith('data:')) return path
   return import.meta.env.BASE_URL + path.replace(/^\.?\//, '')
 }
+
+/**
+ * The board shows a zoomed crop of the illustration, so a 50px card on a
+ * phone is a recognisable face and not a whole scene shrunk to nothing. The
+ * crop lives beside the full picture under the same name: 'cards/dereo.webp'
+ * has 'cards/dereo-face.webp' next to it.
+ *
+ * By convention rather than by column, because a second URL in the database
+ * is a second thing to keep in step for no gain -- and if the crop is ever
+ * missing the <img> onError falls back to the full picture, which is only
+ * ugly, not broken.
+ */
+export function faceUrl(path: string | null | undefined): string | null {
+  const full = artUrl(path)
+  if (!full) return null
+  return full.replace(/(\.[a-z0-9]+)(\?.*)?$/i, '-face$1$2')
+}
