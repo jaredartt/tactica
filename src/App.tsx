@@ -45,8 +45,8 @@ export default function App() {
     return (
       <div className="center-stage">
         <div className="panel">
-          <h1 className="wordmark small">{profileError ? 'Not quite ready' : 'One moment'}</h1>
-          <p className="muted">{profileError ?? 'Setting up your profile…'}</p>
+          <h1 className="wordmark small">{profileError ? 'Not quite ready' : 'Loading game'}</h1>
+          <p className="muted">{profileError ?? 'Getting everything ready…'}</p>
           {profileError && (
             <div className="actionbar" style={{ marginTop: 18, justifyContent: 'flex-start' }}>
               <button className="btn" onClick={retryProfile}>Try again</button>

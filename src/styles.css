@@ -424,6 +424,10 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   margin: 0 0 4px; font-family: var(--display); font-weight: 900;
   font-size: 12px; letter-spacing: 0.02em;
 }
+.rcard-role {
+  margin: -2px 0 5px !important; font-size: 9px !important;
+  letter-spacing: 0.14em; text-transform: uppercase; color: #b3b3c4 !important;
+}
 .rcard-stats { margin: 0 0 5px; display: flex; flex-wrap: wrap; gap: 3px 12px; }
 .rcard-stats > div { display: flex; align-items: baseline; gap: 4px; }
 .rcard-stats dt { font-size: 9px; letter-spacing: 0.08em; color: #b3b3c4; }
@@ -723,7 +727,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   /* NOT cqw: an element cannot query itself, so cqw here would resolve
      against the arena and round the card into a circle. A percentage on
      border-radius is relative to the element's own box, which is what we want. */
-  border-radius: 15%;
+  border-radius: 11%;
   background: var(--paper);
   border: 1.5px solid var(--line-2);
   box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
@@ -755,14 +759,17 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit-face { grid-area: 1 / 1; }
 .unit-face, .unit-detail { transition: opacity 0.16s ease; }
 
+/* The art fills the whole card, clipped to the card's own corners. Nothing
+   is layered over it except the health bar, so the board reads as a row of
+   pictures rather than a row of forms. */
 .unit-face {
-  display: flex; flex-direction: column; gap: 5cqw;
-  padding: 8cqw; min-height: 0; opacity: 1;
+  position: relative; display: block;
+  padding: 0; min-height: 0; opacity: 1;
+  border-radius: inherit; overflow: hidden;
 }
 
 .unit-art {
-  flex: 1; min-height: 0; width: 100%;
-  border-radius: 9cqw; overflow: hidden;
+  position: absolute; inset: 0;
   display: grid; place-items: center;
   background: color-mix(in srgb, var(--accent) 15%, #ffffff);
 }
@@ -772,22 +779,35 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   color: var(--accent); line-height: 1;
 }
 
-.unit-name {
-  font-size: 9.5cqw; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--muted); text-align: center;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ---------- the health bar ------------------------------------------------
+
+   A rhombus, to match the mark: one skew on the track, the opposite skew on
+   the number so the digits stay upright. What is left is green, what is gone
+   is black -- no track colour, no rounding, nothing to read but the ratio. */
+.unit-hpbar {
+  position: absolute; left: 9cqw; right: 9cqw; bottom: 7cqw;
+  /* cqw alone gives a 5px number on a phone. The floor keeps the bar
+     readable on a 50px card without swelling it on a big one. */
+  height: max(11px, 17cqw);
+  background: #000;
+  transform: skewX(-14deg);
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
-
-.unit-hpbar { width: 100%; height: 3.5cqw; border-radius: 2px; background: var(--line); overflow: hidden; }
-.unit-hpbar span { display: block; height: 100%; background: var(--good); transition: width 0.35s ease; }
-
-.unit-hp {
-  position: absolute; top: 6cqw; right: 6cqw;
-  min-width: 22cqw; height: 22cqw; padding: 0 5cqw;
-  border-radius: 999px; background: var(--ink); color: #fff;
-  font-size: 11cqw; display: grid; place-items: center;
+.unit-hpfill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--good);
+  transition: width 0.35s ease;
+}
+.unit-hpnum {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  transform: skewX(14deg);
+  font-family: var(--body); font-weight: 400;
+  font-size: max(7.5px, 11cqw); line-height: 1; color: #fff;
   font-variant-numeric: tabular-nums;
-  transition: opacity 0.16s ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 /* ---------- the detail that opens on hover -------------------------------- */
@@ -801,9 +821,9 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   left: 0; top: 50%;
   width: 100%;
   transform: translateY(-50%);
-  aspect-ratio: 1 / 1.38;
+  aspect-ratio: 1 / 1.34;
   opacity: 0; pointer-events: none;
-  display: flex; flex-direction: column; gap: 3cqw;
+  display: flex; flex-direction: column; gap: 2.5cqw;
   padding: 6cqw;
   border-radius: 11cqw;
   background: var(--paper);
@@ -813,7 +833,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit.is-target .unit-detail { border-color: var(--danger); }
 
 .unit-detail-art {
-  height: 38cqw; width: 100%; flex: none;
+  height: 40cqw; width: 100%; flex: none;
   border-radius: 7cqw; overflow: hidden;
   display: grid; place-items: center;
   background: color-mix(in srgb, var(--accent) 15%, #ffffff);
@@ -822,19 +842,37 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit-detail-art .unit-initial { font-size: 22cqw; }
 
 .unit-detail-name {
-  font-size: 8.5cqw; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--accent); text-align: center;
+  flex: none;
+  font-size: 8.5cqw; line-height: 1.1; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--accent); text-align: center;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.unit-stats { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1cqw 7cqw; }
-.unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 4cqw; }
-.unit-stats dt { font-size: 7cqw; letter-spacing: 0.06em; color: #b3b3c4; }
-.unit-stats dd { margin: 0; font-size: 10cqw; color: var(--ink); font-variant-numeric: tabular-nums; }
+.unit-detail-role {
+  flex: none;
+  font-family: var(--body); font-size: 6cqw; line-height: 1;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: #b3b3c4; text-align: center;
+  margin-top: -1.5cqw;
+}
+
+/* Two columns of four numbers. A damage range is the widest thing that can
+   land here ("15-25"), so nothing may wrap -- a wrapped value pushes the
+   ability line off the bottom of the panel. */
+.unit-stats {
+  flex: none; margin: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.5cqw 5cqw;
+}
+.unit-stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 2cqw; }
+.unit-stats dt { flex: none; font-size: 6.4cqw; letter-spacing: 0.06em; color: #b3b3c4; }
+.unit-stats dd {
+  margin: 0; font-size: 8.6cqw; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 
 .unit-ability {
-  margin: 0; font-size: 6.6cqw; line-height: 1.4; color: var(--muted);
-  border-top: 1px solid var(--line); padding-top: 3cqw;
+  margin: auto 0 0; font-size: 6.4cqw; line-height: 1.35; color: var(--muted);
+  border-top: 1px solid var(--line); padding-top: 2.5cqw;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -847,7 +885,6 @@ form .btn.primary { width: 100%; margin-top: 10px; }
     background: transparent; border-color: transparent; box-shadow: none;
   }
   .unit-slot:hover .unit-face,
-  .unit-slot:hover .unit-hp,
   .unit-slot:hover .unit-burn { opacity: 0; }
   .unit-slot:hover .unit-detail {
     opacity: 1;
@@ -861,8 +898,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
     background: var(--paper); border-color: var(--side, var(--line-2));
     box-shadow: 0 2px 8px rgba(14, 14, 20, 0.10);
   }
-  .board.fx-playing .unit-slot:hover .unit-face,
-  .board.fx-playing .unit-slot:hover .unit-hp { opacity: 1; }
+  .board.fx-playing .unit-slot:hover .unit-face { opacity: 1; }
 }
 
 .unit.is-selected {

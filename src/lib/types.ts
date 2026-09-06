@@ -6,6 +6,8 @@ export interface Unit {
   cardId: string
   slug: string
   name: string
+  /** Swordsmen, Mage, Herbalist... Flavour and a hover heading, nothing more. */
+  role: string
   hp: number
   maxHp: number
   mov: number
@@ -21,6 +23,14 @@ export interface Unit {
   dmax: number
   burns: boolean
   heals: boolean
+  /** Steps over trees and lands where they stood. */
+  tramples: boolean
+  /** Moves by air: distance only, no walking round anything. */
+  flies: boolean
+  /** Never takes a counter. */
+  sneaks: boolean
+  /** Mending also puts a burn out. */
+  cures: boolean
   burned: boolean
   accent: string
   art: string | null
@@ -60,6 +70,8 @@ export interface Fx {
   burnAtk: number
   burnTgt: number
   newBurn: boolean
+  /** The mend also put a fire out. */
+  cured: boolean
   tree: boolean
 }
 
@@ -121,6 +133,7 @@ export interface Card {
   id: string
   slug: string
   name: string
+  role: string
   hp: number
   mov: number
   rmin: number
@@ -131,8 +144,14 @@ export interface Card {
   dmax: number
   burns: boolean
   heals: boolean
+  tramples: boolean
+  flies: boolean
+  sneaks: boolean
+  cures: boolean
   ability: string
   accent: string
+  /** Relative to the site root, e.g. 'cards/dereo.webp'. Run it through
+   *  artUrl() before putting it in a src -- the site is not served from /. */
   art_url: string | null
   sort: number
 }

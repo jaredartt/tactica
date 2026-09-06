@@ -29,16 +29,39 @@ export function occupied(state: MatchState): Set<string> {
   return s
 }
 
+const bodies = (state: MatchState) => new Set(state.units.map((u) => key(u.x, u.y)))
+const trees = (state: MatchState) => new Set((state.obstacles ?? []).map((o) => key(o.x, o.y)))
+
 /**
  * Every tile a unit can walk to. A breadth-first walk of the grid, not a
  * distance test: movement is orthogonal and a tree has to be walked around,
  * so the shape is a diamond with bites taken out of it.
+ *
+ * Two units ask a different question. A flier is not walking, so nothing on
+ * the ground is consulted except the tile it means to land on. A trampler
+ * walks the same grid as everybody else, but a tree is ground to it -- and
+ * the tree comes down when it stops there. Both are mirrored from cn_reach()
+ * in 0010_roster.sql.
  */
 export function reachable(state: MatchState, u: Unit): Set<string> {
   const { w, h } = state.board
-  const blocked = occupied(state)
-  const seen = new Set<string>([key(u.x, u.y)])
+  const body = bodies(state)
+  const wood = trees(state)
   const out = new Set<string>()
+
+  if (u.flies) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = Math.abs(x - u.x) + Math.abs(y - u.y)
+        const k = key(x, y)
+        if (d >= 1 && d <= u.mov && !body.has(k) && !wood.has(k)) out.add(k)
+      }
+    }
+    return out
+  }
+
+  const blocked = (k: string) => body.has(k) || (!u.tramples && wood.has(k))
+  const seen = new Set<string>([key(u.x, u.y)])
   let front: { x: number; y: number }[] = [{ x: u.x, y: u.y }]
 
   for (let step = 0; step < u.mov && front.length; step++) {
@@ -49,7 +72,7 @@ export function reachable(state: MatchState, u: Unit): Set<string> {
         const ny = p.y + dy
         const k = key(nx, ny)
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
-        if (seen.has(k) || blocked.has(k)) continue
+        if (seen.has(k) || blocked(k)) continue
         seen.add(k)
         out.add(k)
         next.push({ x: nx, y: ny })
@@ -111,6 +134,7 @@ export function targetsFor(state: MatchState, u: Unit): Map<string, Target> {
 /** Would this target hit back? Purely informational, for the hover hint. */
 export function willCounter(u: Unit, t: Target): boolean {
   if (t.kind !== 'foe') return false
+  if (u.sneaks) return false
   const d = cheb(u, t.unit)
   return d >= t.unit.crmin && d <= t.unit.crmax
 }

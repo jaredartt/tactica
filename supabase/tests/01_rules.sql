@@ -11,22 +11,22 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('33333333-3333-3333-3333-333333333333', 'carol@x.com', '{"username":"carol"}');
 
 select t_ok((select count(*) from public.profiles) = 3, 'signup trigger created 3 profiles');
-select t_ok((select count(*) from public.cards where is_active) = 6, 'six units in the roster');
+select t_ok((select count(*) from public.cards where is_active) = 8, 'eight units in the roster');
 
 -- ---- decks --------------------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
-select t_raises('select public.set_deck(array[''archer'',''mage'',''titan''])',
+select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu''])',
                 'exactly 4', 'a deck is exactly four cards');
-select t_raises('select public.set_deck(array[''archer'',''archer'',''mage'',''titan''])',
+select t_raises('select public.set_deck(array[''dereo'',''dereo'',''eva'',''wuzu''])',
                 'no repeats', 'no repeats in a deck');
-select t_raises('select public.set_deck(array[''archer'',''mage'',''titan'',''dragon''])',
+select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu'',''dragon''])',
                 'not in the roster', 'every card in a deck has to exist');
-select public.set_deck(array['swordsman','archer','ninja','titan']);
+select public.set_deck(array['dione-grifo','dereo','mako','wuzu']);
 select t_ok((select deck from public.profiles where id = auth.uid())
-            = array['swordsman','archer','ninja','titan'], 'deck saved');
+            = array['dione-grifo','dereo','mako','wuzu'], 'deck saved');
 
 select set_config('app.uid', '22222222-2222-2222-2222-222222222222', false);
-select public.set_deck(array['titan','mage','healer','swordsman']);
+select public.set_deck(array['wuzu','dereo','eva','dione-grifo']);
 
 -- ---- alice opens a room -------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
@@ -81,8 +81,8 @@ select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_element
 select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
               where d.match_id=:'mid' and d.side='guest' and (u->>'y')::int < 3),
             'the guest army starts on the guest half');
-select t_ok(t_dget(:'mid','guest','g1','name') = 'Titan', 'the guest fields the deck they chose');
-select t_ok(t_dget(:'mid','host','h2','name') = 'Archer', 'the host fields the deck they chose');
+select t_ok(t_dget(:'mid','guest','g1','name') = 'Wuzu', 'the guest fields the deck they chose');
+select t_ok(t_dget(:'mid','host','h2','name') = 'Dereo', 'the host fields the deck they chose');
 select t_ok((select count(*) = 0 from public.match_deploy d,
                  jsonb_array_elements(d.units) u, public.matches m,
                  jsonb_array_elements(m.state->'obstacles') o

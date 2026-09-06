@@ -7,6 +7,7 @@ import {
   BOT_LEVELS, DECK_SIZE, reachText, tierOf,
   type Card, type LadderRow, type MatchRow, type Profile,
 } from '../lib/types'
+import { artUrl } from '../lib/art'
 import { Logo } from './Logo'
 import { Page, useZoom } from './Zoom'
 
@@ -305,7 +306,7 @@ export function Lobby({ profile, onEnter }: Props) {
                     >
                       <span className="dcard-pick">{picked ? deck.indexOf(c.slug) + 1 : ''}</span>
                       <span className="dcard-art">
-                        {c.art_url ? <img src={c.art_url} alt="" /> : <span>{c.name[0]}</span>}
+                        {c.art_url ? <img src={artUrl(c.art_url)!} alt="" /> : <span>{c.name[0]}</span>}
                       </span>
                       <span className="dcard-name">{c.name}</span>
                       <span className="dcard-stats">
@@ -340,10 +341,11 @@ export function Lobby({ profile, onEnter }: Props) {
               {roster.map((c) => (
                 <article key={c.id} className="rcard" style={{ '--accent': c.accent } as React.CSSProperties}>
                   <div className="rcard-art">
-                    {c.art_url ? <img src={c.art_url} alt="" /> : <span>{c.name[0]}</span>}
+                    {c.art_url ? <img src={artUrl(c.art_url)!} alt="" /> : <span>{c.name[0]}</span>}
                   </div>
                   <div className="rcard-body">
                     <h3>{c.name}</h3>
+                    {c.role && <p className="rcard-role">{c.role}</p>}
                     <dl className="rcard-stats">
                       <div><dt>HP</dt><dd>{c.hp}</dd></div>
                       <div><dt>{c.heals ? 'PWR' : 'DMG'}</dt><dd>{c.dmin}–{c.dmax}</dd></div>

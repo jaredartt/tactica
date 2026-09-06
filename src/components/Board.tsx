@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
+import { artUrl } from '../lib/art'
 import { reachText } from '../lib/types'
 import { deployTiles, key, ownHalf, reachable, targetsFor, willCounter } from '../lib/rules'
 
@@ -287,9 +288,8 @@ function GhostCard({ unit }: { unit: Unit }) {
          style={{ '--accent': unit.accent } as React.CSSProperties}>
       <div className="unit-face">
         <div className="unit-art">
-          {unit.art ? <img src={unit.art} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
+          {unit.art ? <img src={artUrl(unit.art)!} alt="" /> : <span className="unit-initial">{unit.name[0]}</span>}
         </div>
-        <div className="unit-name">{unit.name}</div>
       </div>
     </div>
   )
@@ -327,7 +327,7 @@ function UnitCard({
   }
 
   const portrait = unit.art
-    ? <img src={unit.art} alt="" />
+    ? <img src={artUrl(unit.art)!} alt="" />
     : <span className="unit-initial">{unit.name[0]}</span>
 
   return (
@@ -351,16 +351,22 @@ function UnitCard({
         onMouseLeave={settle}
         onClick={onClick}
       >
+        {/* On the board a card is its picture and nothing else. The name and
+            the numbers are one hover away; what you need at a glance is who it
+            is and how much of it is left. */}
         <div className="unit-face">
           <div className="unit-art">{portrait}</div>
-          <div className="unit-name">{unit.name}</div>
-          <div className="unit-hpbar"><span style={{ width: `${hpPct}%` }} /></div>
+          <div className="unit-hpbar">
+            <span className="unit-hpfill" style={{ width: `${hpPct}%` }} />
+            <b className="unit-hpnum">{unit.hp}</b>
+          </div>
         </div>
 
         {/* Opens on hover, once the card is large enough to read. */}
         <div className="unit-detail">
           <div className="unit-detail-art">{portrait}</div>
           <div className="unit-detail-name">{unit.name}</div>
+          {unit.role && <div className="unit-detail-role">{unit.role}</div>}
           <dl className="unit-stats">
             <div><dt>HP</dt><dd>{unit.hp}/{unit.maxHp}</dd></div>
             <div><dt>{unit.heals ? 'PWR' : 'DMG'}</dt><dd>{unit.dmin}–{unit.dmax}</dd></div>
@@ -370,7 +376,6 @@ function UnitCard({
           {unit.ability && <p className="unit-ability">{unit.ability}</p>}
         </div>
 
-        <div className="unit-hp">{unit.hp}</div>
         {unit.burned && <div className="unit-burn" title="Burning: loses 5 HP whenever it strikes">🔥</div>}
         {target === 'ally' && <div className="unit-crosshair is-mend" />}
         {target === 'foe' && <div className={`unit-crosshair${counters ? ' is-risky' : ''}`} />}
