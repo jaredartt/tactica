@@ -83,9 +83,14 @@ export function Lobby({ profile, onEnter }: Props) {
     let alive = true
     const load = async () => {
       await sweepMatches()
+      // Practice is not a spectacle. A bot match is you and a machine, so it
+      // is left off the list entirely -- the room still exists and its code
+      // still works, so a friend you hand it to can walk in and watch. It is
+      // simply not advertised.
       const { data } = await supabase
         .from('matches').select('*')
         .in('status', ['waiting', 'deploying', 'active'])
+        .is('bot', null)
         .order('created_at', { ascending: false }).limit(20)
       if (alive && data) setRooms(data as MatchRow[])
     }

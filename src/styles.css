@@ -1456,6 +1456,14 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   to   { transform: skewX(-8deg) translateX(115%); }
 }
 
+/* Less motion, not no transition: the block still covers the swap, it just
+   appears where it is instead of travelling. A view that changes between one
+   frame and the next is the thing this is here to prevent, and that is not
+   what "reduce motion" is asking for. */
 @media (prefers-reduced-motion: reduce) {
-  .wipe { display: none; }
+  .wipe { transform: none; }
+  .wipe.is-in  { animation: wipe-fade-in  0.16s ease-out forwards; }
+  .wipe.is-out { animation: wipe-fade-out 0.22s ease-in forwards; }
+  @keyframes wipe-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes wipe-fade-out { from { opacity: 1; } to { opacity: 0; } }
 }
