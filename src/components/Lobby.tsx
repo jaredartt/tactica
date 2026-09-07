@@ -34,7 +34,7 @@ interface Props {
 const TILES = [
   { id: 'ranked',   label: 'Ranked',     tint: '#d92d20', art: 'menu/ranked.webp',   focus: '22%',
     note: 'Play for a place on the ladder' },
-  { id: 'bot',      label: 'Practice',   tint: '#e8701a', art: 'menu/practice.webp', focus: '8%',
+  { id: 'bot',      label: 'Practice',   tint: '#e8701a', art: 'menu/practice.webp', focus: '0%',
     note: 'Spar with the machine' },
   { id: 'friends',  label: 'Vs Friends', tint: '#d9a41b', art: 'menu/friends.webp',  focus: '28%',
     note: 'Open a room, or join one' },
@@ -44,7 +44,7 @@ const TILES = [
     note: 'Who is on top' },
   { id: 'team',     label: 'My Team',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
     note: 'Four of the eleven' },
-  { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '16%',
+  { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%',
     note: 'The story behind the board' },
 ] as const
 

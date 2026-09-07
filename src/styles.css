@@ -237,10 +237,16 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 /* Counter-skewed so the picture stands up straight inside a leaning frame, and
    overscaled so the lean can never expose a corner of empty tile. This is the
    only thing that moves on hover: the tile itself holds still. */
+/* Overscaled sideways only. A skewX(8deg) box of height H hides H*tan8 of its
+   own width at each edge, and 11% covers that on the narrowest tile here --
+   but nothing needs to overhang vertically, and overhanging vertically was
+   pushing the top of every picture off the tile. That is what was cutting the
+   heads off, not the focal point: no background-position can bring back a band
+   that was scaled out of the box. */
 .mtile-art {
-  position: absolute; inset: -14%; z-index: 0;
+  position: absolute; inset: 0 -11%; z-index: 0;
   background-size: cover; background-position: center 26%;   /* per tile, overridden inline */
-  transform: skewX(8deg) scale(1.02);
+  transform: skewX(8deg);
   transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 /* The colour, laid over the picture rather than mixed into it. Multiply keeps
@@ -268,7 +274,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .mtile:hover:not(:disabled),
 .mtile:focus-visible { z-index: 2; }
 .mtile:hover:not(:disabled) .mtile-art,
-.mtile:focus-visible .mtile-art { transform: skewX(8deg) scale(1.13); }
+.mtile:focus-visible .mtile-art { transform: skewX(8deg) scale(1.09); }
 .mtile:hover:not(:disabled) .mtile-wash,
 .mtile:focus-visible .mtile-wash { opacity: 0.44; }
 .mtile:hover:not(:disabled)::after,
