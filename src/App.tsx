@@ -3,6 +3,7 @@ import { Auth } from './components/Auth'
 import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
 import { Logo } from './components/Logo'
+import { useWipe } from './components/Wipe'
 import { useAuth } from './lib/useAuth'
 import { configured, supabase } from './lib/supabase'
 
@@ -11,6 +12,9 @@ export default function App() {
   const [matchId, setMatchId] = useState<string | null>(
     () => new URLSearchParams(location.search).get('m'),
   )
+  // Every crossing between the menu and a match goes through this, in both
+  // directions: leaving one for the other used to happen in a single frame.
+  const { cross, wipe } = useWipe()
 
   // Keep the URL in step, so a match is a link you can paste to a spectator.
   useEffect(() => {
@@ -58,12 +62,20 @@ export default function App() {
     )
   if (matchId)
     return (
-      <Match
-        matchId={matchId}
-        profile={profile}
-        onLeave={() => setMatchId(null)}
-        onGoTo={setMatchId}
-      />
+      <>
+        <Match
+          matchId={matchId}
+          profile={profile}
+          onLeave={() => cross(() => setMatchId(null))}
+          onGoTo={(id) => cross(() => setMatchId(id))}
+        />
+        {wipe}
+      </>
     )
-  return <Lobby profile={profile} onEnter={setMatchId} />
+  return (
+    <>
+      <Lobby profile={profile} onEnter={(id) => cross(() => setMatchId(id))} />
+      {wipe}
+    </>
+  )
 }

@@ -574,14 +574,18 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 /* The selected unit, spelled out. On a phone this is the only way to read a
    card; on a desktop it saves pointing at one to remember what it does. */
 .unitbar {
-  flex: none; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  flex: none; display: flex; align-items: baseline; gap: 5px 14px; flex-wrap: wrap;
   justify-content: center; max-width: 100%;
-  padding: 9px 16px; border: 1px solid var(--line); border-radius: 12px;
+  padding: 0 16px; border: 1px solid var(--line); border-radius: 12px;
   font-size: 13px; color: var(--muted);
-  /* Mounted whether or not anything is selected, at a fixed height. If it came
-     and went with the selection it would resize the arena above it on every
-     tap, and the board would jump under your thumb. */
-  min-height: 62px; align-content: center;
+  /* A FIXED height, not a minimum. It is mounted whether or not anything is
+     selected so that it cannot come and go -- but a minimum only stops it
+     shrinking, and the filled strip is two rows where the empty one is one, so
+     it grew by twelve pixels the moment you picked a unit. The arena above is
+     flex: 1 and the board is sized from the arena's height, so twelve pixels
+     here is a board that changes size under your thumb. Two rows' worth,
+     always, whether the second row has anything in it or not. */
+  height: 66px; align-content: center; overflow: hidden;
 }
 .unitbar.is-empty { border-style: dashed; }
 .unitbar.is-empty .unitbar-stats { color: #b3b3c4; }
@@ -1423,3 +1427,35 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   transition: opacity 0.2s;
 }
 .savemark.is-busy { color: var(--muted); }
+
+/* ---------- crossing between the menu and a match -------------------------
+
+   The menu grows a tile into a page and shrinks it back again. Going into a
+   match, or coming out of it, has no tile to grow: the two views share
+   nothing. So a leaning block sweeps across, the swap happens underneath it,
+   and it carries on out the far side -- the same skew as the menu, so the
+   whole app moves in one shape.
+
+   Oversized on every edge because a skewed rectangle does not cover the
+   corners of the box it is drawn in, and this one has to cover everything. */
+.wipe {
+  position: fixed; z-index: 80; pointer-events: none;
+  left: -30vw; top: -10vh; width: 160vw; height: 120dvh;
+  background: var(--you);
+  transform: skewX(-8deg) translateX(-115%);
+  will-change: transform;
+}
+.wipe.is-in  { animation: wipe-in  0.26s cubic-bezier(0.5, 0, 0.15, 1) forwards; }
+.wipe.is-out { animation: wipe-out 0.30s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes wipe-in {
+  from { transform: skewX(-8deg) translateX(-115%); }
+  to   { transform: skewX(-8deg) translateX(0); }
+}
+@keyframes wipe-out {
+  from { transform: skewX(-8deg) translateX(0); }
+  to   { transform: skewX(-8deg) translateX(115%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wipe { display: none; }
+}
