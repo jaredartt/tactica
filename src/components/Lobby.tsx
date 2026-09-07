@@ -138,10 +138,22 @@ export function Lobby({ profile, onEnter }: Props) {
     return () => { window.removeEventListener('pagehide', bye); bye() }
   }, [searching])
 
-  // Mirrors deck_of() in 0005: a card retired from the roster invalidates the
-  // whole deck, and the server quietly fields the default four instead. If the
-  // client did not agree, the deck page would claim a deck was saved while the
-  // match used something else.
+  // A team saved before the roster changed still sits in profiles.deck, slug
+  // for slug -- the server never rewrites it, it just refuses to field it and
+  // hands back the default instead. So the draft has to be cleaned when the
+  // roster arrives, or My Team shows "5/5 chosen" over a grid where four of
+  // the five are cards that no longer exist and only one has a number on it.
+  useEffect(() => {
+    if (!roster.length) return
+    const have = new Set(roster.map((c) => c.slug))
+    setDeckDraft((d) => (d.every((s) => have.has(s)) ? d : d.filter((s) => have.has(s))))
+    setSavedDeck((d) => (d.every((s) => have.has(s)) ? d : d.filter((s) => have.has(s))))
+  }, [roster])
+
+  // Mirrors deck_of(): a card retired from the roster invalidates the whole
+  // team, and the server quietly fields the default instead. If the client did
+  // not agree, this page would claim a team was saved while the match used
+  // something else.
   const live = new Set(roster.map((c) => c.slug))
   const deckSet = savedDeck.length === DECK_SIZE && savedDeck.every((s) => live.has(s))
   const effectiveDeck = deckSet ? savedDeck : roster.slice(0, DECK_SIZE).map((c) => c.slug)

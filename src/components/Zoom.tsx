@@ -24,6 +24,20 @@ export interface ZoomTarget {
 const OUT_MS = 360
 const SKEW = -8      // the menu's lean, in degrees; the block keeps it throughout
 
+/**
+ * How far this particular tile has to grow to swallow the screen. The 1.6 /
+ * 1.5 are slack for the lean and for the corners a skewed rectangle leaves
+ * uncovered -- cheaper than the trigonometry, and the block is a flat colour
+ * so nobody can tell it overshot. Recomputed on the way back rather than
+ * remembered, in case the window changed size while the page was open.
+ */
+function growFrom(r: DOMRect) {
+  const s = Math.max((innerWidth * 1.6) / r.width, (innerHeight * 1.5) / r.height)
+  const tx = innerWidth / 2 - (r.left + r.width / 2)
+  const ty = innerHeight / 2 - (r.top + r.height / 2)
+  return `translate(${tx}px, ${ty}px) scale(${s}) skewX(${SKEW}deg)`
+}
+
 export function useZoom() {
   const [rect, setRect] = useState<DOMRect | null>(null)
   const [grow, setGrow] = useState('')
@@ -45,14 +59,7 @@ export function useZoom() {
         setPage(target.id)
         return
       }
-      // How far this particular tile has to grow to swallow the screen. The
-      // 1.6 / 1.5 are slack for the lean and for the corners a skewed rectangle
-      // leaves uncovered -- cheaper than doing the trigonometry, and the block
-      // is a flat colour so nobody can tell it overshot.
-      const s = Math.max((innerWidth * 1.6) / r.width, (innerHeight * 1.5) / r.height)
-      const tx = innerWidth / 2 - (r.left + r.width / 2)
-      const ty = innerHeight / 2 - (r.top + r.height / 2)
-      setGrow(`translate(${tx}px, ${ty}px) scale(${s}) skewX(${SKEW}deg)`)
+      setGrow(growFrom(r))
       setRect(r)
       setOpen(false)
       // one frame at the tile's size, then let the transition do the rest
@@ -66,11 +73,30 @@ export function useZoom() {
     [reduced],
   )
 
+  /**
+   * Leaving runs the same move backwards.
+   *
+   * The block is mounted already at full size -- there is no previous state
+   * for it to transition from, so that first frame simply paints -- the page
+   * is dropped underneath it in the same commit, and only then does it shrink
+   * back into the tile it came out of. Which is why `origin` is kept: the tile
+   * itself is unmounted while a page is open, so its rectangle is the only
+   * record of where the door was.
+   */
   const close = useCallback(() => {
+    const r = origin.current
+    if (reduced || !r) {
+      setPage(null); setRect(null); setOpen(false)
+      return
+    }
+    setGrow(growFrom(r))
+    setRect(r)
+    setOpen(true)     // painted, not animated: nothing to come from
     setPage(null)
-    setRect(null)
-    setOpen(false)
-  }, [])
+    requestAnimationFrame(() => requestAnimationFrame(() => setOpen(false)))
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setRect(null), OUT_MS)
+  }, [reduced])
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 

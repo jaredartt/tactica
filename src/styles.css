@@ -452,9 +452,33 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .laddernote { margin: 16px 0 0; max-width: 62ch; }
 .ownrank { font-weight: 400; color: var(--ink); }
 
-/* ---------- roster --------------------------------------------------------- */
+/* ---------- the phone ------------------------------------------------------ */
 
-.ladder { font-size: 12px; }
+@media (max-width: 720px) {
+  .menu { padding: 0 10px 10px; gap: 8px; }
+  .menu-grid {
+    --overhang: 16px;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: 1.4fr 1fr 0.85fr 0.85fr 0.85fr;
+    gap: 6px;
+  }
+  .mt-ranked   { grid-column: 1 / 3; grid-row: 1; }
+  .mt-team     { grid-column: 1 / 3; grid-row: 2; }
+  .mt-bot      { grid-column: 1; grid-row: 3; }
+  .mt-friends  { grid-column: 2; grid-row: 3; }
+  .mt-spectate { grid-column: 1; grid-row: 4; }
+  .mt-ladder   { grid-column: 2; grid-row: 4; }
+  .mt-comics   { grid-column: 1 / 3; grid-row: 5; }
+  .mtile-inner { padding: 12px calc(var(--overhang, 0px) + 12px); }
+  .mtile-note { font-size: 11px; }
+  .menu-head { padding: 7px 14px; }
+  .page-wash { animation-name: washm; }
+  @keyframes washm { to { height: 66px; } }
+  .page-head { height: 66px; padding: 0 14px; }
+  .page-body { padding: 20px 14px 34px; }
+  .modecard { padding: 16px 18px; border-radius: 13px; }
+  .modecard-name { font-size: 20px; }
+  .ladder { font-size: 12px; }
   .ladder th:nth-child(3), .ladder td:nth-child(3) { display: none; }
 }
 
