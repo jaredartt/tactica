@@ -7,7 +7,7 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('11110000-0000-0000-0000-00000000000a','p@x.com','{"username":"pia"}'),
   ('22220000-0000-0000-0000-00000000000b','q@x.com','{"username":"quin"}');
 
-select t_ok((select count(*) from public.cards where is_active) = 10, 'ten cards in the roster');
+select t_ok((select count(*) from public.cards where is_active) = 11, 'eleven cards in the roster');
 select t_ok((select count(*) from public.cards where is_active and art_url is null) = 0,
             'every one of them has art');
 select t_ok((select count(*) from public.cards where is_active and role = '') = 0,
@@ -177,6 +177,63 @@ select t_ok(t_get(:'p','h2','hp')::int < t_get(:'p','h2','maxHp')::int,
             'and strikes from two tiles away');
 
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+-- ---- Sinie mends everyone at once ---------------------------------------
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+select public.set_deck(array['sinie','mako','wuzu','lumea']);
+select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
+select public.set_deck(array['dione-grifo','dereo','eva','fey']);
+select t_match('11110000-0000-0000-0000-00000000000a',
+               '22220000-0000-0000-0000-00000000000b') as b \gset
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+select t_trees(:'b', '[]'::jsonb);
+select t_park(:'b', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_ok(t_get(:'b','h1','name') = 'Sinie', 'the host fields Sinie in slot 1');
+select t_ok(t_get(:'b','h1','blooms') = 'true', 'and she carries the flag');
+
+-- three allies hurt: one clicked, one in reach, one out of it
+select t_reset(:'b');
+select t_place(:'b','h1',2,2);          -- Sinie, reach 1-2
+select t_place(:'b','h2',2,3);          -- clicked
+select t_place(:'b','h3',3,1);          -- in reach, not clicked
+select t_place(:'b','h4',5,5);          -- far away
+select t_hp(:'b','h2',10); select t_hp(:'b','h3',10); select t_hp(:'b','h4',10);
+select public.submit_attack(:'b','h1','h2');
+select t_ok(t_get(:'b','h2','hp')::int > 10, 'the ally you clicked is mended');
+select t_ok(t_get(:'b','h3','hp')::int > 10, 'and so is the one merely standing near her');
+select t_ok(t_get(:'b','h4','hp')::int = 10, 'but not one outside her reach');
+select t_ok(t_get(:'b','h2','hp')::int = t_get(:'b','h3','hp')::int,
+            'one roll, spent on each of them -- a lucky roll is lucky once');
+select t_ok(jsonb_array_length(t_fx(:'b','bloom')::jsonb) = 1,
+            'the clients are told who else was caught in it');
+
+-- a full ally is not counted
+select t_reset(:'b'); select t_hp(:'b','h2',10);
+select t_full(:'b','h3'); select t_full(:'b','h4');
+select public.submit_attack(:'b','h1','h2');
+select t_ok(jsonb_array_length(t_fx(:'b','bloom')::jsonb) = 0,
+            'nobody at full health is swept up in it');
+
+-- a tree between them blocks the bloom, the same as a shot
+select t_reset(:'b'); select t_hp(:'b','h2',10); select t_hp(:'b','h3',10);
+select t_full(:'b','h4');
+select t_trees(:'b', '[{"id":"t1","x":3,"y":2,"hp":30,"maxHp":30}]'::jsonb);
+select t_place(:'b','h3',4,2);
+select public.submit_attack(:'b','h1','h2');
+select t_ok(t_get(:'b','h3','hp')::int = 10, 'and wood stops it, the same as an arrow');
+
+-- an ordinary healer still mends exactly one
+select t_reset(:'b'); select t_trees(:'b', '[]'::jsonb);
+select public.end_turn(:'b');            -- still the host's to give away
+select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
+select t_ok(t_get(:'b','g3','name') = 'Eva', 'the guest fields Eva');
+select t_park(:'b', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_place(:'b','g3',2,2); select t_place(:'b','g1',2,3); select t_place(:'b','g2',3,1);
+select t_hp(:'b','g1',10); select t_hp(:'b','g2',10);
+select public.submit_attack(:'b','g3','g1');
+select t_ok(t_get(:'b','g1','hp')::int > 10 and t_get(:'b','g2','hp')::int = 10,
+            'Eva mends the one she was pointed at and nobody else');
+select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+
 select id as bm from public.create_bot_match(3) \gset
 select public.set_ready(:'bm');
 do $$

@@ -34,6 +34,8 @@ export interface Unit {
   /** Answers BEFORE the blow it is answering. If the answer kills, the blow
    *  never lands at all. */
   parries: boolean
+  /** Mending reaches every ally in range, not only the one you clicked. */
+  blooms: boolean
   burned: boolean
   accent: string
   art: string | null
@@ -77,6 +79,8 @@ export interface Fx {
   cured: boolean
   /** The counter landed first, so the attack may never have happened. */
   parry: boolean
+  /** Ids of the allies a bloom swept up besides the one that was clicked. */
+  bloom?: string[]
   tree: boolean
 }
 
@@ -154,6 +158,7 @@ export interface Card {
   sneaks: boolean
   cures: boolean
   parries: boolean
+  blooms: boolean
   ability: string
   accent: string
   /** Relative to the site root, e.g. 'cards/dereo.webp'. Run it through

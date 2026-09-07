@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  createBotMatch, createMatch, joinMatch, leaveRanked, rankedTick, setDeck, sweepMatches,
+  createBotMatch, createMatch, joinMatch, leaveRanked, rankedTick,
+  setDeck as setDeck_, sweepMatches,
 } from '../lib/api'
+import { Comics } from './Comics'
 import {
   BOT_LEVELS, DECK_SIZE, reachText, tierOf,
   type Card, type LadderRow, type MatchRow, type Profile,
@@ -16,18 +18,34 @@ interface Props {
   onEnter: (matchId: string) => void
 }
 
-/** Every destination, its colour, and where its tile sits. The colour is used
- *  three times -- the tile, the block that flies out of it, and the band at the
- *  top of the page it lands on -- which is what ties the three together. */
+/** Every destination: its colour, the picture behind it, and where its tile
+ *  sits. The colour is used three times -- washed over the picture, on the
+ *  block that flies out of the tile, and on the band at the top of the page it
+ *  lands on -- which is what ties the three together.
+ *
+ *  `focus` is where the picture is anchored inside a tile far wider than the
+ *  picture is: a lower number shows more of the top of it. It is per tile
+ *  because these are drawings of people, and one number that keeps every head
+ *  on screen does not exist -- the ladder's is a square portrait in a letterbox
+ *  and the practice one is a figure standing at the top of a staircase.
+ *
+ *  Ranked has no picture yet, so its tile is the flat colour until one lands
+ *  in public/menu/. A missing background is invisible, not broken. */
 const TILES = [
-  { id: 'ranked',   label: 'Ranked',   tint: '#2f4bff', note: 'Play for a place on the ladder' },
-  { id: 'bot',      label: 'Practice', tint: '#0e0e14', note: 'Spar with the machine' },
-  { id: 'host',     label: 'Host',     tint: '#ff2e93', note: 'Open a room, send the code' },
-  { id: 'join',     label: 'Join',     tint: '#7c3aed', note: 'Five letters from a friend' },
-  { id: 'deck',     label: 'Deck',     tint: '#10b981', note: 'Four of the six' },
-  { id: 'roster',   label: 'Roster',   tint: '#f59e0b', note: 'Every card in the game' },
-  { id: 'spectate', label: 'Watch',    tint: '#0ea5e9', note: 'Look in on a live match' },
-  { id: 'ladder',   label: 'Ladder',   tint: '#111827', note: 'Who is on top' },
+  { id: 'ranked',   label: 'Ranked',     tint: '#d92d20', art: 'menu/ranked.webp',   focus: '22%',
+    note: 'Play for a place on the ladder' },
+  { id: 'bot',      label: 'Practice',   tint: '#e8701a', art: 'menu/practice.webp', focus: '8%',
+    note: 'Spar with the machine' },
+  { id: 'friends',  label: 'Vs Friends', tint: '#d9a41b', art: 'menu/friends.webp',  focus: '28%',
+    note: 'Open a room, or join one' },
+  { id: 'spectate', label: 'Watch',      tint: '#2f9e52', art: 'menu/watch.webp',    focus: '32%',
+    note: 'Look in on a live match' },
+  { id: 'ladder',   label: 'Ladder',     tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%',
+    note: 'Who is on top' },
+  { id: 'team',     label: 'My Team',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
+    note: 'Four of the eleven' },
+  { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '16%',
+    note: 'The story behind the board' },
 ] as const
 
 type PageId = (typeof TILES)[number]['id']
@@ -42,6 +60,7 @@ export function Lobby({ profile, onEnter }: Props) {
   const [err, setErr] = useState<string | null>(null)
   const [deck, setDeckDraft] = useState<string[]>(profile.deck ?? [])
   const [savedDeck, setSavedDeck] = useState<string[]>(profile.deck ?? [])
+  const [saving, setSaving] = useState(false)
 
   // queue
   const [searching, setSearching] = useState(false)
@@ -76,7 +95,7 @@ export function Lobby({ profile, onEnter }: Props) {
   }, [page])
 
   useEffect(() => {
-    if ((page !== 'roster' && page !== 'deck') || roster.length) return
+    if (page !== 'team' || roster.length) return
     supabase.from('cards').select('*').eq('is_active', true).order('sort')
       .then(({ data }) => data && setRoster(data as Card[]))
   }, [page, roster.length])
@@ -87,11 +106,6 @@ export function Lobby({ profile, onEnter }: Props) {
       .order('lp', { ascending: false }).order('wins', { ascending: false }).limit(50)
       .then(({ data }) => data && setLadder(data as LadderRow[]))
   }, [page])
-
-  // ---- hosting happens on arrival, so the zoom is the loading screen -------
-  useEffect(() => {
-    if (page === 'host') run(createMatch)
-  }, [page, run])
 
   // ---- the queue -----------------------------------------------------------
   useEffect(() => {
@@ -139,18 +153,37 @@ export function Lobby({ profile, onEnter }: Props) {
       : d.length >= DECK_SIZE ? d : [...d, slug])
   }
 
-  async function saveDeck() {
-    setBusy(true); setErr(null)
-    try { setSavedDeck(await setDeck(deck)) }
-    catch (e) { setErr((e as Error).message) }
-    finally { setBusy(false) }
-  }
+  /**
+   * There is no Save button: a team saves itself the moment it is a team.
+   *
+   * set_deck takes exactly four slugs, so a draft of three is not something
+   * the server can hold -- which turns out to be the right behaviour rather
+   * than a limitation. Taking a card out leaves the LAST saved four in place,
+   * so wandering off mid-swap keeps the team you actually had, and putting a
+   * fourth back is what commits the change. A swap is therefore one write.
+   *
+   * A write is a single-row update on your own profile row. Supabase meters
+   * storage and egress, not statements, so this costs nothing that a button
+   * would have saved.
+   */
+  const sent = useRef('')
+  useEffect(() => {
+    if (deck.length !== DECK_SIZE) return
+    const key = deck.join()
+    if (key === savedDeck.join() || key === sent.current) return
+    sent.current = key
+    setSaving(true); setErr(null)
+    setDeck_(deck)
+      .then((d) => setSavedDeck(d))
+      .catch((e) => { setErr((e as Error).message); sent.current = '' })
+      .finally(() => setSaving(false))
+  }, [deck, savedDeck])
 
   const tile = TILES.find((t) => t.id === page)
   const title = (id: PageId) =>
-    id === 'ranked' ? 'Ranked' : id === 'bot' ? 'Practice' : id === 'host' ? 'Opening a room'
-    : id === 'join' ? 'Join by code' : id === 'deck' ? 'Your deck'
-    : id === 'roster' ? 'The roster' : id === 'spectate' ? 'Live matches' : 'Ladder'
+    id === 'ranked' ? 'Ranked' : id === 'bot' ? 'Practice' : id === 'friends' ? 'Vs Friends'
+    : id === 'team' ? 'My Team' : id === 'comics' ? 'Comics'
+    : id === 'spectate' ? 'Live matches' : 'Ladder'
 
   return (
     <div className="menu">
@@ -175,14 +208,27 @@ export function Lobby({ profile, onEnter }: Props) {
           <button
             key={t.id}
             className={`mtile mt-${t.id}`}
-            style={{ background: t.tint }}
+            style={{ '--tint': t.tint } as React.CSSProperties}
             disabled={busy}
             onClick={(e) => zoomTo(e.currentTarget, { id: t.id, tint: t.tint })}
           >
+            {/* Three layers: the picture, the colour laid over it, and the
+                words. The picture is counter-skewed and overscaled so the lean
+                never exposes a corner, and it is the only thing that moves on
+                hover -- the tile itself holds still and its colour thins out. */}
+            <span
+              className="mtile-art"
+              style={{
+                backgroundImage: `url(${import.meta.env.BASE_URL}${t.art})`,
+                backgroundPosition: `center ${t.focus}`,
+              }}
+              aria-hidden="true"
+            />
+            <span className="mtile-wash" aria-hidden="true" />
             <span className="mtile-inner">
               <span className="mtile-label">{t.label}</span>
               <span className="mtile-note">
-                {t.id === 'deck' && !deckSet ? 'Not chosen yet'
+                {t.id === 'team' && !deckSet ? 'Not chosen yet'
                  : t.id === 'ladder' && profile.games > 0
                    ? `You are ${tierOf(profile.lp)} on ${profile.lp} LP`
                    : t.note}
@@ -196,7 +242,7 @@ export function Lobby({ profile, onEnter }: Props) {
       {zoomer}
 
       {page && tile && (
-        <Page title={title(tile.id)} tint={tile.tint} onClose={close}>
+        <Page title={title(tile.id)} tint={tile.tint} onClose={close} wide={page === 'team'}>
           {page === 'ranked' && (
             <div className="modelist">
               <button
@@ -250,20 +296,35 @@ export function Lobby({ profile, onEnter }: Props) {
             </div>
           )}
 
-          {page === 'host' && <p className="muted">Opening a room…</p>}
-
-          {page === 'join' && (
-            <form
-              className="joinform"
-              onSubmit={(e) => { e.preventDefault(); if (code.trim()) run(() => joinMatch(code)) }}
-            >
-              <input
-                className="codeinput" value={code} autoFocus maxLength={5} aria-label="Room code"
-                onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE"
-              />
-              <button className="btn primary" disabled={busy || !code.trim()}>Join</button>
-            </form>
+          {/* Opening a room and joining one used to be two tiles, which made
+              the menu ask a question nobody has: whether you are the host. You
+              want to play a specific person; one of you sends five letters. */}
+          {page === 'friends' && (
+            <div className="modelist">
+              <button className="modecard" disabled={busy} onClick={() => run(createMatch)}>
+                <span className="modecard-name">Open a room</span>
+                <span className="modecard-note">
+                  You get a five-letter code. Send it to whoever you want to play.
+                </span>
+              </button>
+              <div className="orline"><span>or</span></div>
+              <form
+                className="joinform"
+                onSubmit={(e) => { e.preventDefault(); if (code.trim()) run(() => joinMatch(code)) }}
+              >
+                <input
+                  className="codeinput" value={code} maxLength={5} aria-label="Room code"
+                  onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE"
+                />
+                <button className="btn primary" disabled={busy || !code.trim()}>Join</button>
+              </form>
+              <p className="muted tiny queuenote">
+                Nothing you play here touches anybody's rating. That is what Ranked is for.
+              </p>
+            </div>
           )}
+
+          {page === 'comics' && <Comics />}
 
           {page === 'spectate' && (
             <>
@@ -293,75 +354,68 @@ export function Lobby({ profile, onEnter }: Props) {
             </>
           )}
 
-          {page === 'deck' && (
-            <>
-              <p className="muted deckintro">
-                Four of the six, no repeats. Both armies are on the board before the first turn,
-                and you arrange yours then.
-              </p>
-              <div className="deckgrid">
+          {/* The roster, edge to edge, art and nothing else -- you pick your
+              four by recognising them, the way you pick a fighter. Everything
+              a card can do is one hover away, laid over a darkened version of
+              the same picture so the words have something to sit on. */}
+          {page === 'team' && (
+            <div className="teamwrap">
+              <div className="roster-grid">
                 {roster.map((c) => {
                   const picked = deck.includes(c.slug)
+                  const full = deck.length >= DECK_SIZE
                   return (
                     <button
                       key={c.id} type="button" aria-pressed={picked}
-                      className={`dcard${picked ? ' is-picked' : ''}`}
+                      aria-label={`${c.name}, ${c.role}`}
+                      className={`rtile${picked ? ' is-picked' : ''}${!picked && full ? ' is-spare' : ''}`}
                       style={{ '--accent': c.accent } as React.CSSProperties}
                       onClick={() => toggleCard(c.slug)}
                     >
-                      <span className="dcard-pick">{picked ? deck.indexOf(c.slug) + 1 : ''}</span>
-                      <span className="dcard-art">
-                        {c.art_url ? <img src={artUrl(c.art_url)!} alt="" /> : <span>{c.name[0]}</span>}
+                      <span
+                        className="rtile-art"
+                        style={{ backgroundImage: `url(${artUrl(c.art_url) ?? ''})` }}
+                        aria-hidden="true"
+                      />
+                      {picked && <span className="rtile-pick">{deck.indexOf(c.slug) + 1}</span>}
+                      <span className="rtile-name">{c.name}</span>
+
+                      <span className="rtile-info">
+                        <span className="rti-head">
+                          <b>{c.name}</b>
+                          {c.role && <em>{c.role}</em>}
+                        </span>
+                        <span className="rti-stats">
+                          <span><i>HP</i><b>{c.hp}</b></span>
+                          <span><i>{c.heals ? 'PWR' : 'DMG'}</i><b>{c.dmin}–{c.dmax}</b></span>
+                          <span><i>MOV</i><b>{c.mov}</b></span>
+                          <span><i>RNG</i><b>{reachText(c.rmin, c.rmax)}</b></span>
+                          <span><i>CTR</i><b>{reachText(c.crmin, c.crmax)}</b></span>
+                        </span>
+                        {c.ability && <span className="rti-ability">{c.ability}</span>}
+                        <span className="rti-cta">
+                          {picked ? 'Remove' : full ? 'Team is full' : 'Add to team'}
+                        </span>
                       </span>
-                      <span className="dcard-name">{c.name}</span>
-                      <span className="dcard-stats">
-                        <b>{c.hp} HP</b>
-                        <b>{c.dmin}–{c.dmax} {c.heals ? 'PWR' : 'DMG'}</b>
-                        <b>MOV {c.mov}</b>
-                        <b>RNG {reachText(c.rmin, c.rmax)}</b>
-                      </span>
-                      <span className="dcard-ability">{c.ability}</span>
                     </button>
                   )
                 })}
               </div>
+
               <div className="deckfoot">
                 <span className="muted tiny">
                   {deck.length}/{DECK_SIZE} chosen
-                  {!deckSet && ` — until you save, you field ${effectiveDeck.join(', ')}`}
+                  {deck.length < DECK_SIZE && deckSet &&
+                    ` — still fielding ${savedDeck.join(', ')} until you pick a fourth`}
+                  {deck.length < DECK_SIZE && !deckSet &&
+                    ` — you field ${effectiveDeck.join(', ')} until you pick four`}
                 </span>
-                <button
-                  className="btn primary"
-                  disabled={busy || deck.length !== DECK_SIZE || deck.join() === savedDeck.join()}
-                  onClick={saveDeck}
-                >
-                  {deck.join() === savedDeck.join() && deckSet ? 'Saved' : 'Save deck'}
-                </button>
+                <span className={`savemark${saving ? ' is-busy' : ''}`}>
+                  {saving ? 'Saving…'
+                   : deck.length === DECK_SIZE && deck.join() === savedDeck.join() ? 'Saved'
+                   : ''}
+                </span>
               </div>
-            </>
-          )}
-
-          {page === 'roster' && (
-            <div className="rosterlist">
-              {roster.map((c) => (
-                <article key={c.id} className="rcard" style={{ '--accent': c.accent } as React.CSSProperties}>
-                  <div className="rcard-art">
-                    {c.art_url ? <img src={artUrl(c.art_url)!} alt="" /> : <span>{c.name[0]}</span>}
-                  </div>
-                  <div className="rcard-body">
-                    <h3>{c.name}</h3>
-                    {c.role && <p className="rcard-role">{c.role}</p>}
-                    <dl className="rcard-stats">
-                      <div><dt>HP</dt><dd>{c.hp}</dd></div>
-                      <div><dt>{c.heals ? 'PWR' : 'DMG'}</dt><dd>{c.dmin}–{c.dmax}</dd></div>
-                      <div><dt>MOV</dt><dd>{c.mov}</dd></div>
-                      <div><dt>RNG</dt><dd>{reachText(c.rmin, c.rmax)}</dd></div>
-                      <div><dt>CTR</dt><dd>{reachText(c.crmin, c.crmax)}</dd></div>
-                    </dl>
-                    {c.ability && <p>{c.ability}</p>}
-                  </div>
-                </article>
-              ))}
             </div>
           )}
 
