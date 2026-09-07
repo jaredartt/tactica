@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import { artUrl, faceUrl } from '../lib/art'
 import { deployTiles, key, ownSide, reachable, targetsFor, willCounter } from '../lib/rules'
+import {
+  playBurn, playChop, playCounter, playDown, playHit, playMend, playMove, playParry,
+  playPlace, playSelect,
+} from '../lib/sfx'
 
 // No pixel sizes here on purpose. The board is a CSS grid that fills whatever
 // space it is given and keeps its aspect ratio.
@@ -107,6 +111,11 @@ export function Board({
           { duration: 240, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
         )
       }
+      // One sound for the whole change, not one per card: a deployment swap
+      // is two cards but a single act. Sounding it here rather than in the
+      // click handler means the opponent's move is audible too, and means a
+      // move the server refused stays silent.
+      if (moves.length) (deploying ? playPlace : playMove)()
     }
     for (const id of [...seats.current.keys()]) if (!live.has(id)) seats.current.delete(id)
   })
@@ -139,6 +148,26 @@ export function Board({
       tgtAt: t ? { x: t.x, y: t.y } : { x: wood!.x, y: wood!.y },
       atkUnit: a, tgtUnit: t ?? null,
     })
+    // The soundtrack of the exchange, scheduled against the same clock the
+    // CSS uses. These are the numbers in styles.css: a lunge takes 0.34s and
+    // its victim recoils at 0.12s, the answering lunge starts at 0.38s and
+    // lands at 0.5s. Sound that drifts off the picture reads as a bug even
+    // when the picture is right, so the delays live next to the animation
+    // that earns them -- if one moves, move the other.
+    const CONTACT = 0.12
+    const ANSWER = 0.5
+    const power = (n: number) => n / 28
+
+    if (fx.burnAtk || fx.burnTgt) playBurn(0.02)      // fire eating, before anything swings
+    if (fx.heal > 0) playMend(CONTACT)
+    else if (fx.tree) playChop(CONTACT)
+    else if (fx.dmg > 0) playHit(power(fx.dmg), CONTACT)
+    // A tree going over is a second, deeper chop, not a body falling.
+    if (fx.killedTgt) (fx.tree ? playChop : playDown)(CONTACT + 0.22)
+    if (fx.newBurn) playBurn(CONTACT + 0.22)
+    if (fx.counter > 0) (fx.parry ? playParry : playCounter)(power(fx.counter), ANSWER)
+    if (fx.killedAtk) playDown(ANSWER + 0.22)
+
     const id = setTimeout(() => setBlow(null), FX_MS)
     return () => clearTimeout(id)
   }, [state])
@@ -186,11 +215,13 @@ export function Board({
       if (selected && mine && u.owner === mySide && u.id !== selected.id) {
         onDeploy(selected.id, u.x, u.y)
         onSelect(null)
-      } else onSelect(u.id === selectedId ? null : u.id)
+      } else { if (u.id !== selectedId) playSelect(); onSelect(u.id === selectedId ? null : u.id) }
       return
     }
+    // Attacking has its own sound a moment later, from the exchange; putting
+    // one here as well would double every blow.
     if (targets.has(u.id)) onAttack(u.id)
-    else onSelect(u.id === selectedId ? null : u.id)
+    else { if (u.id !== selectedId) playSelect(); onSelect(u.id === selectedId ? null : u.id) }
   }
 
   // A spectator has no ground of their own, so they get the host's reading --

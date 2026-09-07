@@ -12,6 +12,7 @@ import {
   DEPLOY_SECONDS, TURN_SECONDS, reachText,
   type MatchState, type Profile, type Side, type Unit,
 } from '../lib/types'
+import { playLose, playTurn, playWin } from '../lib/sfx'
 
 export function Match({ matchId, profile, onLeave, onGoTo }: {
   matchId: string
@@ -151,6 +152,31 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
 
   // Clear the selection whenever the turn flips.
   useEffect(() => setSelected(null), [state?.turn, state?.turnNumber])
+
+  // Two announcements, and both of them have to be careful about what counts
+  // as news. A turn is news when it becomes yours and was not yours a moment
+  // ago -- not on the first render, where the ref is seeded with whatever is
+  // already true, or opening a match on your turn would chime at you, and so
+  // would every reconnect. The result is news exactly once, for the same
+  // reason: the winner sits in the row for as long as the room exists, so a
+  // spectator arriving afterwards, or a refresh, must not replay the fanfare.
+  const wasMine = useRef(isMyTurn)
+  useEffect(() => {
+    if (isMyTurn && !wasMine.current) playTurn()
+    wasMine.current = isMyTurn
+  }, [isMyTurn])
+
+  const sang = useRef<Side | 'none' | null>(null)
+  useEffect(() => {
+    const won = state?.winner ?? null
+    if (sang.current === null) { sang.current = won ?? 'none'; return }
+    if (!won || sang.current === won) return
+    sang.current = won
+    // A spectator has no side to lose with, so they get the flourish either
+    // way rather than a defeat that is not theirs.
+    if (mySide === null || won === mySide) playWin()
+    else playLose()
+  }, [state?.winner, mySide])
 
   /** Leave for another room. Deliberately not wrapped in guard(): guard
    *  refreshes when it is done, and refreshing the room you have just walked

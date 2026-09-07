@@ -10,3 +10,6 @@ tsconfig.tsbuildinfo
 
 # vite writes these while running the dev server
 vite.config.ts.timestamp-*
+
+# Scratch: this session cannot delete files in the synced folder.
+_to_delete/

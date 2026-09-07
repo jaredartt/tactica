@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 import { setSettings, useSettings } from '../lib/settings'
-import { playClick } from '../lib/sfx'
+import { playHit } from '../lib/sfx'
 import { IconMotion, IconMusic, IconSignOut, IconSound } from './Icons'
 import { Modal } from './Modal'
 
@@ -36,9 +36,12 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
             type="range" min={0} max={100} value={Math.round(s.sfx * 100)}
             aria-label="Sound effects volume"
             onChange={(e) => setSettings({ sfx: Number(e.target.value) / 100 })}
-            // A volume slider you cannot hear is a guess. Every notch plays.
-            onMouseUp={() => playClick()}
-            onKeyUp={() => playClick()}
+            // A volume slider you cannot hear is a guess, so every notch
+            // plays -- and it plays a blow rather than a button, because the
+            // loudest thing this number controls is the fighting. Previewing
+            // with the quietest sound in the set is how you set it too high.
+            onMouseUp={() => playHit(0.6)}
+            onKeyUp={() => playHit(0.6)}
           />
         </Row>
 
