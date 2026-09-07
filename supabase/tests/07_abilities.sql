@@ -14,9 +14,9 @@ select t_ok((select count(*) from public.cards where is_active and role = '') = 
             'and a class beside the name');
 
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['lumea','mako','umiro','wuzu']);
+select public.set_deck(array['lumea','mako','umiro','wuzu','eva']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
-select public.set_deck(array['dione-grifo','dereo','fey','eva']);
+select public.set_deck(array['dione-grifo','dereo','fey','eva','umiro']);
 
 select t_match('11110000-0000-0000-0000-00000000000a',
                '22220000-0000-0000-0000-00000000000b') as m \gset
@@ -100,7 +100,7 @@ select t_ok(t_get(:'m','h1','burned') = 'true', 'a herbalist who does not cure l
 select t_set(:'m','h3','cures','true'::jsonb);
 
 -- ---- Fey reaches three, and only another three answers -------------------
-select t_reset(:'m'); select t_park(:'m', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'m'); select t_park(:'m', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok((select rmin=2 and rmax=3 and crmin=3 and crmax=3
                from public.cards where slug='fey'), 'Fey is 2-3, answering only at 3');
 select t_place(:'m','g3',2,2); select t_place(:'m','h4',2,5);   -- Fey vs Wuzu, three apart
@@ -117,14 +117,14 @@ select t_raises(format('select public.submit_attack(%L,''h4'',''g3'')', :'m'),
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 -- ---- Lium answers first -------------------------------------------------
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['lium','himanta','mako','wuzu']);
+select public.set_deck(array['lium','himanta','mako','wuzu','eva']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
-select public.set_deck(array['dione-grifo','dereo','eva','fey']);
+select public.set_deck(array['dione-grifo','dereo','eva','fey','umiro']);
 select t_match('22220000-0000-0000-0000-00000000000b',
                '11110000-0000-0000-0000-00000000000a') as p \gset
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
 select t_trees(:'p', '[]'::jsonb);
-select t_park(:'p', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'p', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'p','g1','name') = 'Lium', 'the guest fields Lium in slot 1');
 select t_ok(t_get(:'p','g1','parries') = 'true', 'and it carries the flag');
 
@@ -149,7 +149,7 @@ select t_ok(t_fx(:'p','parry') = 'true', 'and flagged as a parry');
 select t_reset(:'p');
 select public.end_turn(:'p');                       -- hand the turn to the guest
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select t_park(:'p', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'p', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'p','g2','name') = 'Himanta', 'the guest fields Himanta in slot 2');
 
 select t_trees(:'p', '[{"id":"t1","x":3,"y":4,"hp":30,"maxHp":30}]'::jsonb);
@@ -179,14 +179,14 @@ select t_ok(t_get(:'p','h2','hp')::int < t_get(:'p','h2','maxHp')::int,
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 -- ---- Sinie mends everyone at once ---------------------------------------
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['sinie','mako','wuzu','lumea']);
+select public.set_deck(array['sinie','mako','wuzu','lumea','eva']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
-select public.set_deck(array['dione-grifo','dereo','eva','fey']);
+select public.set_deck(array['dione-grifo','dereo','eva','fey','umiro']);
 select t_match('11110000-0000-0000-0000-00000000000a',
                '22220000-0000-0000-0000-00000000000b') as b \gset
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 select t_trees(:'b', '[]'::jsonb);
-select t_park(:'b', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'b', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'b','h1','name') = 'Sinie', 'the host fields Sinie in slot 1');
 select t_ok(t_get(:'b','h1','blooms') = 'true', 'and she carries the flag');
 
@@ -226,7 +226,7 @@ select t_reset(:'b'); select t_trees(:'b', '[]'::jsonb);
 select public.end_turn(:'b');            -- still the host's to give away
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
 select t_ok(t_get(:'b','g3','name') = 'Eva', 'the guest fields Eva');
-select t_park(:'b', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'b', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_place(:'b','g3',2,2); select t_place(:'b','g1',2,3); select t_place(:'b','g2',3,1);
 select t_hp(:'b','g1',10); select t_hp(:'b','g2',10);
 select public.submit_attack(:'b','g3','g1');

@@ -16,17 +16,17 @@ select t_ok((select count(*) from public.cards where is_active) = 11, 'eleven un
 -- ---- decks --------------------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
 select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu''])',
-                'exactly 4', 'a deck is exactly four cards');
-select t_raises('select public.set_deck(array[''dereo'',''dereo'',''eva'',''wuzu''])',
-                'no repeats', 'no repeats in a deck');
-select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu'',''dragon''])',
-                'not in the roster', 'every card in a deck has to exist');
-select public.set_deck(array['dione-grifo','dereo','mako','wuzu']);
+                'exactly 5', 'a team is exactly five cards');
+select t_raises('select public.set_deck(array[''dereo'',''dereo'',''eva'',''wuzu'',''mako''])',
+                'no repeats', 'no repeats in a team');
+select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu'',''mako'',''dragon''])',
+                'not in the roster', 'every card in a team has to exist');
+select public.set_deck(array['dione-grifo','dereo','mako','wuzu','eva']);
 select t_ok((select deck from public.profiles where id = auth.uid())
-            = array['dione-grifo','dereo','mako','wuzu'], 'deck saved');
+            = array['dione-grifo','dereo','mako','wuzu','eva'], 'team saved');
 
 select set_config('app.uid', '22222222-2222-2222-2222-222222222222', false);
-select public.set_deck(array['wuzu','dereo','eva','dione-grifo']);
+select public.set_deck(array['wuzu','dereo','eva','dione-grifo','mako']);
 
 -- ---- alice opens a room -------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
@@ -69,16 +69,16 @@ select public.join_match(:'mcode');
 select t_ok((select status from public.matches where id=:'mid') = 'deploying',
             'joining opens the deployment phase, not the match');
 
--- The whole point: while you are arranging your four, NOBODY's four are in the
+-- The whole point: while you are arranging your team, NOBODY's team is in the
 -- row every signed-in player can read.
 select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 0,
             'no army is in the readable match row during deployment');
-select t_ok(t_dcount(:'mid','host') = 4 and t_dcount(:'mid','guest') = 4,
+select t_ok(t_dcount(:'mid','host') = 5 and t_dcount(:'mid','guest') = 5,
             'both armies exist, one private row each');
-select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
+select t_ok((select count(*) = 5 from public.match_deploy d, jsonb_array_elements(d.units) u
               where d.match_id=:'mid' and d.side='host' and (u->>'x')::int < 3),
             'the host army starts on the left');
-select t_ok((select count(*) = 4 from public.match_deploy d, jsonb_array_elements(d.units) u
+select t_ok((select count(*) = 5 from public.match_deploy d, jsonb_array_elements(d.units) u
               where d.match_id=:'mid' and d.side='guest' and (u->>'x')::int >= 3),
             'the guest army starts on the right');
 select t_ok(t_dget(:'mid','guest','g1','name') = 'Wuzu', 'the guest fields the deck they chose');
@@ -101,11 +101,12 @@ select t_raises(format('select public.deploy_unit(%L,''h1'',5,1)', :'mid'),
 select t_raises(format('select public.deploy_unit(%L,''g1'',9,9)', :'mid'),
                 'off the board', 'deployment stays on the board');
 
--- Park the guest's four in a known column so the squares used below are
+-- Park the guest's five in a known column so the squares used below are
 -- free whatever the opening formation happens to be.
 select t_trees(:'mid', '[]'::jsonb);
 select t_dplace(:'mid','guest','g1',5,0), t_dplace(:'mid','guest','g2',5,1),
-       t_dplace(:'mid','guest','g3',5,4), t_dplace(:'mid','guest','g4',5,5);
+       t_dplace(:'mid','guest','g3',5,4), t_dplace(:'mid','guest','g4',5,5),
+       t_dplace(:'mid','guest','g5',4,5);
 select t_ok(public.deploy_unit(:'mid','g1',3,5) is not null,
             'the near column of your own side is yours too');
 select public.deploy_unit(:'mid', 'g1', 3, 2);
@@ -138,7 +139,7 @@ select t_raises(format('select public.deploy_unit(%L,''g1'',3,1)', :'mid'),
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
 select public.set_ready(:'mid');
 select t_ok((select status from public.matches where id=:'mid') = 'active', 'both ready starts the match');
-select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 8,
+select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 10,
             'and that is the moment both armies appear on the board');
 select t_ok((select state->>'phase' from public.matches where id=:'mid') = 'battle', 'phase is battle');
 select t_ok((select turn_deadline > now() from public.matches where id=:'mid'), 'turn clock started');
@@ -150,8 +151,12 @@ select t_raises(format('select public.deploy_unit(%L,''h1'',1,4)', :'mid'),
 select t_trees(:'mid', '[]'::jsonb);
 select t_place(:'mid','h1',0,5); select t_place(:'mid','h2',1,5);
 select t_place(:'mid','h3',2,5); select t_place(:'mid','h4',3,5);
+select t_place(:'mid','h5',4,5);
 select t_place(:'mid','g1',0,0); select t_place(:'mid','g2',1,0);
 select t_place(:'mid','g3',2,0); select t_place(:'mid','g4',3,0);
+-- The fifth has to be placed too. Left where deployment put it, it sometimes
+-- landed in the lane h1 walks up two assertions from here.
+select t_place(:'mid','g5',4,0);
 
 select set_config('app.uid', '22222222-2222-2222-2222-222222222222', false);
 select t_raises(format('select public.submit_move(%L,''g1'',0,1)', :'mid'),
@@ -211,25 +216,31 @@ select t_ok((select status from public.matches where id=:'m2') = 'active',
 
 -- ---- win condition ------------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
-select t_place(:'mid','h1',0,1); select t_hp(:'mid','g1',1);
-select t_place(:'mid','h2',1,1); select t_hp(:'mid','g2',1);
-select t_place(:'mid','h3',2,1); select t_hp(:'mid','g3',1);
-select t_place(:'mid','h4',3,1); select t_hp(:'mid','g4',1);
+-- Both sides placed, not just the attackers: with five a side the opening
+-- formation no longer leaves the far column empty, so "wherever they happen
+-- to be standing" stopped being within anybody's reach.
+select t_place(:'mid','h1',0,1); select t_place(:'mid','g1',0,2); select t_hp(:'mid','g1',1);
+select t_place(:'mid','h2',1,1); select t_place(:'mid','g2',1,2); select t_hp(:'mid','g2',1);
+select t_place(:'mid','h3',2,1); select t_place(:'mid','g3',2,2); select t_hp(:'mid','g3',1);
+select t_place(:'mid','h4',3,1); select t_place(:'mid','g4',3,2); select t_hp(:'mid','g4',1);
+select t_place(:'mid','h5',4,1); select t_place(:'mid','g5',4,2); select t_hp(:'mid','g5',1);
 select t_dmg(:'mid','h1',40); select t_dmg(:'mid','h2',40);
-select t_dmg(:'mid','h3',40); select t_dmg(:'mid','h4',40);
+select t_dmg(:'mid','h3',40); select t_dmg(:'mid','h4',40); select t_dmg(:'mid','h5',40);
 select t_set(:'mid','h1','rmin','1'::jsonb); select t_set(:'mid','h1','rmax','1'::jsonb);
 select t_set(:'mid','h2','rmin','1'::jsonb); select t_set(:'mid','h2','rmax','1'::jsonb);
 select t_set(:'mid','h3','rmin','1'::jsonb); select t_set(:'mid','h3','rmax','1'::jsonb);
 select t_set(:'mid','h4','rmin','1'::jsonb); select t_set(:'mid','h4','rmax','1'::jsonb);
+select t_set(:'mid','h5','rmin','1'::jsonb); select t_set(:'mid','h5','rmax','1'::jsonb);
 
 select public.submit_attack(:'mid','h1','g1');
 select public.submit_attack(:'mid','h2','g2');
 select public.submit_attack(:'mid','h3','g3');
 select public.submit_attack(:'mid','h4','g4');
+select public.submit_attack(:'mid','h5','g5');
 
 select t_ok((select status from public.matches where id=:'mid') = 'finished', 'match finished');
 select t_ok((select winner from public.matches where id=:'mid') = 'host', 'host recorded as winner');
-select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 4,
+select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'mid') = 5,
             'destroyed units removed from the board');
 
 -- ---- privilege checks ---------------------------------------------------

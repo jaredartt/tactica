@@ -205,7 +205,7 @@ export const tierOf = (lp: number) => TIERS.find((t) => lp >= t.at)!.name
 
 export const TURN_SECONDS = 30
 export const DEPLOY_SECONDS = 90
-export const DECK_SIZE = 4
+export const DECK_SIZE = 5
 export const AWAY_TURNS = 3
 
 export const BOT_LEVELS = [

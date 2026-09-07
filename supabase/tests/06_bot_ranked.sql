@@ -25,7 +25,7 @@ select t_ok((select (state->'ready'->>'guest')::boolean from public.matches wher
             'and it is ready before you start');
 select t_ok((select jsonb_array_length(state->'units') from public.matches where id=:'bm') = 0,
             'no army is in the readable row while you deploy');
-select t_ok(t_dcount(:'bm','host') = 4 and t_dcount(:'bm','guest') = 4,
+select t_ok(t_dcount(:'bm','host') = 5 and t_dcount(:'bm','guest') = 5,
             'both armies exist privately, the bot''s included');
 select t_ok((select user_id is null from public.match_deploy
               where match_id=:'bm' and side='guest'),

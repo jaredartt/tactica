@@ -43,7 +43,7 @@ const TILES = [
   { id: 'ladder',   label: 'Ladder',     tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%',
     note: 'Who is on top' },
   { id: 'team',     label: 'My Team',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
-    note: 'Four of the eleven' },
+    note: 'Five of the eleven' },
   { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%',
     note: 'The story behind the board' },
 ] as const
@@ -156,11 +156,11 @@ export function Lobby({ profile, onEnter }: Props) {
   /**
    * There is no Save button: a team saves itself the moment it is a team.
    *
-   * set_deck takes exactly four slugs, so a draft of three is not something
-   * the server can hold -- which turns out to be the right behaviour rather
-   * than a limitation. Taking a card out leaves the LAST saved four in place,
-   * so wandering off mid-swap keeps the team you actually had, and putting a
-   * fourth back is what commits the change. A swap is therefore one write.
+   * set_deck takes exactly a full team, so a short draft is not something the
+   * server can hold -- which turns out to be the right behaviour rather than a
+   * limitation. Taking a card out leaves the LAST saved team in place, so
+   * wandering off mid-swap keeps the team you actually had, and putting the
+   * missing one back is what commits the change. A swap is one write.
    *
    * A write is a single-row update on your own profile row. Supabase meters
    * storage and egress, not statements, so this costs nothing that a button
@@ -270,7 +270,7 @@ export function Lobby({ profile, onEnter }: Props) {
               )}
               {!deckSet && (
                 <p className="muted tiny queuenote">
-                  You have not picked a deck, so you will field {effectiveDeck.join(', ') || 'the default four'}.
+                  You have not picked a deck, so you will field {effectiveDeck.join(', ') || 'the default five'}.
                 </p>
               )}
             </div>
@@ -290,7 +290,7 @@ export function Lobby({ profile, onEnter }: Props) {
                 </button>
               ))}
               <p className="muted tiny queuenote">
-                It brings four random cards and plays by exactly the rules you do. Nothing here
+                It brings five random cards and plays by exactly the rules you do. Nothing here
                 touches your rating.
               </p>
             </div>
@@ -355,7 +355,7 @@ export function Lobby({ profile, onEnter }: Props) {
           )}
 
           {/* The roster, edge to edge, art and nothing else -- you pick your
-              four by recognising them, the way you pick a fighter. Everything
+              five by recognising them, the way you pick a fighter. Everything
               a card can do is one hover away, laid over a darkened version of
               the same picture so the words have something to sit on. */}
           {page === 'team' && (
@@ -406,9 +406,9 @@ export function Lobby({ profile, onEnter }: Props) {
                 <span className="muted tiny">
                   {deck.length}/{DECK_SIZE} chosen
                   {deck.length < DECK_SIZE && deckSet &&
-                    ` — still fielding ${savedDeck.join(', ')} until you pick a fourth`}
+                    ` — still fielding ${savedDeck.join(', ')} until the team is full`}
                   {deck.length < DECK_SIZE && !deckSet &&
-                    ` — you field ${effectiveDeck.join(', ')} until you pick four`}
+                    ` — you field ${effectiveDeck.join(', ')} until you pick ${DECK_SIZE}`}
                 </span>
                 <span className={`savemark${saving ? ' is-busy' : ''}`}>
                   {saving ? 'Saving…'

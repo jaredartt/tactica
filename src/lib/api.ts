@@ -84,7 +84,7 @@ export async function requestRematch(matchId: string): Promise<string | null> {
   return (data as string | null) ?? null
 }
 
-/** Save your four. The server re-checks the count, the duplicates and that
+/** Save your team. The server re-checks the count, the duplicates and that
  *  every card is really in the roster. */
 export async function setDeck(deck: string[]): Promise<string[]> {
   const { data, error } = await supabase.rpc('set_deck', { p_deck: deck })
@@ -96,7 +96,7 @@ export async function setDeck(deck: string[]): Promise<string[]> {
  * Move one of your units during deployment. Dropping onto one of your own
  * swaps the two.
  *
- * Returns YOUR four and nothing else, because during this phase the two armies
+ * Returns YOUR units and nothing else, because during this phase the two armies
  * are not in the match row -- your opponent's positions are somewhere you have
  * no permission to look, which is the only way to stop someone reading them
  * out of the network tab and setting up against what they saw.

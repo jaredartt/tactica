@@ -28,15 +28,15 @@ select t_ok((select hp=95 and mov=1 and rmin=1 and rmax=2 and dmin=10 and dmax=2
                and heals and cures from public.cards where slug='umiro'), 'Umiro');
 
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
-select public.set_deck(array['dione-grifo','dereo','mako','wuzu']);
+select public.set_deck(array['dione-grifo','dereo','mako','wuzu','eva']);
 select set_config('app.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
-select public.set_deck(array['dereo','eva','umiro','lumea']);
+select public.set_deck(array['dereo','eva','umiro','lumea','mako']);
 
 select t_match('aaaaaaaa-0000-0000-0000-000000000001',
                'bbbbbbbb-0000-0000-0000-000000000002') as mid \gset
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
 select t_trees(:'mid', '[]'::jsonb);
-select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 
 -- ---- movement is orthogonal; reach counts diagonals ---------------------
 select t_reset(:'mid'); select t_place(:'mid','h4',2,5);       -- Wuzu, mov 1
@@ -45,12 +45,14 @@ select t_raises(format('select public.submit_move(%L,''h4'',3,4)', :'mid'),
 select public.submit_move(:'mid','h4',2,4);
 select t_ok(t_get(:'mid','h4','y')='4', 'Wuzu moves its one tile');
 
-select t_reset(:'mid'); select t_place(:'mid','h3',0,5);       -- Mako, mov 3
-select public.submit_move(:'mid','h3',0,2);
+-- Column 3, not column 0: t_park stacks five down the back column now, so
+-- column 0 is a wall rather than a corridor.
+select t_reset(:'mid'); select t_place(:'mid','h3',3,5);       -- Mako, mov 3
+select public.submit_move(:'mid','h3',3,2);
 select t_ok(t_get(:'mid','h3','y')='2', 'Mako crosses three tiles');
 
 -- ---- exactly two, and who can answer it ---------------------------------
-select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_place(:'mid','h2',0,3);          -- Dereo, reaches exactly 2
 select t_place(:'mid','g4',0,2);          -- Lumea, one tile away
 select t_raises(format('select public.submit_attack(%L,''h2'',''g4'')', :'mid'),
@@ -71,7 +73,7 @@ select public.submit_attack(:'mid','h2','g1');   -- Dereo on Dereo
 select t_ok(t_get(:'mid','h2','hp')::int < 70, 'another Dereo DOES answer at two');
 
 -- ---- melee reaches diagonally -------------------------------------------
-select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_place(:'mid','h1',1,3); select t_place(:'mid','g4',2,2);
 select t_hp(:'mid','g4',70);
 select public.submit_attack(:'mid','h1','g4');   -- Dione & Grifo, diagonally
@@ -79,7 +81,7 @@ select t_ok(t_get(:'mid','g4','hp')::int < 70, 'Dione & Grifo hit diagonally');
 select t_ok(t_get(:'mid','h1','hp')::int < 110, 'and are answered diagonally');
 
 -- ---- burn -----------------------------------------------------------------
-select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_place(:'mid','h2',2,3); select t_place(:'mid','g1',2,1);
 select t_hp(:'mid','h2',70); select t_hp(:'mid','g1',70);
 -- Dereo set that Dereo alight two assertions ago; put it out first, or this
@@ -103,7 +105,7 @@ select t_ok(t_fx(:'mid','burnAtk')::int = 5, 'a burned attacker burns for 5 too'
 select t_set(:'mid','h1','burned','false'::jsonb);
 
 -- ---- mending --------------------------------------------------------------
-select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_raises(format('select public.submit_attack(%L,''h1'',''h2'')', :'mid'),
                 'friendly fire', 'only a herbalist may target an ally');
 
@@ -111,7 +113,7 @@ select t_match('bbbbbbbb-0000-0000-0000-000000000002',
                'aaaaaaaa-0000-0000-0000-000000000001') as m2 \gset
 select set_config('app.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
 select t_trees(:'m2', '[]'::jsonb);
-select t_park(:'m2', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_park(:'m2', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'m2','h2','name') = 'Eva', 'ben hosts with Eva in slot 2');
 
 select t_reset(:'m2'); select t_place(:'m2','h2',1,3); select t_place(:'m2','h4',1,4);
@@ -133,7 +135,7 @@ select t_ok(t_get(:'m2','g1','hp')::int < 110, 'and at one');
 
 -- ---- trees ----------------------------------------------------------------
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
-select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','g1','g2','g3','g4']);
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 
 select t_trees(:'mid', '[{"id":"t1","x":0,"y":4,"hp":30,"maxHp":30}]'::jsonb);
 select t_place(:'mid','h1',3,5); select t_place(:'mid','h2',4,5); select t_place(:'mid','h4',5,5);
@@ -174,7 +176,7 @@ select t_ok(t_get(:'mid','h4','hp')::int = 120, 'a tree does not counter');
 
 -- ---- decks fall back when the roster changes underneath them ------------
 select t_ok(public.deck_of('bbbbbbbb-0000-0000-0000-000000000002')
-            = array['dereo','eva','umiro','lumea'], 'a saved deck is used');
+            = array['dereo','eva','umiro','lumea','mako'], 'a saved team is used');
 update public.cards set is_active = false where slug = 'dereo';
 select t_ok(public.deck_of('bbbbbbbb-0000-0000-0000-000000000002') = public.default_deck(),
             'a deck holding a retired card falls back to the default');

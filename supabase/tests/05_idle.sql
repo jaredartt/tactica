@@ -75,9 +75,9 @@ select t_ok(t_idle(:'m2','host') = 2, 'host has missed two');
 -- Clear the ground first: the opening formation is laid out around whatever
 -- trees were rolled, so which squares are free is not fixed until it is.
 select t_trees(:'m2', '[]'::jsonb);
-select t_park(:'m2', array['h1','h2','h3','h4','g1','g2','g3','g4']);
-select t_place(:'m2','h1',0,5);
-select public.submit_move(:'m2','h1',0,4);          -- host does one thing
+select t_park(:'m2', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
+select t_place(:'m2','h1',2,5);                      -- a lane the parked five
+select public.submit_move(:'m2','h1',2,4);          -- are not standing in
 select t_timeout(:'m2');                            -- then lets the clock go
 select t_ok(t_idle(:'m2','host') = 0,
             'moving a single unit resets the count, even if the clock then runs out');
