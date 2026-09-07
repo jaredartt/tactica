@@ -10,12 +10,19 @@ import {
   type Card, type LadderRow, type MatchRow, type Profile,
 } from '../lib/types'
 import { artUrl } from '../lib/art'
+import { Avatar } from './Avatar'
+import { IconGear } from './Icons'
 import { Logo } from './Logo'
+import { ProfileCard } from './ProfileCard'
+import { SettingsCard } from './SettingsCard'
 import { Page, useZoom } from './Zoom'
 
 interface Props {
   profile: Profile
   onEnter: (matchId: string) => void
+  /** The lobby owns the profile panel, so it is the lobby that reports a new
+   *  name or face back up to whoever is holding the profile. */
+  onProfile: (patch: Partial<Profile>) => void
 }
 
 /** Every destination: its colour, the picture behind it, and where its tile
@@ -50,7 +57,7 @@ const TILES = [
 
 type PageId = (typeof TILES)[number]['id']
 
-export function Lobby({ profile, onEnter }: Props) {
+export function Lobby({ profile, onEnter, onProfile }: Props) {
   const { zoomTo, close, page, zoomer } = useZoom()
   const [rooms, setRooms] = useState<MatchRow[]>([])
   const [roster, setRoster] = useState<Card[]>([])
@@ -63,6 +70,8 @@ export function Lobby({ profile, onEnter }: Props) {
   const [saving, setSaving] = useState(false)
 
   // queue
+  const [overlay, setOverlay] = useState<null | 'profile' | 'settings'>(null)
+
   const [searching, setSearching] = useState(false)
   const [waiting, setWaiting] = useState(0)
   const [elapsed, setElapsed] = useState(0)
@@ -210,13 +219,19 @@ export function Lobby({ profile, onEnter }: Props) {
           <h1 className="wordmark small">CROWN NEMESIS</h1>
         </div>
         <div className="menu-who">
-          <span className="muted">
-            {profile.username}
+          {/* One button, not two: the face and the name are the same thing to
+              point at, and splitting them would make the smaller of the two a
+              target you have to aim for. */}
+          <button className="whoami" onClick={() => setOverlay('profile')}>
+            <Avatar slug={profile.avatar} name={profile.username} size={30} />
+            <span className="whoami-name">{profile.username}</span>
             {profile.games > 0 && (
-              <>{' · '}<b className="ownrank">{tierOf(profile.lp)} {profile.lp}</b></>
+              <span className="ownrank">{tierOf(profile.lp)} {profile.lp}</span>
             )}
-          </span>
-          <button className="linkbtn" onClick={() => supabase.auth.signOut()}>Sign out</button>
+          </button>
+          <button className="iconbtn" onClick={() => setOverlay('settings')} aria-label="Settings">
+            <IconGear />
+          </button>
         </div>
       </header>
 
@@ -257,6 +272,11 @@ export function Lobby({ profile, onEnter }: Props) {
 
       {err && <p className="error menu-err">{err}</p>}
       {zoomer}
+
+      {overlay === 'profile' && (
+        <ProfileCard profile={profile} onClose={() => setOverlay(null)} onChanged={onProfile} />
+      )}
+      {overlay === 'settings' && <SettingsCard onClose={() => setOverlay(null)} />}
 
       {page && tile && (
         <Page title={title(tile.id)} tint={tile.tint} onClose={close} wide={page === 'team'}>

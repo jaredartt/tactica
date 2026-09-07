@@ -1,0 +1,102 @@
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { setAvatar, setUsername } from '../lib/api'
+import type { Card, Profile } from '../lib/types'
+import { Avatar } from './Avatar'
+import { Modal } from './Modal'
+
+/**
+ * Who you are: a face out of the roster and a name.
+ *
+ * The icon saves the moment you pick one -- it is one tap and there is nothing
+ * to get wrong. The name does not: a name is typed, and typing wants a moment
+ * to change your mind before anyone else sees it.
+ */
+export function ProfileCard({
+  profile, onClose, onChanged,
+}: {
+  profile: Profile
+  onClose: () => void
+  onChanged: (p: Partial<Profile>) => void
+}) {
+  const [roster, setRoster] = useState<Card[]>([])
+  const [name, setName] = useState(profile.username)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    supabase.from('cards').select('*').eq('is_active', true).order('sort')
+      .then(({ data }) => data && setRoster(data as Card[]))
+  }, [])
+
+  async function pick(slug: string) {
+    const next = profile.avatar === slug ? null : slug     // tap it again to clear
+    setErr(null)
+    onChanged({ avatar: next })                            // optimistic: it is one tap
+    try { await setAvatar(next) }
+    catch (e) { setErr((e as Error).message); onChanged({ avatar: profile.avatar }) }
+  }
+
+  async function rename() {
+    const v = name.trim()
+    if (v === profile.username) return
+    setBusy(true); setErr(null); setSaved(false)
+    try {
+      const got = await setUsername(v)
+      onChanged({ username: got })
+      setSaved(true)
+    } catch (e) {
+      setErr((e as Error).message.replace(/^.*?:\s*/, ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Your profile" onClose={onClose}>
+      <div className="pf">
+        <div className="pf-you">
+          <Avatar slug={profile.avatar} name={profile.username} size={72} className="is-big" />
+          <div className="pf-name">
+            <label htmlFor="pf-username">Name</label>
+            <div className="pf-rename">
+              <input
+                id="pf-username" value={name} maxLength={20} autoComplete="off"
+                onChange={(e) => { setName(e.target.value); setSaved(false) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') rename() }}
+              />
+              <button
+                className="btn small primary"
+                disabled={busy || !name.trim() || name.trim() === profile.username}
+                onClick={rename}
+              >
+                {busy ? 'Saving…' : saved ? 'Saved' : 'Save'}
+              </button>
+            </div>
+            <p className="muted tiny">
+              2 to 20 characters. Letters, numbers, spaces, dots, dashes and underscores.
+            </p>
+          </div>
+        </div>
+
+        <h3 className="pf-title">Pick a face</h3>
+        <div className="pf-grid">
+          {roster.map((c) => (
+            <button
+              key={c.id}
+              className={`pf-pick${profile.avatar === c.slug ? ' is-on' : ''}`}
+              onClick={() => pick(c.slug)}
+              title={c.name}
+              aria-pressed={profile.avatar === c.slug}
+            >
+              <Avatar slug={c.slug} name={c.name} size={54} />
+              <em>{c.name}</em>
+            </button>
+          ))}
+        </div>
+        {err && <p className="error">{err}</p>}
+      </div>
+    </Modal>
+  )
+}

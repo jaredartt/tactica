@@ -4,17 +4,22 @@ import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
 import { Logo } from './components/Logo'
 import { useWipe } from './components/Wipe'
+import { attachUiSounds } from './lib/sfx'
 import { useAuth } from './lib/useAuth'
 import { configured, supabase } from './lib/supabase'
 
 export default function App() {
-  const { session, profile, loading, profileError, retryProfile } = useAuth()
+  const { session, profile, loading, profileError, retryProfile, patchProfile } = useAuth()
   const [matchId, setMatchId] = useState<string | null>(
     () => new URLSearchParams(location.search).get('m'),
   )
   // Every crossing between the menu and a match goes through this, in both
   // directions: leaving one for the other used to happen in a single frame.
   const { cross, wipe } = useWipe()
+
+  // One pair of listeners for every button in the app, rather than a sound
+  // wired into each one and forgotten on the next.
+  useEffect(attachUiSounds, [])
 
   // Keep the URL in step, so a match is a link you can paste to a spectator.
   useEffect(() => {
@@ -74,7 +79,11 @@ export default function App() {
     )
   return (
     <>
-      <Lobby profile={profile} onEnter={(id) => cross(() => setMatchId(id))} />
+      <Lobby
+        profile={profile}
+        onEnter={(id) => cross(() => setMatchId(id))}
+        onProfile={patchProfile}
+      />
       {wipe}
     </>
   )

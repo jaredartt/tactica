@@ -1460,10 +1460,177 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    appears where it is instead of travelling. A view that changes between one
    frame and the next is the thing this is here to prevent, and that is not
    what "reduce motion" is asking for. */
+@keyframes wipe-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wipe-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   .wipe { transform: none; }
   .wipe.is-in  { animation: wipe-fade-in  0.16s ease-out forwards; }
   .wipe.is-out { animation: wipe-fade-out 0.22s ease-in forwards; }
-  @keyframes wipe-fade-in  { from { opacity: 0; } to { opacity: 1; } }
-  @keyframes wipe-fade-out { from { opacity: 1; } to { opacity: 0; } }
+}
+/* The same, asked for in Settings rather than in the operating system. */
+:root[data-reduce-motion="1"] .wipe { transform: none; }
+:root[data-reduce-motion="1"] .wipe.is-in  { animation: wipe-fade-in  0.16s ease-out forwards; }
+:root[data-reduce-motion="1"] .wipe.is-out { animation: wipe-fade-out 0.22s ease-in forwards; }
+
+/* ---------- who you are ---------------------------------------------------
+
+   A face, a name, and a gear. The face and the name are one button because
+   they are one thing to point at -- splitting them would make the smaller of
+   the two a target you have to aim for. */
+
+.avatar {
+  flex: none; display: grid; place-items: center; overflow: hidden;
+  border-radius: 50%; background: var(--tile-a);
+  box-shadow: inset 0 0 0 1px rgba(14, 14, 20, 0.10);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar i {
+  font-style: normal; font-family: var(--display); font-weight: 900;
+  font-size: 0.46em; color: var(--muted);
+}
+.avatar.is-big { box-shadow: inset 0 0 0 2px rgba(14, 14, 20, 0.10); }
+
+.whoami {
+  display: flex; align-items: center; gap: 9px;
+  border: 0; background: none; padding: 4px 8px 4px 4px; border-radius: 999px;
+  font: inherit; color: var(--ink); cursor: pointer;
+  transition: background 0.15s;
+}
+.whoami:hover { background: rgba(14, 14, 20, 0.05); }
+.whoami-name { font-size: 13px; }
+.whoami .ownrank {
+  font-family: var(--display); font-weight: 900; font-size: 11px;
+  letter-spacing: 0.02em; color: var(--muted);
+  padding-left: 9px; border-left: 1px solid var(--line);
+}
+
+.iconbtn {
+  flex: none; width: 34px; height: 34px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: none; color: var(--muted);
+  cursor: pointer; transition: background 0.15s, color 0.15s, transform 0.3s;
+}
+.iconbtn svg { width: 20px; height: 20px; }
+.iconbtn:hover { background: rgba(14, 14, 20, 0.06); color: var(--ink); transform: rotate(35deg); }
+
+/* ---------- a panel over everything ---------------------------------------- */
+
+.scrim {
+  position: fixed; inset: 0; z-index: 90;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(14, 14, 20, 0.42);
+  backdrop-filter: blur(7px) saturate(0.9);
+  -webkit-backdrop-filter: blur(7px) saturate(0.9);
+  animation: scrim-in 0.16s ease-out;
+}
+@keyframes scrim-in { from { opacity: 0; } }
+
+.modal {
+  width: min(520px, 100%); max-height: min(84dvh, 720px); overflow-y: auto;
+  background: var(--paper); border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(14, 14, 20, 0.34);
+  padding: 20px 22px 24px;
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.modal:focus { outline: none; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(10px) scale(0.985); } }
+
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-head h2 {
+  margin: 0; font-family: var(--display); font-weight: 900;
+  font-size: 20px; letter-spacing: -0.01em;
+}
+.modal-x {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: none; color: var(--muted); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.modal-x svg { width: 18px; height: 18px; }
+.modal-x:hover { background: rgba(14, 14, 20, 0.07); color: var(--ink); }
+
+/* ---------- the profile panel ---------------------------------------------- */
+
+.pf { display: flex; flex-direction: column; gap: 18px; margin-top: 16px; }
+.pf-you { display: flex; align-items: flex-start; gap: 16px; }
+.pf-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pf-name label {
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #b3b3c4;
+}
+.pf-rename { display: flex; gap: 8px; }
+.pf-rename input { flex: 1; min-width: 0; }
+.pf-title {
+  margin: 0; font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #b3b3c4; font-weight: 400;
+}
+.pf-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+}
+.pf-pick {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  border: 0; background: none; padding: 8px 4px; border-radius: 12px;
+  font: inherit; color: var(--muted); cursor: pointer;
+  transition: background 0.14s;
+}
+.pf-pick em {
+  font-style: normal; font-size: 10px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-pick:hover { background: rgba(14, 14, 20, 0.05); }
+.pf-pick.is-on { background: color-mix(in srgb, var(--you) 12%, transparent); color: var(--you); }
+.pf-pick.is-on .avatar { box-shadow: inset 0 0 0 2px var(--you), 0 0 0 2px var(--you); }
+
+/* ---------- the settings panel --------------------------------------------- */
+
+.settings { display: flex; flex-direction: column; gap: 2px; margin-top: 14px; }
+.set-row {
+  width: 100%; display: grid;
+  grid-template-columns: 26px 1fr auto; align-items: center; gap: 14px;
+  padding: 13px 6px; border: 0; background: none; border-radius: 12px;
+  font: inherit; color: var(--ink); text-align: left;
+}
+.set-icon { display: grid; place-items: center; color: var(--muted); }
+.set-icon svg { width: 20px; height: 20px; }
+.set-label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.set-label em { font-style: normal; font-size: 11px; color: var(--muted); }
+.set-control { display: flex; align-items: center; }
+.set-sep { height: 1px; background: var(--line); margin: 8px 0; }
+.set-row.is-action { cursor: pointer; transition: background 0.14s; }
+.set-row.is-action:hover { background: rgba(14, 14, 20, 0.05); }
+
+/* A slider that looks like the rest of the app rather than like the browser. */
+.settings input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 148px; height: 4px; border-radius: 999px; background: var(--line-2);
+  cursor: pointer;
+}
+.settings input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--you); border: 2px solid var(--paper);
+  box-shadow: 0 1px 4px rgba(14, 14, 20, 0.28);
+}
+.settings input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--paper);
+  background: var(--you); box-shadow: 0 1px 4px rgba(14, 14, 20, 0.28);
+}
+
+.toggle {
+  width: 46px; height: 27px; border-radius: 999px; border: 0; padding: 0;
+  background: var(--line-2); cursor: pointer; position: relative;
+  transition: background 0.18s;
+}
+.toggle i {
+  position: absolute; top: 3px; left: 3px; width: 21px; height: 21px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(14, 14, 20, 0.3);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.toggle.is-on { background: var(--you); }
+.toggle.is-on i { transform: translateX(19px); }
+
+@media (max-width: 560px) {
+  .whoami-name { display: none; }
+  .modal { padding: 16px 16px 20px; border-radius: 15px; }
+  .settings input[type="range"] { width: 110px; }
 }

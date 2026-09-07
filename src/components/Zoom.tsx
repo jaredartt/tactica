@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { lessMotion } from '../lib/settings'
 
 /**
  * The Smash-menu transition: the tile you pressed grows until it IS the page.
@@ -47,8 +48,8 @@ export function useZoom() {
   const origin = useRef<DOMRect | null>(null)
   const timer = useRef<number | undefined>(undefined)
 
-  const reduced =
-    typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  // The setting in Settings, or the one in the operating system. Either.
+  const reduced = lessMotion()
 
   const zoomTo = useCallback(
     (el: HTMLElement, target: ZoomTarget) => {

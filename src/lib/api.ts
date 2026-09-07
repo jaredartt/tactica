@@ -168,3 +168,20 @@ export async function declineRematch(matchId: string) {
   const { error } = await supabase.rpc('decline_rematch', { p_match: matchId })
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
 }
+
+/** Your icon: one of the roster's own tokens, stored as its slug. The server
+ *  checks it is a card that exists, and a trigger checks again on the way in
+ *  whichever door it came by. */
+export async function setAvatar(slug: string | null): Promise<string | null> {
+  const { data, error } = await supabase.rpc('set_avatar', { p_slug: slug })
+  if (error) throw error
+  return (data as string | null) ?? null
+}
+
+/** Rename yourself. The unique index decides it; this turns the constraint
+ *  violation into a sentence. */
+export async function setUsername(name: string): Promise<string> {
+  const { data, error } = await supabase.rpc('set_username', { p_name: name })
+  if (error) throw error
+  return data as string
+}

@@ -76,5 +76,15 @@ export function useAuth() {
     }
   }, [session, attempt])
 
-  return { session, profile, loading, profileError, retryProfile, userId: session?.user.id ?? null }
+  /** Fold a change made elsewhere -- a new name, a new face -- into the copy
+   *  every screen is reading from, without a round trip to fetch what we just
+   *  wrote. */
+  const patchProfile = useCallback((patch: Partial<Profile>) => {
+    setProfile((p) => (p ? { ...p, ...patch } : p))
+  }, [])
+
+  return {
+    session, profile, loading, profileError, retryProfile, patchProfile,
+    userId: session?.user.id ?? null,
+  }
 }

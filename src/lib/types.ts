@@ -170,6 +170,8 @@ export interface Card {
 export interface Profile {
   id: string
   username: string
+  /** A card slug, or null for the plain initial. */
+  avatar: string | null
   is_admin: boolean
   lp: number
   wins: number
@@ -182,6 +184,7 @@ export interface Profile {
 export interface LadderRow {
   id: string
   username: string
+  avatar: string | null
   lp: number
   tier: string
   wins: number
