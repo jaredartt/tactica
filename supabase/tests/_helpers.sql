@@ -169,3 +169,12 @@ returns void language sql as $$
       from jsonb_array_elements(units) u)
    where match_id = p_m and side = p_side;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Who acts first is a coin flip in the real game (0017). A suite that cannot
+-- predict it fails one run in two, so the test database pins it. Scoped to the
+-- DATABASE rather than the session on purpose: the runner opens a fresh
+-- connection per test file, and a session GUC would not survive the gap.
+-- Nothing outside this file ever sets it, so production keeps its coin.
+-- ---------------------------------------------------------------------------
+alter database t set cn.first_side = 'host';

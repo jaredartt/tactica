@@ -253,9 +253,7 @@ export function Board({
               lit ? (deploying ? 'tile-deploy' : 'tile-move') : '',
             ].join(' ')}
             onClick={(e) => { e.stopPropagation(); clickTile(x, y) }}
-          >
-            {lit && <span className="tile-dot" />}
-          </div>
+          />
         )
       })}
 
@@ -436,29 +434,22 @@ function UnitCard({
 }) {
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
-  // The card leans toward the pointer. The angles go to CSS variables rather
-  // than straight to `transform`, so the lean composes with the hover scale
-  // instead of overwriting it.
-  // The same two angles go on the card under the pointer and on the arena, so
-  // the big card opening beside the board leans by exactly as much as the
-  // little one you are pointing at. Written straight to the DOM rather than
-  // held in state: this fires on every mouse move, and re-rendering the board
-  // sixty times a second to tilt a card is not a trade worth making.
+  // The piece on the board no longer leans toward the pointer -- it holds
+  // still and only lifts, because a token that tips while you are trying to
+  // read the art is the art losing. The movement moved to the big card
+  // opening beside the board, which still takes its angles from here: the
+  // arena's --brx/--bry. Written straight to the DOM rather than held in
+  // state, because this fires on every mouse move and re-rendering the board
+  // sixty times a second to tilt one card is not a trade worth making.
   function lean(e: React.MouseEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect()
     const px = (e.clientX - r.left) / r.width - 0.5
     const py = (e.clientY - r.top) / r.height - 0.5
-    const ry = `${(px * MAX_TILT * 2).toFixed(1)}deg`
-    const rx = `${(-py * MAX_TILT * 2).toFixed(1)}deg`
-    e.currentTarget.style.setProperty('--ry', ry)
-    e.currentTarget.style.setProperty('--rx', rx)
     const arena = e.currentTarget.closest('.arena') as HTMLElement | null
-    arena?.style.setProperty('--bry', ry)
-    arena?.style.setProperty('--brx', rx)
+    arena?.style.setProperty('--bry', `${(px * MAX_TILT * 2).toFixed(1)}deg`)
+    arena?.style.setProperty('--brx', `${(-py * MAX_TILT * 2).toFixed(1)}deg`)
   }
   function settle(e: React.MouseEvent<HTMLDivElement>) {
-    e.currentTarget.style.setProperty('--ry', '0deg')
-    e.currentTarget.style.setProperty('--rx', '0deg')
     const arena = e.currentTarget.closest('.arena') as HTMLElement | null
     arena?.style.setProperty('--bry', '0deg')
     arena?.style.setProperty('--brx', '0deg')

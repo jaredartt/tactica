@@ -89,9 +89,14 @@ export function ProfileCard({
               onClick={() => pick(c.slug)}
               title={c.name}
               aria-pressed={profile.avatar === c.slug}
+              aria-label={c.name}
             >
-              <Avatar slug={c.slug} name={c.name} size={54} />
-              <em>{c.name}</em>
+              {/* No caption. The faces ARE the labels -- you are picking the
+                  one you recognise, not reading a list -- and the names cost
+                  a row of 10px text under every tile for nothing. The name
+                  still reaches a screen reader and a tooltip through the
+                  button's title and aria-label. */}
+              <Avatar slug={c.slug} name={c.name} size={80} />
             </button>
           ))}
         </div>

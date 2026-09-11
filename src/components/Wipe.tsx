@@ -35,13 +35,33 @@ export function useWipe() {
    * in place instead of sweeping it across. The timing is the same either way,
    * so there is one code path and not two.
    */
+  const pending = useRef<(() => void) | null>(null)
+  const running = useRef(false)
+
   const cross = useCallback((swap: () => void) => {
+    // A crossing already under way takes the new destination and keeps its
+    // own clock. Restarting the timers on every call was a real bug: a caller
+    // that asks again more often than the 310ms swap -- an effect re-running
+    // on a component that re-renders five times a second -- would push the
+    // swap forward for ever, and the block would cover the screen and never
+    // leave. Latest destination wins; the timing is not up for negotiation.
+    pending.current = swap
+    if (running.current) return
+
+    running.current = true
     timers.current.forEach(window.clearTimeout)
     timers.current = []
     setPhase('in')
     timers.current.push(
-      window.setTimeout(() => { swap(); setPhase('out') }, SWAP_MS),
-      window.setTimeout(() => setPhase('idle'), SWAP_MS + OUT_MS),
+      window.setTimeout(() => {
+        pending.current?.()
+        pending.current = null
+        setPhase('out')
+      }, SWAP_MS),
+      window.setTimeout(() => {
+        running.current = false
+        setPhase('idle')
+      }, SWAP_MS + OUT_MS),
     )
   }, [])
 

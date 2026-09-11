@@ -49,7 +49,7 @@ const TILES = [
     note: 'Look in on a live match' },
   { id: 'ladder',   label: 'Ladder',     tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%',
     note: 'Who is on top' },
-  { id: 'team',     label: 'My Team',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
+  { id: 'team',     label: 'My Kingdom',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
     note: 'Five of the eleven' },
   { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%',
     note: 'The story behind the board' },
@@ -208,7 +208,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
   const tile = TILES.find((t) => t.id === page)
   const title = (id: PageId) =>
     id === 'ranked' ? 'Ranked' : id === 'bot' ? 'Practice' : id === 'friends' ? 'Vs Friends'
-    : id === 'team' ? 'My Team' : id === 'comics' ? 'Comics'
+    : id === 'team' ? 'My Kingdom' : id === 'comics' ? 'Comics'
     : id === 'spectate' ? 'Live matches' : 'Ladder'
 
   return (
@@ -431,7 +431,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                         </span>
                         {c.ability && <span className="rti-ability">{c.ability}</span>}
                         <span className="rti-cta">
-                          {picked ? 'Remove' : full ? 'Team is full' : 'Add to team'}
+                          {picked ? 'Remove' : full ? 'Kingdom is full' : 'Add to kingdom'}
                         </span>
                       </span>
                     </button>
@@ -443,7 +443,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                 <span className="muted tiny">
                   {deck.length}/{DECK_SIZE} chosen
                   {deck.length < DECK_SIZE && deckSet &&
-                    ` — still fielding ${savedDeck.join(', ')} until the team is full`}
+                    ` — still fielding ${savedDeck.join(', ')} until the kingdom is full`}
                   {deck.length < DECK_SIZE && !deckSet &&
                     ` — you field ${effectiveDeck.join(', ')} until you pick ${DECK_SIZE}`}
                 </span>

@@ -216,3 +216,32 @@ select t_ok((select host_name from public.matches where id=:'rr2'::uuid) = 'gus'
 select set_config('app.uid', 'f0000000-0000-0000-0000-000000000003', false);
 select t_raises(format('select public.decline_rematch(%L)', :'rr'),
                 'spectating', 'a spectator cannot answer for anybody');
+
+-- ---------------------------------------------------------------------------
+-- the coin that decides who opens
+-- ---------------------------------------------------------------------------
+do $$
+declare v_uid uuid := '77770000-0000-0000-0000-0000000000c1';
+        mid uuid; n int := 0; i int; v_turn text;
+begin
+  -- Unpin the database default for this session only, so we measure the real
+  -- thing rather than the harness.
+  perform set_config('cn.first_side', '', true);
+  delete from auth.users where id = v_uid;
+  insert into auth.users (id, email, raw_user_meta_data)
+  values (v_uid, 'coin@x.com', '{"username":"coiner"}');
+  perform set_config('app.uid', v_uid::text, false);
+
+  for i in 1..300 loop
+    select id into mid from public.create_bot_match(1);
+    perform public.set_ready(mid);
+    select state->>'turn' into v_turn from public.matches where id = mid;
+    if v_turn = 'guest' then n := n + 1; end if;
+    delete from public.matches where id = mid;
+  end loop;
+
+  -- 300 flips: outside 110..190 is a one-in-a-million coincidence, so it is a
+  -- rigged coin instead.
+  perform t_ok(n between 110 and 190,
+    format('the first move is a fair coin in practice too (%s/300 went to the bot)', n));
+end $$;

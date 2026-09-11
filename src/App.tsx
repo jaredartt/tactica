@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Auth } from './components/Auth'
 import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
@@ -16,6 +16,12 @@ export default function App() {
   // Every crossing between the menu and a match goes through this, in both
   // directions: leaving one for the other used to happen in a single frame.
   const { cross, wipe } = useWipe()
+
+  // Stable identities. These are effect dependencies down in Match, and a
+  // fresh arrow on every render makes those effects re-run on every render --
+  // which is how a rematch used to leave the wipe covering the screen.
+  const goTo = useCallback((id: string) => cross(() => setMatchId(id)), [cross])
+  const leave = useCallback(() => cross(() => setMatchId(null)), [cross])
 
   // One pair of listeners for every button in the app, rather than a sound
   // wired into each one and forgotten on the next.
@@ -68,12 +74,7 @@ export default function App() {
   if (matchId)
     return (
       <>
-        <Match
-          matchId={matchId}
-          profile={profile}
-          onLeave={() => cross(() => setMatchId(null))}
-          onGoTo={(id) => cross(() => setMatchId(id))}
-        />
+        <Match matchId={matchId} profile={profile} onLeave={leave} onGoTo={goTo} />
         {wipe}
       </>
     )
@@ -81,7 +82,7 @@ export default function App() {
     <>
       <Lobby
         profile={profile}
-        onEnter={(id) => cross(() => setMatchId(id))}
+        onEnter={goTo}
         onProfile={patchProfile}
       />
       {wipe}

@@ -130,12 +130,24 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   // The rematch is signalled by the finished room pointing at a new one, which
   // arrives over the realtime subscription we are already holding. Whoever
   // asked second created it; both sides get here the same way.
+  //
+  // The ref is what stops this from firing more than once for the same room,
+  // and it is not paranoia. onGoTo used to be a fresh arrow on every App
+  // render, so this effect re-ran on every render -- and the clock above
+  // re-renders this component five times a second. Each run restarted the
+  // crossing, whose swap lands at 310ms, so the swap never got to run: the
+  // wipe block covered the screen and stayed there, matchId never changed,
+  // and the condition below never went false. That was the blank white page
+  // on a practice rematch. onGoTo is stable now and the crossing ignores a
+  // second call, but this is the guard that says the intent out loud: go to a
+  // given room once.
+  const wentTo = useRef<string>('')
   useEffect(() => {
     const next = match?.next_match_id
-    if (next && next !== matchId) {
-      leaveMatch(matchId)
-      onGoTo(next)
-    }
+    if (!next || next === matchId || wentTo.current === next) return
+    wentTo.current = next
+    leaveMatch(matchId)
+    onGoTo(next)
   }, [match?.next_match_id, matchId, onGoTo])
 
   async function askRematch() {
