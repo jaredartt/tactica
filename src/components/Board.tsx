@@ -1,15 +1,14 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import type { Ghost } from '../lib/useGhost'
+import { buildCine, fighterOf, fighterOfTree, type Cine } from '../lib/cine'
+import { Duel } from './Duel'
 import { artUrl, faceUrl } from '../lib/art'
 import {
   canAct, deployTiles, draw, drawSign, flipFor, key, ownSide, pathTo, reachable,
   targetsFor, undraw, willCounter,
 } from '../lib/rules'
-import {
-  playBurn, playChop, playCounter, playDown, playHit, playMend, playMove, playParry,
-  playPlace, playSelect,
-} from '../lib/sfx'
+import { playMove, playPlace, playSelect } from '../lib/sfx'
 
 // No pixel sizes here on purpose. The board is a CSS grid that fills whatever
 // space it is given and keeps its aspect ratio.
@@ -39,6 +38,11 @@ interface Props {
   ghost?: Ghost | null
   onLook?: (g: { tile: { x: number; y: number } | null; unit: string | null;
                  mode: 'menu' | 'move' | 'attack' | null }) => void
+  /** True while a fight is on screen. The bot takes an action every 650ms and
+   *  a fight takes seconds, so without this it plays its whole turn behind the
+   *  cinematic and you watch the fights it had rather than the fights it is
+   *  having. */
+  onWatching?: (busy: boolean) => void
 }
 
 const watching = (side: Side | null) => side === null
@@ -71,7 +75,7 @@ type Mode = 'menu' | 'move' | 'attack'
 
 export function Board({
   state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
-  onWait, onDeploy, onHover, ghost = null, onLook,
+  onWait, onDeploy, onHover, ghost = null, onLook, onWatching,
 }: Props) {
   const { w, h } = state.board
   const trees: Obstacle[] = state.obstacles ?? []
@@ -162,6 +166,24 @@ export function Board({
   const lastSeq = useRef<number>(state.fx?.seq ?? 0)
   const [blow, setBlow] = useState<Blow | null>(null)
 
+  // The exchange, as a cinematic. Built HERE because this is where the board a
+  // moment ago still exists: a unit killed by the blow is gone from
+  // `state.units` by the time we hear about it, and the duel has to show it
+  // standing before it falls. Health is walked forward from this snapshot for
+  // the same reason -- see buildCine.
+  // A QUEUE and not a slot. Exchanges can arrive faster than they can be
+  // watched -- the bot takes its second activation while you are still
+  // watching its first, and so can a human who is quick about it. Replacing
+  // the one on screen would cut a fight off halfway through and show you the
+  // aftermath of one you never saw; the answer is to watch them in order.
+  const [queue, setQueue] = useState<Cine[]>([])
+  const cine = queue[0] ?? null
+  // Stable on purpose. A fresh arrow here on every render would re-run the
+  // cinematic's scheduling effect and restart it from the top -- the same
+  // shape of bug as the blank rematch page.
+  const endCine = useCallback(() => setQueue((q) => q.slice(1)), [])
+  useEffect(() => { onWatching?.(queue.length > 0) }, [queue.length, onWatching])
+
   useEffect(() => {
     const fx = state.fx
     const prev = before.current
@@ -174,6 +196,9 @@ export function Board({
     const wood = prev.trees.find((o) => o.id === fx.tgt)
     if (!a || (!t && !wood)) return
 
+    const next = buildCine(fx, fighterOf(a), t ? fighterOf(t) : fighterOfTree(wood!))
+    setQueue((q) => [...q, next])
+
     setBlow({
       seq: fx.seq, atk: fx.atk, tgt: fx.tgt,
       dmg: fx.dmg ?? 0, heal: fx.heal ?? 0, counter: fx.counter ?? 0,
@@ -183,26 +208,15 @@ export function Board({
       tgtAt: t ? { x: t.x, y: t.y } : { x: wood!.x, y: wood!.y },
       atkUnit: a, tgtUnit: t ?? null,
     })
-    // The soundtrack of the exchange, scheduled against the same clock the
-    // CSS uses. These are the numbers in styles.css: a lunge takes 0.34s and
-    // its victim recoils at 0.12s, the answering lunge starts at 0.38s and
-    // lands at 0.5s. Sound that drifts off the picture reads as a bug even
-    // when the picture is right, so the delays live next to the animation
-    // that earns them -- if one moves, move the other.
-    const CONTACT = 0.12
-    const ANSWER = 0.5
-    const power = (n: number) => n / 28
-
-    if (fx.burnAtk || fx.burnTgt) playBurn(0.02)      // fire eating, before anything swings
-    if (fx.heal > 0) playMend(CONTACT)
-    else if (fx.tree) playChop(CONTACT)
-    else if (fx.dmg > 0) playHit(power(fx.dmg), CONTACT)
-    // A tree going over is a second, deeper chop, not a body falling.
-    if (fx.killedTgt) (fx.tree ? playChop : playDown)(CONTACT + 0.22)
-    if (fx.newBurn) playBurn(CONTACT + 0.22)
-    if (fx.counter > 0) (fx.parry ? playParry : playCounter)(power(fx.counter), ANSWER)
-    if (fx.killedAtk) playDown(ANSWER + 0.22)
-
+    // The soundtrack of the exchange used to be scheduled here, against this
+    // animation's clock. It belongs to the cinematic now: the cinematic plays
+    // the same exchange beat by beat and sounds each one on its own clock, and
+    // two soundtracks for one fight is every blow struck twice.
+    //
+    // The picture below is deliberately NOT moved. It runs under the
+    // cinematic, where nobody sees it -- but a player who skips the cinematic
+    // two hundred milliseconds in lands on a board that is still resolving the
+    // blow, rather than on a board where it has silently already happened.
     const id = setTimeout(() => setBlow(null), FX_MS)
     return () => clearTimeout(id)
   }, [state])
@@ -569,6 +583,22 @@ export function Board({
             </button>
           </div>
         </div>
+      )}
+
+      {/* The cinematic. Rendered from here because this is where the board a
+          moment ago lives, but it is fixed to the viewport and covers the lot.
+          It owns the exchange: the picture, the sound and the words. */}
+      {cine && (
+        <Duel
+          // Keyed by the exchange, so the next one in the queue is a FRESH
+          // component rather than the same one handed different props. Without
+          // it the scheduling effect would have to unwind a half-played
+          // timeline, and `done` would still be latched from the last fight.
+          key={cine.seq}
+          cine={cine}
+          mySide={mySide}
+          onDone={endCine}
+        />
       )}
 
       {/* Everything below is transient: it exists only while an exchange plays. */}

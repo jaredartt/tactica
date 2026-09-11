@@ -89,8 +89,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const theyAreAway = Boolean(
     theirSide && state?.away === theirSide && match?.status === 'active' && match?.bot == null,
   )
+  // Held while a fight is on screen -- see Board's onWatching.
+  const [watching, setWatching] = useState(false)
   const botTurn = Boolean(
-    match?.bot != null && match.status === 'active' && state?.turn === 'guest' && !state?.winner,
+    match?.bot != null && match.status === 'active' && state?.turn === 'guest'
+    && !state?.winner && !watching,
   )
 
   // Where they are looking, and a way to tell them where we are. Only while
@@ -382,6 +385,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   onHover={setHovered}
                   ghost={ghost}
                   onLook={look}
+                  onWatching={setWatching}
                 />
               </div>
 

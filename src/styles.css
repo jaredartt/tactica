@@ -1426,6 +1426,252 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .bigcard { animation: none !important; }
 }
 
+/* ==========================================================================
+   THE BATTLE CINEMATIC
+   The board goes away and the two of them fill the screen. Fixed to the
+   viewport rather than sized to the arena: it is a takeover, and a takeover
+   that leaves a rail showing is a panel.
+
+   The whole thing is paid for by 0021, which pushes the turn deadline by
+   exactly cineMs(). Every duration in here is counted there. If you lengthen
+   something, lengthen cn_cine_ms() too, or you start charging the player for
+   the privilege of watching it.
+   ========================================================================== */
+
+.duel {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: clamp(14px, 3vh, 34px);
+  padding: clamp(12px, 3vh, 32px);
+  background: radial-gradient(120% 90% at 50% 45%, #1b1b28 0%, #0a0a10 70%);
+  cursor: pointer;
+  animation: duel-in 0.22s ease-out;
+  overflow: hidden;
+}
+@keyframes duel-in { from { opacity: 0; } }
+
+/* A ring of light behind the pair, so the middle of the screen -- where the
+   blow lands -- is the brightest thing on it. */
+.duel-ring {
+  position: absolute; left: 50%; top: 46%;
+  width: min(120vw, 1100px); aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 62%);
+  pointer-events: none;
+}
+
+/* Hitstop. Everything that is drifting or floating stops dead for ninety
+   milliseconds on contact, and that -- not the lunge -- is what makes a blow
+   land rather than merely arrive. It is inside the beat, so it costs no clock. */
+.duel.is-stopped * { animation-play-state: paused !important; }
+
+/* The camera shakes on a crit, a parry and a unit going down -- on the whole
+   screen rather than one panel, because it is the camera. It is NOT here: it
+   is played through the Web Animations API in Duel.tsx, because two shaking
+   beats in a row leave the class already on the element and a CSS animation
+   that is already applied does not restart. A parry chain is nothing but
+   shaking beats in a row. The board's FLIP animation is driven that way for
+   exactly the same reason, and Duel.tsx checks reduce-motion itself before it
+   plays one. */
+
+.duel-pair {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(18px, 7vw, 120px);
+  width: 100%;
+}
+
+.duel-side {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px;
+  width: clamp(130px, 30vw, 300px);
+  animation: duel-enter 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.duel-side.is-facing-right { animation-name: duel-enter-l; }
+.duel-side.is-facing-left  { animation-name: duel-enter-r; }
+@keyframes duel-enter-l { from { opacity: 0; transform: translateX(-60px); } }
+@keyframes duel-enter-r { from { opacity: 0; transform: translateX(60px); } }
+@keyframes duel-enter   { from { opacity: 0; } }
+
+/* The slow float. Two units drifting slightly out of phase read as alive;
+   two still ones read as a screenshot. The tilt is part of it -- a figure
+   that only bobs reads as a lift. */
+.duel-figure {
+  position: relative;
+  width: 100%; aspect-ratio: 1;
+  animation: duel-float 3.4s ease-in-out infinite;
+}
+.is-facing-left .duel-figure { animation-duration: 3.9s; animation-delay: -1.2s; }
+@keyframes duel-float {
+  0%, 100% { transform: translateY(0) rotate(-1.1deg); }
+  50%      { transform: translateY(-10px) rotate(1.1deg); }
+}
+
+.duel-art {
+  position: absolute; inset: 0;
+  border-radius: 14px; overflow: hidden;
+  background: color-mix(in srgb, var(--accent) 22%, #14141c);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.10), 0 26px 60px rgba(0,0,0,0.55);
+  display: grid; place-items: center;
+}
+.duel-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* The far one faces the near one. A duel where both look the same way is two
+   people queueing. */
+.is-facing-left .duel-art img { transform: scaleX(-1); }
+.duel-initial {
+  font-family: var(--display); font-weight: 900;
+  font-size: clamp(40px, 9vw, 96px);
+  color: var(--accent);
+}
+
+/* The charge and the fall are NOT here. They are played from Duel.tsx through
+   the Web Animations API, because two blows in a row is the normal shape of a
+   fight and a CSS animation whose class is already on the element does not
+   play a second time. The classes below are kept as state, for styling and for
+   anything that wants to ask what is happening. */
+
+/* ---------- the parry, after Smash Ultimate -------------------------------
+   A hard white frame on the moment it is caught, and a ring thrown off it.
+   Not a glow: the whole read is that it was instantaneous. */
+.duel-flash {
+  position: absolute; inset: -6%;
+  border-radius: 18px;
+  background: #fff;
+  animation: duel-flash 0.24s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes duel-flash {
+  0% { opacity: 0.92; }
+  100% { opacity: 0; }
+}
+.duel-ripple {
+  position: absolute; left: 50%; top: 50%;
+  width: 40%; aspect-ratio: 1; margin: -20% 0 0 -20%;
+  border: 3px solid #fff; border-radius: 50%;
+  animation: duel-ripple 0.5s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+  pointer-events: none;
+}
+@keyframes duel-ripple {
+  0% { opacity: 1; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(2.6); }
+}
+
+/* ---------- the numbers ---------------------------------------------------- */
+.duel-pop {
+  position: absolute; left: 50%; top: 14%;
+  transform: translateX(-50%);
+  font-family: var(--display); font-weight: 900;
+  font-size: clamp(28px, 6vw, 58px); line-height: 1;
+  color: var(--danger);
+  text-shadow: 0 3px 18px rgba(0,0,0,0.8);
+  animation: duel-pop 0.75s ease-out forwards;
+  pointer-events: none;
+}
+.duel-pop.is-heal { color: var(--good); }
+.duel-pop.is-burn { color: #f97316; font-size: clamp(20px, 4vw, 40px); }
+@keyframes duel-pop {
+  0% { opacity: 0; transform: translate(-50%, 14px) scale(0.7); }
+  22% { opacity: 1; transform: translate(-50%, -10px) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -54px) scale(1); }
+}
+
+/* ---------- name and health ------------------------------------------------ */
+.duel-name {
+  font-family: var(--display); font-weight: 900;
+  font-size: clamp(13px, 2.2vw, 22px); letter-spacing: -0.01em;
+  text-transform: uppercase; color: #fff;
+  text-align: center; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* The same rhombus the board's bar is, at the size the screen can afford. */
+.duel-hp {
+  position: relative; width: 100%; height: clamp(16px, 2.6vh, 24px);
+  background: #000; overflow: hidden;
+  transform: skewX(-14deg);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
+}
+.duel-hpfill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: var(--side-col, var(--good));
+  transition: width 0.42s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.duel-side.is-host  { --side-col: var(--you); }
+.duel-side.is-guest { --side-col: var(--foe); }
+.duel-side.is-wood  { --side-col: var(--wood); }
+.duel-hp b {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  transform: skewX(14deg);
+  font-family: var(--body); font-weight: 400;
+  font-size: clamp(10px, 1.5vh, 13px); color: #fff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* ---------- the caption ----------------------------------------------------
+   Black box, white type. It holds its height whether or not there is a second
+   line in it, because a box that grows and shrinks between beats is the one
+   thing on this screen that would move for no reason. */
+.duel-say {
+  width: min(680px, 94vw); min-height: 84px;
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  padding: 14px 20px;
+  background: #05050a;
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 12px;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.duel-say.is-on { opacity: 1; transform: translateY(0); }
+.duel-text {
+  margin: 0; color: #fff;
+  font-size: clamp(14px, 2vw, 19px); line-height: 1.35;
+}
+/* The rule behind the number, in the colour Phase D's keyword tooltips will
+   use -- so when the two meet they read as one voice rather than two. */
+.duel-note {
+  margin: 0; color: #b79cff;
+  font-size: clamp(11px, 1.5vw, 14px); line-height: 1.35;
+}
+
+.duel-skip {
+  position: absolute; right: clamp(10px, 2vw, 22px); bottom: clamp(10px, 2vh, 22px);
+  border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06);
+  color: #cfcfe0; font: inherit; font-size: 12px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.duel-skip:hover { background: rgba(255,255,255,0.14); color: #fff; }
+
+/* A phone turns the pair into a column: two 30vw figures side by side on a
+   narrow screen are two thumbnails, and the point of this screen is size. */
+@media (max-width: 560px) {
+  .duel-pair { gap: 10px; }
+  .duel-side { width: clamp(110px, 42vw, 170px); }
+  .duel-say { min-height: 76px; padding: 11px 14px; }
+}
+
+/* Reduce motion keeps the CUTS and drops the drifting. The cinematic still
+   plays -- it is how you find out what happened -- it simply stops floating,
+   lunging and shaking while it does. */
+@media (prefers-reduced-motion: reduce) {
+  .duel, .duel-side, .duel-figure, .duel-pop, .duel-ripple, .duel-flash {
+    animation: none !important;
+  }
+  .duel-pop { opacity: 1; }
+  .duel-hpfill { transition: none; }
+}
+:root[data-reduce-motion="1"] .duel,
+:root[data-reduce-motion="1"] .duel-side,
+:root[data-reduce-motion="1"] .duel-figure,
+:root[data-reduce-motion="1"] .duel-pop,
+:root[data-reduce-motion="1"] .duel-ripple,
+:root[data-reduce-motion="1"] .duel-flash { animation: none !important; }
+:root[data-reduce-motion="1"] .duel-pop { opacity: 1; }
+
 /* ---------- password fields ---------------------------------------------- */
 
 .field { position: relative; display: flex; }

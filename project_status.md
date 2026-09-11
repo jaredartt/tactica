@@ -138,16 +138,51 @@ npm cannot reach the registry from the cloud container (403 on
 do this alone. The arrangement that works:
 
 1. Build a harness **on the device**, where `node_modules` already is. A harness
-   is an entry that mounts one component with a fabricated `MatchState`, plus a
-   vite config pointed at it. `emptyOutDir` must be **false** and the out dir
-   must be a path that does not exist yet -- vite cannot unlink inside the
-   synced folder, which is the same reason `deploy.sh` builds to a `mktemp -d`.
+   is an entry that mounts one component with a fabricated `MatchState`.
 2. Stage the built html/js/css into the container, serve them with
    `python3 -m http.server`, and drive it with python Playwright against
    `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` -- note the version in
    that path, there is no plain `chromium/` directory.
 3. Measure PIXELS: element rects and the board's own tile pitch, never the grid
    styles the component wrote, because the style is the thing under test.
+
+#### Build it WITHOUT a bundler -- `_to_delete/h/mksite.py`
+
+Do not rely on `vite build` for a harness. `node_modules` is inside the synced
+folder and therefore **shared between a Mac and a Linux VM**, while rollup and
+esbuild each ship a native binary per platform. An `npm install` run on the Mac
+prunes it to darwin binaries, and the VM can then run neither -- `Cannot find
+module '@rollup/rollup-linux-arm64-gnu'`, and `Exec format error` from esbuild.
+This has happened once already and will happen again on any `npm install`.
+
+`tsc` is pure JavaScript and always works, so the harness is built from tsc
+output instead. `_to_delete/h/mksite.py` (gone with `_to_delete`; rebuild it
+from this description) does three small jobs:
+
+1. tsc emits `from '../lib/cine'`; a browser needs `../lib/cine.js`.
+2. tsc emits `import '../styles.css'`, which is not a module -- strip it and
+   `<link>` the stylesheet in the page. Also replace `import.meta.env.BASE_URL`,
+   which is Vite's and undefined anywhere else.
+3. `react`, `react/jsx-runtime` and `react-dom/client` are bare specifiers. Load
+   React's UMD builds from `node_modules/react*/umd/` as plain scripts and point
+   an **import map** at three shims that re-export the globals. Read the shim's
+   export list off the installed React with
+   `node -e "Object.keys(require('react'))"` rather than writing it by hand -- a
+   hand-written list is wrong the first time a dependency imports a hook nobody
+   thought of, which is exactly how it failed once, on `useSyncExternalStore`.
+
+To restore the native binaries instead, on the Mac:
+`npm install --no-save --force @rollup/rollup-linux-arm64-gnu@$(node -p "require('rollup/package.json').version") @esbuild/linux-arm64@$(node -p "require('esbuild/package.json').version")`.
+`--force` is needed because npm's `--cpu`/`--os` filter dependencies but still
+platform-check a package you name directly.
+
+Phase C's client was checked with 85 browser assertions (the takeover, the
+beats and their captions, the reductions that are named and the ones that are
+not, a parry chain where every flash has to be a fresh element, the falling,
+skipping, phone widths, reduce-motion, and the queue and the bot hold from
+inside `Board`) plus 400 random fights in node. Note that most of it is NEW
+surface, so "run it against the old code first" does not apply the way it did
+in Phase B -- there was nothing there to regress.
 
 Phase B's client was checked this way -- 109 browser assertions over the flip,
 the tints, the half line, the whole menu flow, the budget gates, the pips, the
@@ -255,9 +290,8 @@ It contains:
 `0019_board_and_actions.sql` is **run in production** as of 2026-09-11, so the
 8-tall board, the two-activation turn, Defend and Wait are all live.
 
-**`0020_swings.sql` and `0021_cinematic_clock.sql` are built and tested but NOT
-yet run in production.** They are Phase C's server half and they go together --
-see the Phase C section.
+`0020_swings.sql` and `0021_cinematic_clock.sql` are **run in production** as of
+2026-09-11, so the blow-by-blow record and the paused turn clock are both live.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -451,10 +485,10 @@ Nothing of Phase B is left.
 
 ### Phase C — the battle cinematic
 
-**The server half is DONE, in `0020_swings.sql` and `0021_cinematic_clock.sql`.**
-Built and tested (`11_swings.sql` 38 assertions, `12_clock.sql` 18), waiting to
-be pasted into the Supabase SQL editor **in that order**. Neither is run in
-production yet. The client half is not started.
+**Phase C is DONE.** The server half is `0020_swings.sql` and
+`0021_cinematic_clock.sql` (`11_swings.sql` 38 assertions, `12_clock.sql` 18),
+both run in production on 2026-09-11. The client half is `cine.ts` and
+`Duel.tsx`.
 
 Jared's two answers that shaped this: the cinematic is a **full takeover** of
 the screen, and **the turn clock is paused for it**. There is no off switch for
@@ -531,15 +565,53 @@ drawing, and if the client's picture runs longer than the server's budget the
 player loses their turn watching it. Change a beat length in one, change it in
 the other.
 
-Still to build, all client:
+### The client half
 
-- Fire Emblem 1v1: both units enlarge and float with slow tilts, attacker
-  charges, clash/parry/counter/heal effects, HP bars beneath each.
-- Animated black caption boxes narrating damage, reductions, and which passive
-  fired and why.
-- **Hitstop on every attack.** Camera shake on crits and parries.
-- Parry VFX modelled on Super Smash Bros Ultimate.
-- Per-ability animations (fireball travels, etc.) and status-effect animations.
+`src/lib/cine.ts` turns the server's record into a **timeline** -- beats with a
+clock, a running health total and a sentence each -- and decides nothing. All
+of it is pure: no React, no DOM, no clock of its own, which is what lets four
+hundred random fights be checked in node rather than in a browser.
+
+`src/components/Duel.tsx` walks that timeline. It takes the whole screen, the
+two of them float and lunge, the health drains, a caption box says what
+happened and which rule made it happen, and it is skippable on any click or
+key.
+
+Things in there that are load-bearing and look like style until they are not:
+
+- **Health is walked FORWARD from a snapshot taken before the exchange**, never
+  back-calculated from what survived. Back-calculation works for the living and
+  silently invents a number for the dead -- and the dead are what the last beat
+  is about. `Board.tsx` is where the cinematic is built for exactly this
+  reason: it already keeps the board a moment ago, because a killed unit is
+  gone from `state.units` by the time the fx arrives.
+- **Almost nothing is a CSS animation on a class.** A CSS animation starts when
+  its class arrives and does NOT restart if the class is already there -- and
+  consecutive beats of the same kind are the normal case, not the edge one: a
+  parry chain is eight parries in a row. So the lunge, the fall and the camera
+  shake go through the Web Animations API, and the parry flash, the ring and
+  the damage number are keyed by the beat so React hands each one a fresh
+  element. The board's FLIP animation is driven this way for the same reason.
+- **Exchanges are QUEUED, not replaced.** The bot acts every 650ms and a fight
+  takes seconds, so without a queue its second activation would cut its first
+  fight off and show you the aftermath of one you never saw. `Board` also
+  reports `onWatching`, and `Match` holds the bot back while a fight is on
+  screen.
+- **`onDone` is held in a ref and kept out of the schedule's dependencies**, and
+  the parent's callback is stable as well. A fresh arrow on any re-render would
+  tear down every timer and restart the cinematic from the top -- the blank
+  rematch page wearing a different hat.
+- Hitstop is **inside** a beat rather than added to it, so it costs no clock and
+  cannot accumulate.
+
+Still to build, and deliberately left:
+
+- **Per-ability animations** (the fireball travelling, and so on) and
+  status-effect animations. Abilities do not exist yet; they arrive with the
+  roster rework, and the beat kinds in `cine.ts` are where they will hang.
+- A **full / quick / off setting**. Offered and deferred to Phase D with the
+  rest of the settings work. Fire Emblem itself ships one, and by turn forty of
+  a long match the case for it will make itself.
 
 ### Phase D — UI, i18n, kingdoms
 
@@ -717,10 +789,10 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open, and Phase B is finished. The next piece of work is **Phase C,
-the battle cinematic**.
+Nothing is open, and Phase C is finished. The next piece of work is **Phase D**
+-- dark mode, settings saved per account, Spanish, kingdoms, the card editor --
+which is also where the cinematic's full/quick/off setting belongs.
 
-One thing is still waiting on Jared rather than on code: the site has not been
-**deployed** since any of this landed. `./deploy.sh` has to be run from an
-ordinary terminal -- see the git section. Everything Phase B needs is already
-live in the database.
+One thing is waiting on Jared rather than on code: the site has to be
+**deployed** for any of the Phase C client to be visible. `./deploy.sh` from an
+ordinary terminal. Everything it needs is already live in the database.

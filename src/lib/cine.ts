@@ -1,0 +1,253 @@
+import type { Fx, Obstacle, Swing, Unit } from './types'
+
+/**
+ * The exchange, turned into something that can be watched.
+ *
+ * cn_attack decides a fight and records it swing by swing (0020); this turns
+ * that record into a timeline of beats with a clock, a running health total
+ * and a sentence for each one. It decides nothing -- every number here was
+ * decided by Postgres and is being read back, which is the same relationship
+ * rules.ts has to the board.
+ *
+ * All of it is pure. No React, no DOM, no clock of its own: a timeline is a
+ * value, and a value can be checked in node against four hundred random
+ * fights, which is exactly what it is.
+ */
+
+/* ---------------------------------------------------------------------------
+ * How long each beat is on screen.
+ *
+ * THESE NUMBERS ARE MIRRORED IN cn_cine_ms() IN 0021_cinematic_clock.sql, and
+ * the server buys the player exactly this much extra clock. If the picture
+ * here runs longer than the budget there, the player loses their turn watching
+ * it -- so if you change one, change both, and 12_clock.sql pins the same
+ * table from the other side.
+ * ------------------------------------------------------------------------- */
+export const BEAT_MS: Record<Swing['k'], number> = {
+  hit: 700,
+  heal: 700,
+  // Shorter than a blow because there is no health bar to drain -- a parry is
+  // a flash and a ring, and holding it longer only delays the answer.
+  parry: 600,
+  burn: 450,
+  // The longest single beat. A unit leaving the board should be allowed to.
+  down: 800,
+}
+/** The two of them squaring up, before anything is swung. */
+export const LEAD_MS = 900
+/** And a moment at the end to read the last number before the board returns. */
+export const HOLD_MS = 700
+/** Nothing today can exceed this. Abilities are coming; an ability that swings
+ *  fifty times must not hand its owner a minute of thinking time. */
+export const CINE_CAP_MS = 12000
+
+/** The freeze on contact. Short, and the whole reason a blow lands rather than
+ *  merely arriving -- it is the single cheapest thing that makes a hit feel
+ *  like one. Inside a beat, not added to it, so it costs no clock. */
+export const HITSTOP_MS = 90
+
+/** Mirrors cn_cine_ms(). */
+export function cineMs(swings: Swing[]): number {
+  const body = swings.reduce((n, s) => n + (BEAT_MS[s.k] ?? 0), 0)
+  return Math.min(CINE_CAP_MS, LEAD_MS + HOLD_MS + body)
+}
+
+/**
+ * The swings, or the best that can be said without them.
+ *
+ * A match that was already running when 0020 landed has an fx with no list in
+ * it, and the cinematic still has to play something honest. The aggregates
+ * cannot be un-added -- that is the whole reason 0020 exists -- so the fallback
+ * does not pretend: one blow, one answer, the burns and the fallings, in the
+ * order they must have happened. No parries, because `parries: 2` cannot say
+ * which swings they caught, and inventing them would narrate a fight nobody
+ * fought.
+ */
+export function swingsOf(fx: Fx): Swing[] {
+  if (Array.isArray(fx.swings)) return fx.swings
+  const out: Swing[] = []
+  if (fx.heal > 0) {
+    out.push({ k: 'heal', by: fx.atk, at: fx.tgt, dmg: fx.heal, why: 'mend' })
+    return out
+  }
+  if (fx.dmg > 0 || fx.counter === 0) {
+    out.push({
+      k: 'hit', by: fx.atk, at: fx.tgt, dmg: fx.dmg,
+      crit: fx.crit ?? false, counter: false, why: fx.tree ? 'tree' : 'strike',
+    })
+  }
+  if (fx.burnAtk > 0) out.push({ k: 'burn', by: fx.atk, at: fx.atk, dmg: fx.burnAtk })
+  if (fx.killedTgt) out.push({ k: 'down', by: fx.tgt, at: fx.tgt })
+  if (fx.counter > 0) {
+    out.push({
+      k: 'hit', by: fx.tgt, at: fx.atk, dmg: fx.counter,
+      crit: fx.critCounter ?? false, counter: true,
+      why: fx.parry ? 'quick' : 'counter', first: fx.parry,
+    })
+  }
+  if (fx.burnTgt > 0) out.push({ k: 'burn', by: fx.tgt, at: fx.tgt, dmg: fx.burnTgt })
+  if (fx.killedAtk) out.push({ k: 'down', by: fx.atk, at: fx.atk })
+  return out
+}
+
+/** Either end of the duel. A tree gets one too -- it has hit points and it can
+ *  fall, which is all this screen needs of anybody. */
+export interface Fighter {
+  id: string
+  name: string
+  art: string | null
+  accent: string
+  hp: number
+  maxHp: number
+  side: 'host' | 'guest' | null
+}
+
+export interface Beat {
+  swing: Swing
+  /** Milliseconds from the opening of the cinematic. */
+  at: number
+  ms: number
+  /** Which panel acts. The other one is the one it happens to. */
+  actor: 'a' | 'b'
+  /** Health AFTER this beat, for both, so a bar can be driven straight from
+   *  the beat rather than by replaying everything before it. */
+  aHp: number
+  bHp: number
+  /** The sentence, and the rule behind it. `note` is empty when there is no
+   *  rule worth naming -- most blows are just blows. */
+  text: string
+  note: string
+  /** The number that flies off the receiving panel, and where it lands. */
+  pop: number
+  popAt: 'a' | 'b' | null
+  popKind: 'dmg' | 'heal' | 'burn'
+  shake: boolean
+}
+
+export interface Cine {
+  /** The exchange's own number, straight off fx.seq. It is what makes one
+   *  cinematic distinguishable from the next -- two identical trades in a row
+   *  are identical in every other field, and something has to tell them
+   *  apart when they are queued. */
+  seq: number
+  beats: Beat[]
+  ms: number
+  /** The two panels, as they stood BEFORE the exchange. */
+  a: Fighter
+  b: Fighter
+}
+
+export function fighterOf(u: Unit): Fighter {
+  return {
+    id: u.id, name: u.name, art: u.art, accent: u.accent,
+    hp: u.hp, maxHp: u.maxHp, side: u.owner,
+  }
+}
+export function fighterOfTree(t: Obstacle): Fighter {
+  return {
+    id: t.id, name: 'Tree', art: null, accent: '#6b8f4e',
+    hp: t.hp, maxHp: t.maxHp, side: null,
+  }
+}
+
+const n = (v: number | undefined) => v ?? 0
+
+/**
+ * Build the timeline.
+ *
+ * `a` and `b` are the two fighters as they stood BEFORE the exchange -- the
+ * caller has that snapshot and this function cannot recover it, because a unit
+ * that died is already gone from the board by the time the fx arrives.
+ *
+ * Health is walked FORWARD from those two, never back-calculated from what
+ * survived. Back-calculation would work for the living and silently invent a
+ * number for the dead, and the dead are the ones the last beat is about.
+ */
+export function buildCine(fx: Fx, a: Fighter, b: Fighter): Cine {
+  const swings = swingsOf(fx)
+  const beats: Beat[] = []
+  let aHp = a.hp
+  let bHp = b.hp
+  let at = LEAD_MS
+
+  for (const s of swings) {
+    const actor: 'a' | 'b' = s.by === a.id ? 'a' : 'b'
+    const ms = BEAT_MS[s.k] ?? 0
+    let pop = 0
+    let popAt: 'a' | 'b' | null = null
+    let popKind: Beat['popKind'] = 'dmg'
+    let text = ''
+    let note = ''
+    let shake = false
+
+    const actorName = actor === 'a' ? a.name : b.name
+    const otherName = actor === 'a' ? b.name : a.name
+
+    if (s.k === 'hit') {
+      const onA = s.at === a.id
+      pop = n(s.dmg); popAt = onA ? 'a' : 'b'; popKind = 'dmg'
+      if (onA) aHp = Math.max(0, aHp - n(s.dmg))
+      else bHp = Math.max(0, bHp - n(s.dmg))
+      shake = Boolean(s.crit)
+
+      if (s.why === 'tree') {
+        text = `${actorName} strikes the tree for ${n(s.dmg)}.`
+      } else if (s.why === 'quick') {
+        text = `${actorName} answers first, for ${n(s.dmg)}.`
+        note = 'Quick Dagger — the answer lands before the blow it answers.'
+      } else if (s.counter) {
+        text = `${actorName} answers for ${n(s.dmg)}.`
+        note = 'A counter, at half.'
+      } else {
+        text = `${actorName} strikes ${otherName} for ${n(s.dmg)}.`
+      }
+      // Reductions, in the order cn_damage applies them, and only the ones
+      // that actually fired. A caption listing rules that did not apply is
+      // noise dressed as detail.
+      const why: string[] = []
+      if (s.crit) why.push('A critical hit — half again')
+      if (s.counter && s.why !== 'quick') why.push('halved as an answer')
+      if (s.def) why.push('halved again by the raised guard')
+      if (why.length) note = why.join(', ') + '.'
+      if (s.why === 'quick') {
+        note = 'Quick Dagger — the answer lands before the blow it answers.'
+          + (s.crit ? ' And a critical hit.' : '')
+      }
+    } else if (s.k === 'heal') {
+      const onA = s.at === a.id
+      pop = n(s.dmg); popAt = onA ? 'a' : 'b'; popKind = 'heal'
+      if (onA) aHp = Math.min(a.maxHp, aHp + n(s.dmg))
+      else bHp = Math.min(b.maxHp, bHp + n(s.dmg))
+      text = `${actorName} mends ${otherName} for ${n(s.dmg)}.`
+      note = 'A mend is not an exchange — no crit, no parry, nothing comes back.'
+    } else if (s.k === 'parry') {
+      text = `${actorName} parries.`
+      note = s.why === 'all'
+        ? 'Always Ready — Lium catches the answer as well as the blow.'
+        : 'Caught clean. Nothing gets through.'
+      shake = true
+    } else if (s.k === 'burn') {
+      const onA = s.by === a.id
+      pop = n(s.dmg); popAt = onA ? 'a' : 'b'; popKind = 'burn'
+      if (onA) aHp = Math.max(0, aHp - n(s.dmg))
+      else bHp = Math.max(0, bHp - n(s.dmg))
+      text = `${actorName} burns for ${n(s.dmg)}.`
+      note = 'Burning costs you every time you swing.'
+    } else {
+      // The server says this one fell, so the bar reads empty whatever the
+      // arithmetic before it came to. In the ordinary case the blow already
+      // took it to nothing -- but in the fallback, where only the totals
+      // survived, the killing damage may have been riposte that the totals
+      // cannot place. A full bar under the word "falls" is a lie either way.
+      if (s.by === a.id) aHp = 0
+      else bHp = 0
+      text = `${actorName} falls.`
+      shake = true
+    }
+
+    beats.push({ swing: s, at, ms, actor, aHp, bHp, text, note, pop, popAt, popKind, shake })
+    at += ms
+  }
+
+  return { seq: fx.seq, beats, ms: cineMs(swings), a, b }
+}

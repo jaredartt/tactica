@@ -103,6 +103,46 @@ export interface Fx {
   /** Ids of the allies a bloom swept up besides the one that was clicked. */
   bloom?: string[]
   tree: boolean
+  /** These five have been written by the server since 0018 and were simply
+   *  missing from this type. The cinematic needs them, and the board's own
+   *  little animation would have been entitled to them all along. */
+  crit?: boolean
+  critCounter?: boolean
+  /** Swings caught, and swings swung -- the parry chain, counted. */
+  parries?: number
+  chain?: number
+  /** What the attacker took off in ANSWER to a parry, as opposed to `dmg`,
+   *  which is the opening blow. Lium's free hit lands here. */
+  riposte?: number
+  /** The exchange blow by blow, in the order it happened, from 0020. Absent on
+   *  a match that was already in flight when that landed -- read it through
+   *  swingsOf() in cine.ts, never directly. */
+  swings?: Swing[]
+}
+
+/**
+ * One thing that happened inside an exchange. Written by cn_attack in
+ * 0020_swings.sql; the comment block at the top of that file is the contract.
+ *
+ * `why` is the field that earns its place: Lium catching an answer because he
+ * is Lium ('all') is not the same event as a 5% roll coming up ('roll'), and a
+ * caption that calls both of them a parry is labelling rather than narrating.
+ */
+export interface Swing {
+  k: 'hit' | 'parry' | 'burn' | 'down' | 'heal'
+  /** Who swung, caught, burned or fell. */
+  by: string
+  /** Who received it. Equal to `by` for a burn or a falling. */
+  at: string
+  dmg?: number
+  crit?: boolean
+  /** It was an answer, so it was already halved. */
+  counter?: boolean
+  /** The receiver had a guard up, so it was halved again. */
+  def?: boolean
+  /** It landed BEFORE the blow it answers. Quick Dagger, and nothing else. */
+  first?: boolean
+  why?: 'strike' | 'counter' | 'quick' | 'tree' | 'mend' | 'roll' | 'all'
 }
 
 export interface MatchState {
