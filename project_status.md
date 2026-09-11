@@ -118,6 +118,31 @@ invisible to reasoning and obvious to a measurement. Where a bug is subtle,
 write the test so it **fails on the old code first** — a test that passes on
 both versions proves nothing.
 
+### Measuring the client (Playwright)
+
+npm cannot reach the registry from the cloud container (403 on
+`registry.npmjs.org`) and Chromium is not on the device, so neither machine can
+do this alone. The arrangement that works:
+
+1. Build a harness **on the device**, where `node_modules` already is. A harness
+   is an entry that mounts one component with a fabricated `MatchState`, plus a
+   vite config pointed at it. `emptyOutDir` must be **false** and the out dir
+   must be a path that does not exist yet -- vite cannot unlink inside the
+   synced folder, which is the same reason `deploy.sh` builds to a `mktemp -d`.
+2. Stage the built html/js/css into the container, serve them with
+   `python3 -m http.server`, and drive it with python Playwright against
+   `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` -- note the version in
+   that path, there is no plain `chromium/` directory.
+3. Measure PIXELS: element rects and the board's own tile pitch, never the grid
+   styles the component wrote, because the style is the thing under test.
+
+Phase B's client was checked this way -- 66 assertions over the flip, the tints,
+the half line, the whole menu flow, the budget gates and the pips, at 320 / 390
+/ 768 / 1280 px. Every one was also run against `c74c47d`'s files first, where
+the seven geometry assertions and the entire menu suite failed. That is the only
+thing that proves they are testing anything. The harness itself lived in
+`_to_delete/` and is gone; the recipe above is what to rebuild it from.
+
 ### Security constraints (non-negotiable)
 
 - **Never** handle or enter the Supabase database password.
@@ -138,18 +163,27 @@ Profile icons + settings panel, UI sounds, reduce-motion, battle sound effects
 
 ### Pushed and live
 
-`afc4f7f`, `c93311a`, `595b32d`, `4c80f8f` are on `origin/main`. The quick fixes
-below are in them.
+`afc4f7f`, `c93311a`, `595b32d`, `4c80f8f`, `c74c47d` are on `origin/main`.
+Jared pushed `c74c47d` (Phase B's server half) himself on 2026-09-11.
 
-**Still not deployed.** `./deploy.sh` force-pushes `gh-pages`, and no session has
-been able to reach GitHub to do it: the device sandbox gets a proxy 403 on
-CONNECT, and the cloud container is refused by its git proxy with
-`jaredartt/tactica is not in this session's authorized repository set`. That is a
-policy denial, not a credentials problem -- it lands identically with a personal
-access token and with none, because the repo is rejected before any credential is
-read. Two tokens were pasted into chat trying to solve it and neither could; both
-should be treated as burned and rotated. The fix is to add the repo to the
-session's sources, or to run `./deploy.sh` from an ordinary terminal.
+**Pushing from a session is still blocked, and the shape of the block has
+changed.** The cloud container can now READ the repo -- `git ls-remote` and
+`git clone` over HTTPS both work -- but a push is refused by the git proxy with
+`jaredartt/tactica is not in this session's authorized repository set`. That is
+a policy denial and not a credentials problem: the repo is rejected before any
+credential is read, so it lands identically with a token and with none. The
+device sandbox still gets a proxy 403 on CONNECT and cannot reach GitHub at all.
+Two tokens were pasted into chat in earlier sessions trying to solve this and
+neither could; both should be treated as burned and rotated.
+
+So the working arrangement is: a session commits, Jared pushes. To lift it, add
+the repo to the session's sources. (A session CAN move a commit to where Jared
+can push it without going through GitHub: `git bundle create` on the device,
+stage the bundle, fetch it in the container. That is how `c74c47d` was checked
+against origin.)
+
+**Still not deployed.** `./deploy.sh` force-pushes `gh-pages` and hits the same
+wall, so it has to be run from an ordinary terminal.
 
 ### What those four commits contain
 
@@ -307,17 +341,54 @@ Done in `0019`:
   until the server raised, which is how 06 and 07 found this. It now skips spent
   units and, once the budget is gone, considers only the unit already mid-go.
 
+**The client half is DONE too.** Three things landed:
+
+- **The action menu.** Clicking one of your units opens Move / Attack / Ability
+  / Defend / (Wait) / Cancel on the piece itself, and NOTHING is lit until you
+  choose. That last part is the real change: the board used to light the move
+  tiles and the crosshairs the instant you selected a unit, which made a tile
+  and a target look like alternatives when they are two halves of one go.
+  Ability is present and disabled -- leaving the slot out until abilities exist
+  would move the other four items under the player's thumb on the day they land.
+  Wait appears only for the unit already mid-go, because `submit_wait` takes no
+  unit and ends whichever one the SERVER has open. Walking does not close the
+  menu: it comes straight back, standing where the unit now stands, with Move
+  greyed and the rest still there.
+- **The board flip**, in `draw()` / `flipFor()` in `rules.ts`. Here is the part
+  that reads backwards until you check the rows: it is the **HOST** who flips,
+  not the guest. `cn_own_side` gives the host rows 0-3, so drawn straight the
+  host is along the TOP and the guest is already at the bottom where they
+  belong. A spectator flips nothing, and the tinted half is therefore always the
+  NEAR half rather than "yours" -- which is the honest reading for somebody who
+  has no side. It is a half turn and not a mirror: flipping only the rows would
+  leave left and right alone, and a spearman advancing up the right of the board
+  for one player would be advancing up the left of it for the other.
+  Two places convert a coordinate for the screen -- `Board.tsx`, and the hovered
+  tree's card in `Match.tsx` -- and both go through `flipFor()`, which is why
+  the rule is named rather than written out twice.
+- **The goes**, as two rhomboid pips in the turn bar beside the clock, plus the
+  count in the hint under the board. One pip on the opening turn, because that
+  turn really does have one activation. Nothing on screen used to say this, so
+  the server's refusal was the first you heard of the rule.
+
+Also: `spent` and `defending` reach the token. A spent unit greys out -- the
+PICTURE greys, not the whole token, or the shield on a defending unit would be
+invisible on every unit it matters for -- and a raised guard shows a shield in
+the upper left, stacking rightward past the burn icon the way the roster spec
+asks for.
+
+**Order of operations, and it matters: `0019` has to be run in production BEFORE
+this client is deployed.** The client reads `acts` / `active` / `spent`, calls
+`submit_defend` and `submit_wait`, and reads the halves as rows. On a database
+still at `0018` those two functions do not exist and the board is still 8 wide
+by 6 tall, so Defend and Wait would error and the tints would be drawn across
+the wrong axis.
+
 Still to build, all client:
 
-- Fire Emblem action menu on clicking a unit: Move / Attack / Ability / Defend /
-  Cancel. The server calls behind it all exist now.
-- **The board flip.** You are always at the bottom, yours blue, theirs red at
-  the top. Server coordinates do not change; only the drawing does.
 - Movement arrow from unit to hovered tile, Fire Emblem style.
 - **Duelyst-style opponent presence**: show which tile the opponent is hovering,
   and their targeting highlights while they aim. Hidden for Rogue secret actions.
-- The client must also show the budget — two pips, or something like them.
-  Nothing on screen currently says how many goes you have left.
 
 ### Phase C — the battle cinematic
 
@@ -505,5 +576,13 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. The next thing is Phase B's client half — the action menu, the
-per-player board flip, and somewhere on screen to show the two goes.
+Nothing is open. Phase B is now built end to end apart from the movement arrow
+and the opponent-presence overlay; the next real piece of work is Phase C, the
+battle cinematic.
+
+Two things are waiting on Jared rather than on code:
+
+1. **Run `0019` in production**, before the new client is deployed. See the
+   ordering note in the Phase B section -- the client needs it.
+2. **Push the client commit**, or add the repo to the session's sources so that
+   a session can push it itself.

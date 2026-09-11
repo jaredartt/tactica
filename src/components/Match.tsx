@@ -6,13 +6,15 @@ import { TreeBigCard, UnitBigCard } from './BigCard'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import {
   botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
-  myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitMove,
+  myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitDefend, submitMove,
+  submitWait,
 } from '../lib/api'
 import {
-  DEPLOY_SECONDS, TURN_SECONDS, reachText,
+  DEPLOY_SECONDS, TURN_SECONDS, actsCap, reachText,
   type MatchState, type Profile, type Side, type Unit,
   unitPower,
 } from '../lib/types'
+import { flipFor } from '../lib/rules'
 import { playLose, playTurn, playWin } from '../lib/sfx'
 
 export function Match({ matchId, profile, onLeave, onGoTo }: {
@@ -89,6 +91,13 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const botTurn = Boolean(
     match?.bot != null && match.status === 'active' && state?.turn === 'guest' && !state?.winner,
   )
+
+  // The turn's budget. It belongs to whoever is to move -- there is only one
+  // of it -- so this is as true while you are watching them spend it as while
+  // you are spending it yourself.
+  const actsCapNow = state ? actsCap(state) : 2
+  const actsSpent = Math.min(actsCapNow, state?.acts ?? 0)
+  const actsLeft = actsCapNow - actsSpent
 
   const onClock = match?.status === 'active' || deploying
   const clockLength = deploying ? DEPLOY_SECONDS : TURN_SECONDS
@@ -236,7 +245,15 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   ) : hoverTree ? (
     <TreeBigCard
       tree={hoverTree}
-      side={hoverTree.x < Math.floor(board.board.w / 2) ? 'left' : 'right'}
+      // Drawn column, not board column: the host sees the board half a turn
+      // round, so a tree on their left is a tree at high x. Board.tsx owns the
+      // flip, and this is the one other place a coordinate reaches the screen
+      // -- which is why the rule itself lives in flipFor() and neither of them
+      // spells it out.
+      side={
+        (flipFor(mySide) ? board.board.w - 1 - hoverTree.x : hoverTree.x)
+          < Math.floor(board.board.w / 2) ? 'left' : 'right'
+      }
     />
   ) : null
 
@@ -293,6 +310,26 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
             {' · '}
             {Math.max(0, Math.ceil(remaining ?? 0))}s
           </div>
+
+          {/* The two goes. Nothing on screen used to say how many were left,
+              which made the server's refusal ("no actions left this turn") the
+              first time you heard about the rule. The opening turn has one pip
+              rather than two, because it really does have one activation. */}
+          {match.status === 'active' && !s.winner && (
+            <div
+              className="goes"
+              role="img"
+              aria-label={`${actsLeft} of ${actsCapNow} ${actsCapNow === 1 ? 'go' : 'goes'} left`}
+              title={
+                (isMyTurn ? 'Your turn: ' : 'Their turn: ') +
+                `${actsLeft} of ${actsCapNow} left. One go is one unit's move and strike together.`
+              }
+            >
+              {Array.from({ length: actsCapNow }, (_, i) => (
+                <span key={i} className={`go${i < actsSpent ? ' is-used' : ''}`} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -327,6 +364,8 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   onSelect={setSelected}
                   onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
                   onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
+                  onDefend={(unitId) => guard(() => submitDefend(match.id, unitId))}
+                  onWait={() => guard(() => submitWait(match.id))}
                   onDeploy={(id, x, y) =>
                     guard(async () => setMyUnits(await deployUnit(match.id, id, x, y)))
                   }
@@ -429,9 +468,12 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                       Resign
                     </button>
                     <span className="hint">
-                      {isMyTurn
-                        ? 'Pick a unit, then a lit tile or a marked enemy.'
-                        : 'Waiting for your opponent.'}
+                      {!isMyTurn
+                        ? 'Waiting for your opponent.'
+                        : actsLeft === 0
+                          ? 'No goes left. End your turn.'
+                          : `Pick a unit, then choose from its menu. ${actsLeft} of ` +
+                            `${actsCapNow} ${actsCapNow === 1 ? 'go' : 'goes'} left.`}
                     </span>
                   </>
                 ) : (

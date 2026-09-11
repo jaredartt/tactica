@@ -49,6 +49,10 @@ export interface Unit {
   /** Mending reaches every ally in range, not only the one you clicked. */
   blooms: boolean
   burned: boolean
+  /** Guard up. Halves what lands on this unit until its OWN next turn, so it
+   *  is still standing while the opponent swings -- which is the only moment
+   *  it could matter. Raised by submit_defend, dropped by advance_turn. */
+  defending?: boolean
   accent: string
   art: string | null
   ability: string
@@ -56,6 +60,11 @@ export interface Unit {
   y: number
   moved: boolean
   acted: boolean
+  /** This unit has had its whole go this turn and cannot start another.
+   *  Optional for the same reason `pow` is: a match already in flight when
+   *  0019 landed has units without it. Read it as false when it is missing --
+   *  cn_begin_act does exactly that. */
+  spent?: boolean
 }
 
 /** A tree. Blocks feet and arrows, has 30 HP, and can be cut down. */
@@ -104,6 +113,12 @@ export interface MatchState {
   obstacles: Obstacle[]
   turn: Side
   turnNumber: number
+  /** Activations the side to move has spent this turn, and the unit part-way
+   *  through one -- it has moved but has not yet struck, so it may still, and
+   *  that costs nothing further. Both from 0019; both absent on an older
+   *  match, which is why everything reads them through a default. */
+  acts?: number
+  active?: string | null
   /** Consecutive turns each side has let expire without touching a unit. */
   idle?: Record<Side, number>
   /** Set once a side reaches three. A fact, not a verdict -- the match keeps
@@ -223,6 +238,17 @@ export const TIERS = [
 ] as const
 
 export const tierOf = (lp: number) => TIERS.find((t) => lp >= t.at)!.name
+
+/** A turn is two activations, and one activation is one unit's whole go --
+ *  move, then strike, or either alone. Mirrors cn_acts_cap() in
+ *  0019_board_and_actions.sql: the opening turn of a match gets ONE, because
+ *  going first with a full turn is worth too much on a board this size. It
+ *  reads <= 1 rather than === 1 so a match from before that migration, which
+ *  may carry no turnNumber at all, is treated as opening rather than as
+ *  unlimited -- the same fallback the server takes. */
+export const ACTS_PER_TURN = 2
+export const actsCap = (s: { turnNumber?: number }) =>
+  (s.turnNumber ?? 1) <= 1 ? 1 : ACTS_PER_TURN
 
 export const TURN_SECONDS = 30
 export const DEPLOY_SECONDS = 90

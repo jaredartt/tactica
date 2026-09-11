@@ -35,6 +35,27 @@ export async function submitAttack(matchId: string, unitId: string, targetId: st
   )
 }
 
+/**
+ * Raise a guard. It halves everything that lands on this unit until its own
+ * next turn -- so it is still up while the opponent is swinging, which is the
+ * only time it could matter. It costs the activation and ends it.
+ */
+export async function submitDefend(matchId: string, unitId: string) {
+  return unwrap(
+    await supabase.rpc('submit_defend', { p_match: matchId, p_unit: unitId }).single(),
+  )
+}
+
+/**
+ * Close the go of whichever unit is part-way through one. A unit that moved
+ * and does not want to strike needs a way to say so, or its go stays open and
+ * the second activation cannot start cleanly. Harmless when nobody is mid-go:
+ * the server hands the room back unchanged.
+ */
+export async function submitWait(matchId: string) {
+  return unwrap(await supabase.rpc('submit_wait', { p_match: matchId }).single())
+}
+
 export async function endTurn(matchId: string) {
   return unwrap(await supabase.rpc('end_turn', { p_match: matchId }).single())
 }

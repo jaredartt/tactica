@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import { artUrl, faceUrl } from '../lib/art'
-import { deployTiles, key, ownSide, reachable, targetsFor, willCounter } from '../lib/rules'
+import {
+  canAct, deployTiles, draw, drawSign, flipFor, key, ownSide, reachable, targetsFor,
+  willCounter,
+} from '../lib/rules'
 import {
   playBurn, playChop, playCounter, playDown, playHit, playMend, playMove, playParry,
   playPlace, playSelect,
@@ -21,6 +24,10 @@ interface Props {
   onSelect: (id: string | null) => void
   onMove: (x: number, y: number) => void
   onAttack: (targetId: string) => void
+  onDefend: (unitId: string) => void
+  /** Close the open go without striking. Takes no unit: the server already
+   *  knows which one is mid-go, and asking it is how the two stay agreed. */
+  onWait: () => void
   onDeploy: (unitId: string, x: number, y: number) => void
   /** The unit or tree the pointer is over. The card it opens is drawn beside
    *  the board, not inside it, so the board reports and Match renders. */
@@ -46,20 +53,37 @@ interface Blow {
   tgtUnit: Unit | null
 }
 
+/**
+ * What the board is waiting for. Fire Emblem's shape: clicking a unit of yours
+ * opens its menu and nothing is lit, and only once you have chosen Move or
+ * Attack does the board light up for the thing you chose. Lighting both at
+ * once -- which is what this did before -- makes a tile and a target look like
+ * alternatives when they are two halves of one go.
+ */
+type Mode = 'menu' | 'move' | 'attack'
+
 export function Board({
-  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDeploy, onHover,
+  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
+  onWait, onDeploy, onHover,
 }: Props) {
   const { w, h } = state.board
   const trees: Obstacle[] = state.obstacles ?? []
   const selected = state.units.find((u) => u.id === selectedId) ?? null
 
-  // Nothing is rotated or mirrored. The host holds the left, the guest holds
-  // the right, and both players -- and anyone watching -- look at the same
-  // board with the same square in the same place, so "the tree by your
-  // archer" means one thing to both of them. Which units are yours is carried
-  // by colour, which is what colour was already doing everywhere else.
-  const at = (p: { x: number; y: number }) =>
-    ({ gridColumn: p.x + 1, gridRow: p.y + 1 }) as React.CSSProperties
+  // The board turns half a turn for the host, and for nobody else -- see
+  // flipFor(), which is where the surprise in that sentence is explained. 0019
+  // gave the halves back to the rows, and the whole point of doing the turn in
+  // the client is that the database never learns about it: one set of
+  // coordinates, two pictures of it. You are always at the bottom, looking up.
+  //
+  // Every coordinate that reaches the screen goes through draw(), and nothing
+  // that reaches the server does. If you find yourself flipping a coordinate
+  // anywhere else, it belongs here instead.
+  const flip = flipFor(mySide)
+  const at = (p: { x: number; y: number }) => {
+    const d = draw(p, w, h, flip)
+    return ({ gridColumn: d.x + 1, gridRow: d.y + 1 }) as React.CSSProperties
+  }
 
   // A card changes square by changing which grid cell it is in, which is
   // instant and unreadable, so we play the change back: put the card where it
@@ -97,10 +121,14 @@ export function Board({
       const gs = el.parentElement ? getComputedStyle(el.parentElement) : null
       const gapX = parseFloat(gs?.columnGap ?? '0') || 0
       const gapY = parseFloat(gs?.rowGap ?? '0') || 0
+      // Drawn deltas, not board deltas: on a flipped board a step north is
+      // played back as a step south, and a piece that travels the wrong way
+      // and arrives in the right place reads as a glitch rather than a move.
+      const sgn = drawSign(flip)
       moves.push({
         el,
-        dx: (was.x - u.x) * (cell.width + gapX),
-        dy: (was.y - u.y) * (cell.height + gapY),
+        dx: sgn * (was.x - u.x) * (cell.width + gapX),
+        dy: sgn * (was.y - u.y) * (cell.height + gapY),
       })
     }
 
@@ -174,25 +202,61 @@ export function Board({
 
   const mine = selected && selected.owner === mySide
 
-  // Where the selected unit may go. In deployment that is your whole half; in
-  // battle it is however far it can actually walk.
+  const [mode, setMode] = useState<Mode | null>(null)
+  // The menu belongs to the selection, so it dies with it -- including when
+  // Match drops the selection because the turn flipped under us.
+  useEffect(() => { if (!selectedId) setMode(null) }, [selectedId])
+
+  // Where the selected unit COULD go, and what it COULD hit. Both are computed
+  // whether or not the board is currently showing them, because the menu needs
+  // to know whether Move and Attack are worth offering before you pick one --
+  // an enabled button that does nothing is worse than a greyed one.
+  const canMove = Boolean(selected && mine && isMyTurn && !selected.moved && canAct(state, selected))
+  const canStrike = Boolean(selected && mine && isMyTurn && !selected.acted && canAct(state, selected))
+
   const litTiles = useMemo(() => {
     if (!selected || !mine) return new Set<string>()
     if (deploying) return deployTiles(state, mySide!)
-    if (!isMyTurn || selected.moved) return new Set<string>()
+    if (!canMove) return new Set<string>()
     return reachable(state, selected)
-  }, [state, selected, mine, deploying, isMyTurn, mySide])
+  }, [state, selected, mine, deploying, canMove, mySide])
 
   const targets = useMemo(() => {
-    if (!selected || !mine || deploying || !isMyTurn || selected.acted) return new Map()
+    if (!selected || !mine || deploying || !canStrike) return new Map()
     return targetsFor(state, selected)
-  }, [state, selected, mine, deploying, isMyTurn])
+  }, [state, selected, mine, deploying, canStrike])
+
+  // And what the board actually draws. In deployment there is no menu -- you
+  // are placing, not activating -- so the tiles are lit the moment you pick
+  // something up, exactly as they always were.
+  const showTiles = deploying || mode === 'move'
+  const showTargets = !deploying && mode === 'attack'
+  const shownTiles = showTiles ? litTiles : new Set<string>()
+  const shownTargets = showTargets ? targets : new Map()
+
+  // Which way a piece leans when it swings. Drawn direction again, for the
+  // same reason the travel above is: half a turn of the board turns a lunge
+  // north into a lunge south.
+  // Where the menu hangs, in drawn coordinates. Null when there is no menu.
+  const menuAt = mode === 'menu' && selected ? draw(selected, w, h, flip) : null
 
   const lungeVars = (from: { x: number; y: number }, to: { x: number; y: number }) =>
     ({
-      '--lx': `${Math.sign(to.x - from.x) * 16}%`,
-      '--ly': `${Math.sign(to.y - from.y) * 16}%`,
+      '--lx': `${drawSign(flip) * Math.sign(to.x - from.x) * 16}%`,
+      '--ly': `${drawSign(flip) * Math.sign(to.y - from.y) * 16}%`,
     }) as React.CSSProperties
+
+  /** Clicking one of yours opens its menu -- unless it has nothing left to
+   *  spend, in which case the click still selects it so you can read the card,
+   *  it just does not offer you a go it would have to refuse. */
+  const opensMenu = (u: Unit) =>
+    !deploying && isMyTurn && u.owner === mySide && canAct(state, u) && !state.winner
+
+  function pick(u: Unit) {
+    if (u.id !== selectedId) playSelect()
+    onSelect(u.id)
+    setMode(opensMenu(u) ? 'menu' : null)
+  }
 
   function clickTile(x: number, y: number) {
     if (watching(mySide)) return
@@ -200,12 +264,15 @@ export function Board({
       // Placing one ends the placing. Leaving the unit selected left its whole
       // half lit up as if you still had something in your hand, which is only
       // true until you put it down.
-      if (selected && mine && litTiles.has(key(x, y))) { onDeploy(selected.id, x, y); onSelect(null) }
+      if (selected && mine && shownTiles.has(key(x, y))) { onDeploy(selected.id, x, y); onSelect(null) }
       else onSelect(null)
       return
     }
-    if (litTiles.has(key(x, y))) onMove(x, y)
-    else onSelect(null)
+    // Walking does not end the go: the unit may still strike, and move-then-
+    // strike is one activation. So the menu comes straight back, standing
+    // where the unit now stands, with Move spent and the rest still there.
+    if (shownTiles.has(key(x, y))) { onMove(x, y); setMode('menu') }
+    else { onSelect(null); setMode(null) }
   }
 
   function clickUnit(u: Unit) {
@@ -218,28 +285,33 @@ export function Board({
       } else { if (u.id !== selectedId) playSelect(); onSelect(u.id === selectedId ? null : u.id) }
       return
     }
-    // Attacking has its own sound a moment later, from the exchange; putting
-    // one here as well would double every blow.
-    if (targets.has(u.id)) onAttack(u.id)
-    else { if (u.id !== selectedId) playSelect(); onSelect(u.id === selectedId ? null : u.id) }
+    // Aiming. Attacking has its own sound a moment later, from the exchange;
+    // putting one here as well would double every blow.
+    if (shownTargets.has(u.id)) { onAttack(u.id); setMode(null); return }
+    // Clicking the open menu's own unit closes it, which is the second way out
+    // besides Cancel and the one a thumb finds first.
+    if (u.id === selectedId && mode) { setMode(null); return }
+    pick(u)
   }
 
-  // A spectator has no ground of their own, so they get the host's reading --
-  // the left is tinted, the right is not -- rather than a board with no
-  // orientation at all.
-  const halfSide: Side = mySide ?? 'host'
+  // The tinted half is always the NEAR one -- which for a player is their own,
+  // because the flip has already put them at the bottom. A spectator turns
+  // nothing, so the near half of their board is the guest's, and tinting it is
+  // the honest reading: it says "this end", not "yours", and there is nothing
+  // that is theirs to say.
+  const halfSide: Side = mySide ?? 'guest'
 
   return (
     <div
       className={`board${blow ? ' fx-playing' : ''}${watching(mySide) ? ' is-watching' : ''}`}
       style={{ '--cols': w, '--rows': h } as React.CSSProperties}
-      onClick={() => onSelect(null)}
+      onClick={() => { onSelect(null); setMode(null) }}
     >
       {Array.from({ length: w * h }, (_, i) => {
         const x = i % w
         const y = Math.floor(i / w)
         const k = key(x, y)
-        const lit = litTiles.has(k)
+        const lit = shownTiles.has(k)
         return (
           <div
             key={k}
@@ -249,7 +321,7 @@ export function Board({
             style={at({ x, y })}
             className={[
               'tile',
-              ownSide(halfSide, x, w) ? 'tile-mine' : 'tile-theirs',
+              ownSide(halfSide, y, h) ? 'tile-mine' : 'tile-theirs',
               lit ? (deploying ? 'tile-deploy' : 'tile-move') : '',
             ].join(' ')}
             onClick={(e) => { e.stopPropagation(); clickTile(x, y) }}
@@ -258,11 +330,14 @@ export function Board({
       })}
 
       {/* Where your ground stops. The tint on the tiles says it quietly; this
-          says it at a glance, which is what you want while deploying. */}
+          says it at a glance, which is what you want while deploying. It sits
+          on the far edge of row h/2 whichever way up the board is drawn --
+          the flip moves which rows that row is between, not where the seam is
+          on the screen, because the seam is always across the middle. */}
       <div
         className="halfline"
         aria-hidden="true"
-        style={{ gridRow: '1 / -1', gridColumn: Math.floor(w / 2) + 1 }}
+        style={{ gridColumn: '1 / -1', gridRow: Math.floor(h / 2) + 1 }}
       />
 
       {trees.map((t) => (
@@ -270,14 +345,14 @@ export function Board({
           key={t.id}
           tree={t}
           style={at(t)}
-          targetable={targets.has(t.id)}
+          targetable={shownTargets.has(t.id)}
           shaking={blow?.tgt === t.id}
           falling={blow?.tgt === t.id && blow.killedTgt}
           onHover={(over) => onHover(over ? t.id : null)}
           onClick={(e) => {
             e.stopPropagation()
-            if (targets.has(t.id)) onAttack(t.id)
-            else onSelect(null)
+            if (shownTargets.has(t.id)) { onAttack(t.id); setMode(null) }
+            else { onSelect(null); setMode(null) }
           }}
         />
       ))}
@@ -285,7 +360,7 @@ export function Board({
       {state.units.map((u) => {
         const striking = blow?.atk === u.id
         const struck = blow?.tgt === u.id
-        const target = targets.get(u.id)
+        const target = shownTargets.get(u.id)
         return (
           <UnitCard
             key={u.id}
@@ -316,6 +391,76 @@ export function Board({
           />
         )
       })}
+
+      {/* The action menu. Anchored to the tile the unit is standing on and
+          drawn over the board rather than beside it, so your eye never leaves
+          the piece you are giving an order to.
+          It opens away from the nearest edge -- leftward from the right-hand
+          columns, upward from the bottom rows -- because .center clips what
+          overflows it, and a menu half off the screen is a menu you cannot
+          finish using. Those are DRAWN columns, so the rule holds either way
+          up the board is turned. */}
+      {menuAt && selected && (
+        <div className="actmenu-slot" style={at(selected)}>
+          <div
+            className={[
+              'actmenu',
+              menuAt.x > (w - 1) / 2 ? 'is-left' : '',
+              menuAt.y > (h - 1) / 2 ? 'is-up' : '',
+            ].join(' ')}
+            role="menu"
+            aria-label={`${selected.name} — choose an action`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="actmenu-head">{selected.name}</div>
+            <button
+              role="menuitem"
+              disabled={!canMove || litTiles.size === 0}
+              onClick={() => setMode('move')}
+            >
+              Move
+            </button>
+            <button
+              role="menuitem"
+              disabled={!canStrike || targets.size === 0}
+              onClick={() => setMode('attack')}
+            >
+              {selected.heals ? 'Strike / Mend' : 'Attack'}
+            </button>
+            {/* Kept in the menu, and kept off. Every unit's ability is written
+                on its card already, and leaving the slot out until Phase C
+                would move the other four items under the player's thumb on the
+                day it lands. */}
+            <button role="menuitem" disabled title="Abilities are not built yet.">
+              Ability
+            </button>
+            <button
+              role="menuitem"
+              disabled={!canStrike}
+              title="Halves what lands on this unit until its next turn."
+              onClick={() => { onDefend(selected.id); setMode(null) }}
+            >
+              Defend
+            </button>
+            {/* Only for the unit that is already mid-go. For anyone else there
+                is nothing open to close, and submit_wait would end somebody
+                else's go instead -- it takes no unit, it ends whichever one
+                the server has open. */}
+            {(state.active ?? null) === selected.id && (
+              <button role="menuitem" onClick={() => { onWait(); setMode(null) }}>
+                Wait
+              </button>
+            )}
+            <button
+              role="menuitem"
+              className="actmenu-cancel"
+              onClick={() => { onSelect(null); setMode(null) }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Everything below is transient: it exists only while an exchange plays. */}
       {blow && (
@@ -473,7 +618,13 @@ function UnitCard({
           selected ? 'is-selected' : '',
           target ? `is-target is-target-${target}` : '',
           unit.burned ? 'is-burned' : '',
-          unit.moved && unit.acted ? 'is-spent' : '',
+          unit.defending ? 'is-guarding' : '',
+          // `spent` is the server's word for "this one has had its go", and it
+          // is the honest one now: a unit that moved and chose not to strike
+          // is finished for the turn without ever having acted. The old test
+          // is kept behind it for a match that was already running when 0019
+          // landed and whose units carry no `spent` at all.
+          (unit.spent ?? (unit.moved && unit.acted)) ? 'is-spent' : '',
         ].join(' ')}
         style={{ '--accent': unit.accent } as React.CSSProperties}
         onMouseMove={lean}
@@ -493,6 +644,9 @@ function UnitCard({
         </div>
 
         {unit.burned && <div className="unit-burn" title="Burning: loses 5 HP whenever it strikes">🔥</div>}
+        {unit.defending && (
+          <div className="unit-guard" title="Guard up: halves what lands on it until its next turn">🛡</div>
+        )}
         {target === 'ally' && <div className="unit-crosshair is-mend" />}
         {target === 'foe' && <div className={`unit-crosshair${counters ? ' is-risky' : ''}`} />}
       </div>

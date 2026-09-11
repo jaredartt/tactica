@@ -1,4 +1,4 @@
-import type { MatchState, Obstacle, Side, Unit } from './types'
+import { actsCap, type MatchState, type Obstacle, type Side, type Unit } from './types'
 
 /**
  * The client's copy of the geometry in 0005_roster_terrain_deploy.sql.
@@ -18,11 +18,71 @@ export const key = (x: number, y: number) => `${x},${y}`
 export const cheb = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 
-/** The host holds the left of the board, the guest the right. Both players
- *  see the same board the same way up -- which side is yours is carried by
- *  colour, not by which end of the screen it is on. Mirrors cn_own_side(). */
-export const ownSide = (side: Side, x: number, w: number) =>
-  side === 'host' ? x < Math.floor(w / 2) : x >= Math.floor(w / 2)
+/** The host holds the top of the board, the guest the bottom: on an 8-tall
+ *  board that is rows 0-3 and rows 4-7. Mirrors cn_own_side() in 0019, whose
+ *  arguments mean y and h where 0011's meant x and w.
+ *
+ *  Note that this asks about SERVER coordinates, which is the only kind there
+ *  is -- the flip below is a drawing, and nothing in the rules knows about it. */
+export const ownSide = (side: Side, y: number, h: number) =>
+  side === 'host' ? y < Math.floor(h / 2) : y >= Math.floor(h / 2)
+
+/**
+ * Where a tile is DRAWN.
+ *
+ * The server keeps one set of coordinates and 0019 gave the halves back to the
+ * rows, so the host's ground is the top of that one board and the guest's is
+ * the bottom. Rather than rotate anything in the database -- which is what
+ * 0011 was trying to avoid and what cost it the halves in the first place --
+ * the guest's client turns the picture half a turn, so whoever is looking is
+ * always at the bottom looking up.
+ *
+ * A half turn, and not a mirror: flipping only the rows would leave left and
+ * right where they were, and a spearman who advanced up the right of the board
+ * for the host would be advancing up the LEFT of it for the guest. Board
+ * coordinates go in, screen coordinates come out, and the two are only ever
+ * converted here.
+ */
+export const draw = (
+  p: { x: number; y: number }, w: number, h: number, flip: boolean,
+) => (flip ? { x: w - 1 - p.x, y: h - 1 - p.y } : { x: p.x, y: p.y })
+
+/**
+ * Who turns the board over.
+ *
+ * The HOST does. It reads backwards until you check which rows are whose:
+ * cn_own_side gives the host rows 0-3, so drawn straight the host's army sits
+ * along the TOP and the guest's along the bottom -- and the guest is already
+ * where they should be. It is the host who has to turn the picture over to be
+ * at the bottom of it.
+ *
+ * A spectator turns nothing. They have no ground to be near, and leaving the
+ * board as the server holds it means the one picture nobody is playing in is
+ * also the one that matches the coordinates in the log.
+ *
+ * Board.tsx draws from this and Match.tsx sides a hovered tree's card from it,
+ * which is the whole reason it is a named rule here rather than a comparison
+ * written out twice.
+ */
+export const flipFor = (side: Side | null) => side === 'host'
+
+/** And the sign a direction picks up on the way through it. A lunge to the
+ *  east is drawn as a lunge to the west on a flipped board. */
+export const drawSign = (flip: boolean) => (flip ? -1 : 1)
+
+/**
+ * May this unit start -- or carry on -- a go right now? Mirrors cn_begin_act()
+ * in 0019, minus the ownership checks the caller has already made.
+ *
+ * The unit already mid-go always may, and that is the whole subtlety: it moved
+ * a moment ago and is now striking, which is the same activation and costs
+ * nothing further. Everybody else needs a spare one in the turn's budget.
+ */
+export function canAct(state: MatchState, u: Unit): boolean {
+  if (u.spent) return false
+  if ((state.active ?? null) === u.id) return true
+  return (state.acts ?? 0) < actsCap(state)
+}
 
 export function occupied(state: MatchState): Set<string> {
   const s = new Set<string>()
@@ -153,9 +213,9 @@ export function deployTiles(state: MatchState, side: Side): Set<string> {
   const { w, h } = state.board
   const wood = new Set((state.obstacles ?? []).map((o) => key(o.x, o.y)))
   const out = new Set<string>()
-  for (let x = 0; x < w; x++) {
-    if (!ownSide(side, x, w)) continue
-    for (let y = 0; y < h; y++) if (!wood.has(key(x, y))) out.add(key(x, y))
+  for (let y = 0; y < h; y++) {
+    if (!ownSide(side, y, h)) continue
+    for (let x = 0; x < w; x++) if (!wood.has(key(x, y))) out.add(key(x, y))
   }
   return out
 }

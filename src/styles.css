@@ -536,16 +536,43 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 /* Turn clock. The text gets its own row rather than sitting absolutely
    positioned inside the 3px bar -- which clipped it out of existence, since
    the bar hides its own overflow so the fill has square ends. */
-.turnbar { flex: none; }
-.timerbar { height: 3px; background: var(--line); overflow: hidden; }
+/* Three things, two rows: the clock across the top, and the sentence and the
+   pips side by side beneath it. The 1fr on each end is what keeps that PAIR
+   centred rather than the sentence alone -- and it still centres correctly
+   while deploying, when there are no pips to sit beside. */
+.turnbar {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto auto 1fr;
+  grid-template-areas: "bar bar bar bar" ". text goes .";
+  align-items: center;
+}
+.timerbar { grid-area: bar; height: 3px; background: var(--line); overflow: hidden; }
 .timerfill { height: 100%; background: var(--you); transition: width 0.2s linear; }
 .turnbar.urgent .timerfill { background: var(--danger); }
 .timertext {
+  grid-area: text;
   padding: 9px 12px 3px; text-align: center;
   font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--muted);
 }
 .turnbar.urgent .timertext { color: var(--danger); }
+
+/* The two goes. Rhomboids rather than dots, because everything else in this
+   app that counts something -- the health bar, the menu tiles, the wipe --
+   leans by the same eight-or-so degrees, and a row of circles here read as a
+   loading spinner. A spent go goes flat grey; it is not removed, so the shape
+   of the turn stays the same width whether you have spent none or both. */
+.goes { grid-area: goes; display: flex; gap: 5px; padding: 9px 0 3px 2px; }
+.go {
+  width: 15px; height: 8px;
+  transform: skewX(-14deg);
+  background: var(--you);
+  transition: background 0.2s;
+}
+.go.is-used { background: var(--line-2); }
+.turnbar.urgent .go { background: var(--danger); }
+.turnbar.urgent .go.is-used { background: var(--line-2); }
 
 .stage { flex: 1; display: grid; grid-template-columns: 260px 1fr 280px; min-height: 0; }
 
@@ -690,14 +717,18 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   background: var(--tile-a);
   transition: background 0.18s, box-shadow 0.18s;
 }
-/* Your half is a shade warmer than theirs. Nothing is rotated any more, so
-   both players see the same board -- and this tint, plus the colour of the
-   cards, is what tells you which side of it is yours. */
+/* Your half is a shade warmer than theirs. The board is turned half a turn
+   for the guest, so your rows are always the near ones -- this tint and the
+   colour of the cards agree with each other instead of having to carry the
+   orientation between them. */
 .tile-mine   { background: var(--tile-mine); }
+/* The seam between the halves. Stretched across the row rather than down the
+   column since 0019 gave the halves back to the rows, and pinned to that row's
+   leading edge, which is the middle of the board either way up. */
 .halfline {
-  justify-self: start; width: 0;
-  margin-left: calc(var(--gap) / -2 - 1px);
-  border-left: 2px dashed var(--line-2);
+  align-self: start; height: 0;
+  margin-top: calc(var(--gap) / -2 - 1px);
+  border-top: 2px dashed var(--line-2);
   pointer-events: none;
 }
 .tile-theirs { background: var(--tile-a); }
@@ -722,6 +753,57 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   animation: tilepulse 1.5s ease-in-out infinite;
 }
 .tile-deploy:hover { background: rgba(0, 196, 106, 0.24); animation: none; }
+
+/* ---------- the action menu ----------------------------------------------
+   Fire Emblem's: it opens ON the piece you clicked rather than beside the
+   board, so your eye never has to leave the unit you are giving an order to.
+   The slot is a grid cell like any other and the menu hangs off it absolutely,
+   which is why it can be wider than a tile on a phone without disturbing one.
+   -------------------------------------------------------------------------- */
+.actmenu-slot { position: relative; z-index: 45; pointer-events: none; }
+.actmenu {
+  position: absolute; left: 104%; top: -4%;
+  pointer-events: auto;
+  min-width: 124px;
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border: 1.5px solid var(--line-2); border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(14, 14, 20, 0.22);
+  overflow: hidden;
+  animation: actmenu-in 0.14s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+/* Board.tsx sets these from the DRAWN column and row, so the menu opens away
+   from whichever edge the unit is actually near on the screen. .center clips
+   its overflow, and a menu with Cancel off the edge is a trap. */
+.actmenu.is-left { left: auto; right: 104%; }
+.actmenu.is-up   { top: auto; bottom: -4%; }
+
+.actmenu-head {
+  padding: 7px 13px 6px;
+  font-family: var(--display); font-weight: 900;
+  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.actmenu button {
+  border: 0; background: none; font: inherit; font-size: 13px;
+  text-align: left; padding: 8px 14px; color: var(--ink); cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.actmenu button + button { border-top: 1px solid var(--line); }
+.actmenu button:hover:not(:disabled) { background: var(--you); color: #fff; }
+.actmenu button:disabled { color: #c2c2d0; cursor: default; }
+.actmenu-cancel { color: var(--muted); }
+.actmenu-cancel:hover:not(:disabled) { background: var(--line); color: var(--ink); }
+
+@keyframes actmenu-in { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .actmenu { animation: none; } }
+/* A thumb is not a cursor. Nothing in here should be a 28px-tall target. */
+@media (pointer: coarse) {
+  .actmenu { min-width: 138px; }
+  .actmenu button { padding: 11px 15px; font-size: 14px; }
+}
 
 @keyframes tilepulse { 50% { filter: brightness(1.55); } }
 @media (prefers-reduced-motion: reduce) {
@@ -1055,6 +1137,21 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit.is-target { --rim: var(--danger); cursor: crosshair; }
 .unit.is-target-ally { --rim: var(--good); cursor: cell; }
 
+/* Guard up. Blue because it is a defence and blue is your colour, and placed
+   before the burn below on purpose: a unit that is both burning and guarding
+   reads as burning, which is the more urgent of the two. */
+.unit.is-guarding { --rim: var(--you); }
+.unit-guard {
+  position: absolute; left: 5cqw; top: 5cqw;
+  font-size: 13cqw; line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(47, 75, 255, 0.55));
+  pointer-events: none;
+}
+/* Effect icons live in the upper left and stack rightward as more of them
+   apply, which is the arrangement the roster spec asks for. Two of them exist
+   so far; a third goes at 37cqw. */
+.unit.is-burned .unit-guard { left: 21cqw; }
+
 /* A unit the Mage has set alight. It loses 5 whenever it strikes, which is a
    fact about the future, so it needs to be visible on the board and not only
    in the log. */
@@ -1066,7 +1163,11 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   pointer-events: none;
 }
 
-.unit.is-spent { filter: grayscale(1) opacity(0.5); }
+/* The picture greys out, not the whole token. Defending both raises a guard
+   AND spends the go, so a shield drawn inside the greyed-out element would be
+   invisible on every unit that has one -- which is every unit it matters for.
+   The rim stays lit for the same reason. */
+.unit.is-spent .unit-face { filter: grayscale(1) opacity(0.5); }
 
 .unit-crosshair {
   position: absolute; inset: -6cqw;
