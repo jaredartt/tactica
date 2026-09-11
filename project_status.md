@@ -164,10 +164,14 @@ It contains:
 
 ### Migrations
 
-`0001`–`0016` are applied in production. **`0017_first_move_coin.sql` and
-`0018_combat_core.sql` have NOT been run yet** — Jared must paste each into the
-Supabase SQL editor, `0017` first. Both print a row of checks; every column
-must say true.
+`0001`–`0016` and **`0018_combat_core.sql`** are applied in production —
+Jared ran `0018` on 2026-09-11.
+
+**`0017_first_move_coin.sql` is still unconfirmed.** It was never reported as
+run, and `0018` does not depend on it (`0018` never touches `cn_set_ready`), so
+running them out of order changed nothing — but until `0017` is in, the host
+still moves first in every mode. Check `cn_set_ready` in the SQL editor before
+assuming either way.
 
 `0017` makes who moves first a coin flip in **every** mode (was: host always
 first; `0012` only randomised the ranked *seat*). It is spliced from `0008`
