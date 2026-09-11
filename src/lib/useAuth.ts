@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { hydrate, unlink } from './settings'
 import type { Profile } from './types'
 
 /** Every column the current client needs that a older schema would not have.
@@ -37,6 +38,9 @@ export function useAuth() {
     if (!session) {
       setProfile(null)
       setProfileError(null)
+      // The settings stay -- they are still this browser's -- but there is
+      // nothing to write them to until somebody signs in again.
+      unlink()
       return
     }
     let cancelled = false
@@ -59,7 +63,16 @@ export function useAuth() {
           if (cancelled) return
           const missing = REQUIRED_COLUMNS.filter((c) => !(c in data))
           if (missing.length) setProfileError(BEHIND)
-          else setProfile(data as Profile)
+          else {
+            // The account's settings win over this browser's cache, and
+            // whatever the account is missing gets pushed up once -- which is
+            // how somebody who had settings here before 0022 keeps them.
+            // Deliberately NOT in REQUIRED_COLUMNS: a database that has not
+            // run 0022 yet should still let you play, with the cache doing
+            // exactly what it did before.
+            hydrate((data as { settings?: unknown }).settings)
+            setProfile(data as Profile)
+          }
           return
         }
         if (error) last = error.message

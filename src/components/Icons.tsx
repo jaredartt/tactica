@@ -32,6 +32,15 @@ export const IconMotion = (p: { className?: string }) => (
   </svg>
 )
 
+/** A disc half filled: the one glyph that means "light or dark" without
+ *  committing to either, which is what a three-way control needs. */
+export const IconTheme = (p: { className?: string }) => (
+  <svg {...box} {...p} aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 export const IconSignOut = (p: { className?: string }) => (
   <svg {...box} {...p} aria-hidden="true">
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />

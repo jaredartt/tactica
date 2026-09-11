@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase'
-import { setSettings, useSettings } from '../lib/settings'
+import { setSettings, useSettings, type Theme } from '../lib/settings'
 import { playHit } from '../lib/sfx'
-import { IconMotion, IconMusic, IconSignOut, IconSound } from './Icons'
+import { IconMotion, IconMusic, IconSignOut, IconSound, IconTheme } from './Icons'
 import { Modal } from './Modal'
 
 /** A row: an icon, a label, and the one control that changes it. */
@@ -51,6 +51,27 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
             aria-label="Music volume"
             onChange={(e) => setSettings({ music: Number(e.target.value) / 100 })}
           />
+        </Row>
+
+        {/* Three states and not a switch. "Follow the system" is a real
+            answer and the one most people want, and a two-position toggle
+            cannot hold it -- it would have to be a switch plus a second
+            control to say whether the switch counts. */}
+        <Row icon={<IconTheme />} label="Theme" note="Light, dark, or whatever your device says">
+          <div className="seg" role="radiogroup" aria-label="Theme">
+            {([['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']] as [Theme, string][])
+              .map(([v, label]) => (
+                <button
+                  key={v}
+                  role="radio"
+                  aria-checked={s.theme === v}
+                  className={s.theme === v ? 'is-on' : ''}
+                  onClick={() => setSettings({ theme: v })}
+                >
+                  {label}
+                </button>
+              ))}
+          </div>
         </Row>
 
         <Row

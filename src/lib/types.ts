@@ -252,6 +252,10 @@ export interface Profile {
   games: number
   streak: number
   deck: string[] | null
+  /** Sound, motion, theme -- see settings.ts. Optional because a client can be
+   *  one deploy ahead of the database, which here is a normal state rather
+   *  than a hypothetical. */
+  settings?: Record<string, unknown> | null
 }
 
 export interface LadderRow {

@@ -199,6 +199,18 @@ export async function setAvatar(slug: string | null): Promise<string | null> {
   return (data as string | null) ?? null
 }
 
+/**
+ * Save some settings. A PATCH, not the whole blob: the server merges it, so two
+ * devices changing different settings do not overwrite one another, and a key
+ * this build does not know about is not erased by a build that would never
+ * think to send it.
+ */
+export async function pushSettings(patch: Record<string, unknown>): Promise<unknown> {
+  const { data, error } = await supabase.rpc('set_settings', { p_patch: patch })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return data
+}
+
 /** Rename yourself. The unique index decides it; this turns the constraint
  *  violation into a sentence. */
 export async function setUsername(name: string): Promise<string> {

@@ -1,10 +1,27 @@
 /* ==========================================================================
    CROWN NEMESIS
-   White, quiet, and saturated only where it carries meaning. The board is a
-   plane tilted away from the camera; the unit cards are counter-rotated on
-   that plane so they stand up on it like pieces on a table.
-   Committed single-theme on purpose: an arena should look the same to both
-   players, so every colour here is painted explicitly.
+   Quiet, and saturated only where it carries meaning. The board is a plane
+   tilted away from the camera; the unit cards are counter-rotated on that
+   plane so they stand up on it like pieces on a table.
+
+   TWO THEMES, ONE SET OF MEANINGS. This file used to say it was committed to
+   a single theme so that an arena looked the same to both players. That was
+   the wrong reason for the right instinct: what has to be the same for both
+   players is what the colours MEAN -- blue is the host, red is the guest, a
+   solid crosshair is a trade and a dashed one is a free hit -- and none of
+   that moves between themes. How bright the paper is underneath it is a
+   question about the room somebody is sitting in, and there is no fairness in
+   making them squint.
+
+   So every colour that answers "what is the page made of" is a token defined
+   twice, below; every colour that answers "what does this MEAN" is defined
+   once and does not move. Anything painted on a saturated background -- the
+   white on a nameplate, the white on a health bar -- is fixed for the same
+   reason: the thing underneath it did not change.
+
+   Themes are resolved in JavaScript and stamped on <html> as data-theme, so a
+   rule has exactly one question to ask. 'system' never reaches this
+   stylesheet; settings.ts has already turned it into light or dark.
    ========================================================================== */
 
 :root {
@@ -20,6 +37,19 @@
   --muted:   #75758a;
   --line:    #ebebf3;
   --line-2:  #dededf;
+  /* The quietest thing that is still text -- a label nobody reads on purpose. */
+  --faint:   #b3b3c4;
+  /* Body text in the rails: softer than --ink, still comfortably readable. */
+  --ink-2:   #43435a;
+  /* The glow that lifts a damage number off whatever it is standing on. It is
+     the PAGE's colour, not white -- on a dark board a white halo is a lamp. */
+  --halo:    #ffffff;
+  /* Behind a big card's art. Fixed in both themes: a printed card is a dark
+     object, and it is a dark object in a bright room too. */
+  --card-back: #0e0e14;
+  /* The side colour when it is being read rather than filled. Identical to
+     --you here; the dark theme lifts it, and only it. */
+  --you-ink: var(--you);
 
   --you:     #2f4bff;   /* your side */
   --foe:     #f2503c;   /* the other side */
@@ -32,6 +62,42 @@
   --body:    "Lexend", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --tile: 88px;
+}
+
+/* ---------- dark ----------------------------------------------------------
+   Only the tokens that answer "what is the page made of". The side colours
+   lift a little, because a mid-blue that reads cleanly on white is muddy on
+   near-black -- the MEANING is identical, the legibility is not. Everything
+   else in this file is untouched, and stays untouched. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --paper:   #0f0f16;
+  --paper-2: #16161f;
+  --tile-a:    #1b1b26;   /* their half */
+  --tile-mine: #262636;   /* yours -- a shade LIGHTER here, not deeper */
+
+  --ink:     #ececf4;
+  --muted:   #9797ad;
+  --line:    #22222e;
+  --line-2:  #33333f;
+  --faint:   #8a8aa3;
+  --ink-2:   #c6c6d6;
+  --halo:    #05050a;
+
+  /* The side colours do NOT move, and that was measured rather than decided.
+     Lifting them for a dark background reads better as a line or a tint --
+     and it quietly wrecks the thing they are mostly used for, which is a
+     SURFACE with white type on it: a nameplate, the primary button, the
+     selected segment. A lifted blue took white-on-blue from 5.9 to 3.2, which
+     is worse than the same nameplate in the light theme. So they stay put,
+     and white on them is identical in both themes.
+
+     What a brand colour cannot do on near-black is be small TEXT: #2f4bff on
+     this paper is 3.2, which is fine at 56px and not fine at 13px. That is
+     what --you-ink is for, below -- it is the same blue, lifted, and it is
+     used only where the blue IS the text. */
+  --you-ink: #8b9dff;
 }
 
 * { box-sizing: border-box; }
@@ -51,7 +117,7 @@ body {
 .muted { color: var(--muted); }
 .tiny { font-size: 12px; }
 .error { color: var(--danger); font-size: 13px; }
-.notice { color: var(--you); font-size: 13px; }
+.notice { color: var(--you-ink); font-size: 13px; }
 code {
   background: var(--paper-2); border: 1px solid var(--line);
   padding: 1px 5px; border-radius: 5px; font-size: 12px;
@@ -117,7 +183,7 @@ input {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input::placeholder { color: #b3b3c4; }
+input::placeholder { color: var(--faint); }
 input:focus { border-color: var(--you); box-shadow: 0 0 0 3px rgba(47, 75, 255, 0.12); }
 
 .btn {
@@ -149,7 +215,7 @@ input:focus { border-color: var(--you); box-shadow: 0 0 0 3px rgba(47, 75, 255, 
   color: var(--muted); font: inherit; cursor: pointer;
   text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2);
 }
-.linkbtn:hover { color: var(--you); text-decoration-color: currentColor; }
+.linkbtn:hover { color: var(--you-ink); text-decoration-color: currentColor; }
 
 form .btn.primary { width: 100%; margin-top: 10px; }
 .auth .linkbtn { margin-top: 14px; }
@@ -436,7 +502,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .ladder { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ladder th {
   text-align: left; font-weight: 400; font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: #b3b3c4;
+  text-transform: uppercase; color: var(--faint);
   padding: 0 10px 10px; border-bottom: 1px solid var(--line);
 }
 .ladder td { padding: 11px 10px; border-bottom: 1px solid var(--line); }
@@ -628,7 +694,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   height: 66px; align-content: center; overflow: hidden;
 }
 .unitbar.is-empty { border-style: dashed; }
-.unitbar.is-empty .unitbar-stats { color: #b3b3c4; }
+.unitbar.is-empty .unitbar-stats { color: var(--faint); }
 
 /* Not an accusation and not a verdict -- the fact, and the one thing it
    unlocks. The button argues back if they are merely reloading. */
@@ -640,8 +706,8 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   align-items: center; gap: 6px 14px;
   max-width: min(560px, 100%);
   padding: 9px 10px 9px 16px; border-radius: 12px;
-  background: color-mix(in srgb, var(--danger) 8%, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--danger) 28%, #ffffff);
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper));
+  border: 1px solid color-mix(in srgb, var(--danger) 28%, var(--paper));
   font-size: 13px; line-height: 1.35; color: var(--ink);
 }
 .awaybar p { margin: 0; min-width: 0; }
@@ -651,6 +717,14 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .unitbar-name {
   font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+}
+/* An accent comes out of the database and was chosen against white. Some of
+   them land at 3.8 on near-black, so in dark they are lifted toward the page's
+   own ink -- which keeps the card recognisably its own colour while making the
+   name readable. The mix is only in this theme; light leaves them exactly as
+   the card author set them. */
+:root[data-theme="dark"] .unitbar-name {
+  color: color-mix(in srgb, var(--accent) 62%, var(--ink));
 }
 .unitbar-stats { color: var(--muted); font-variant-numeric: tabular-nums; }
 .unitbar-stats b { color: var(--ink); font-weight: 400; }
@@ -681,11 +755,11 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 .msg { font-size: 13px; line-height: 1.5; }
 .msg-who { color: var(--muted); margin-right: 8px; }
-.msg-own .msg-who { color: var(--you); }
+.msg-own .msg-who { color: var(--you-ink); }
 
-.logline { display: flex; gap: 10px; font-size: 13px; color: #43435a; line-height: 1.5; }
+.logline { display: flex; gap: 10px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
 .log-turn {
-  color: #b3b3c4; font-size: 11px; flex: none; padding-top: 2px;
+  color: var(--faint); font-size: 11px; flex: none; padding-top: 2px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -868,7 +942,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .actmenu button + button { border-top: 1px solid var(--line); }
 .actmenu button:hover:not(:disabled) { background: var(--you); color: #fff; }
-.actmenu button:disabled { color: #c2c2d0; cursor: default; }
+.actmenu button:disabled { color: var(--faint); cursor: default; }
 .actmenu-cancel { color: var(--muted); }
 .actmenu-cancel:hover:not(:disabled) { background: var(--line); color: var(--ink); }
 
@@ -899,7 +973,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   display: grid; place-items: center;
   border-radius: 8%;
   overflow: hidden;
-  border: 1.5px solid color-mix(in srgb, var(--wood) 40%, #ffffff);
+  border: 1.5px solid color-mix(in srgb, var(--wood) 40%, var(--paper));
   transition: transform 0.16s, box-shadow 0.2s, border-color 0.2s;
 }
 .tree img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1009,7 +1083,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .unit-art {
   position: absolute; inset: 0;
   display: grid; place-items: center;
-  background: color-mix(in srgb, var(--accent) 15%, #ffffff);
+  background: color-mix(in srgb, var(--accent) 15%, var(--paper));
 }
 .unit-art img { width: 100%; height: 100%; object-fit: cover; }
 .unit-initial {
@@ -1077,7 +1151,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   container-type: inline-size;
   border-radius: 10px;
   overflow: hidden;
-  background: var(--ink);
+  background: var(--card-back);
   border: 2px solid var(--side, var(--wood));
   box-shadow: 0 22px 56px rgba(14, 14, 20, 0.30);
   z-index: 20; pointer-events: none;
@@ -1301,7 +1375,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   display: grid; place-items: start center;
   font-family: var(--display); font-weight: 900; font-size: clamp(15px, 4cqmin, 24px);
   color: var(--danger);
-  text-shadow: 0 2px 10px #fff, 0 0 4px #fff;
+  text-shadow: 0 2px 10px var(--halo), 0 0 4px var(--halo);
   opacity: 0;
   animation: riseaway 0.9s ease-out forwards 0.14s;
 }
@@ -1861,7 +1935,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .chapter-body { display: flex; flex-direction: column; gap: 3px; padding: 16px 18px 16px 4px; }
 .chapter-body b { font-family: var(--display); font-weight: 900; font-size: 16px; }
 .chapter-body em { font-style: normal; font-size: 13px; color: var(--muted); }
-.chapter-body i { font-style: normal; font-size: 11px; color: #b3b3c4; letter-spacing: 0.06em; }
+.chapter-body i { font-style: normal; font-size: 11px; color: var(--faint); letter-spacing: 0.06em; }
 
 .comic { display: flex; flex-direction: column; gap: 12px; }
 .comic-back { align-self: flex-start; }
@@ -1873,7 +1947,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .comic-foot { align-self: center; margin-top: 18px; }
 
 .orline {
-  display: flex; align-items: center; gap: 12px; color: #b3b3c4;
+  display: flex; align-items: center; gap: 12px; color: var(--faint);
   font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
 }
 .orline::before, .orline::after {
@@ -2015,13 +2089,13 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .pf-you { display: flex; align-items: flex-start; gap: 16px; }
 .pf-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .pf-name label {
-  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #b3b3c4;
+  font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
 }
 .pf-rename { display: flex; gap: 8px; }
 .pf-rename input { flex: 1; min-width: 0; }
 .pf-title {
   margin: 0; font-size: 10px; letter-spacing: 0.12em;
-  text-transform: uppercase; color: #b3b3c4; font-weight: 400;
+  text-transform: uppercase; color: var(--faint); font-weight: 400;
 }
 .pf-grid {
   display: grid; gap: 10px;
@@ -2071,6 +2145,29 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .settings input[type="range"]::-moz-range-thumb {
   width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--paper);
   background: var(--you); box-shadow: 0 1px 4px rgba(14, 14, 20, 0.28);
+}
+
+/* A segmented control, for a setting with three answers rather than two. It
+   is a radiogroup and not a row of toggles, because exactly one of them is
+   true and the control should say so by its shape. */
+.seg {
+  display: inline-flex; padding: 2px; gap: 2px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.seg button {
+  border: 0; background: none; font: inherit; font-size: 12px;
+  /* --muted here measured 4.21 against the panel, which is under the bar for
+     text this size. --ink-2 is the next step in and clears it. */
+  color: var(--ink-2); cursor: pointer;
+  padding: 5px 12px; border-radius: 999px;
+  transition: background 0.14s, color 0.14s;
+}
+.seg button:hover { color: var(--ink); }
+.seg button.is-on {
+  background: var(--you); color: #fff;
+  box-shadow: 0 1px 3px rgba(14, 14, 20, 0.28);
 }
 
 .toggle {

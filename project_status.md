@@ -92,9 +92,9 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 429 assertions, all green.** `09_combat.sql` is the Phase A file;
-`10_board.sql` is Phase B's, and `11_swings.sql` and `12_clock.sql` are
-Phase C's. Run the whole thing with `./supabase/tests/run.sh`.
+**Current: 461 assertions, all green.** `09_combat.sql` is the Phase A file;
+`10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
+Phase C's, and `13_settings.sql` is Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
 
 That script has now had **three** silent-failure bugs, which is worth saying out
 loud: if a test run ever looks too quiet, suspect the runner before you suspect
@@ -292,6 +292,9 @@ It contains:
 
 `0020_swings.sql` and `0021_cinematic_clock.sql` are **run in production** as of
 2026-09-11, so the blow-by-blow record and the paused turn clock are both live.
+
+**`0022_settings.sql` is built and tested but NOT yet run in production.** It is
+Phase D's first piece -- see the Phase D section.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -615,11 +618,72 @@ Still to build, and deliberately left:
 
 ### Phase D — UI, i18n, kingdoms
 
-- **Dark mode**: follows system theme, plus an explicit light/dark toggle.
-- **All settings saved per account** (currently localStorage) → `profiles.settings`
-  jsonb, localStorage as cache.
+Phase D is thirteen loosely-related items rather than one chunk, so it is being
+built in slices. Jared picked the order: **settings plumbing and dark mode
+first**, because the dark-mode toggle and the language toggle both need
+somewhere per-account to live, and doing it first stops the other two each
+inventing their own storage.
+
+#### DONE: settings per account, and dark mode
+
+**`0022_settings.sql` is built and tested (`13_settings.sql`, 32 assertions) and
+NOT yet run in production.** One `profiles.settings` jsonb column, one
+`set_settings(patch)` function, one trigger.
+
+The design worth remembering is **known keys are validated, unknown keys are
+kept**. Each half prevents a different failure. Drop unknown keys and a client
+one deploy ahead of the database loses every new setting silently -- and that
+is a NORMAL state here, because the site deploys instantly while migrations are
+pasted in by hand. Keep everything unvalidated and a volume of 40 or a theme of
+'bananas' comes back as a broken screen on every device rather than only on the
+one that wrote it. It is a PATCH rather than a replacement for a related
+reason: settings are exactly the thing somebody has open in two tabs.
+
+On the client, **the account is the truth and localStorage is the cache in
+front of it**. Writes go local-first and are pushed up debounced and coalesced
+(a finger on a volume slider is thirty changes a second); the account's copy
+wins when it arrives, and whatever the account is MISSING is pushed up once --
+which is how anybody who had settings in a browser before 0022 keeps them.
+`settings` is deliberately NOT in `useAuth`'s `REQUIRED_COLUMNS`: a database
+that has not run 0022 should still let you play, with the cache doing exactly
+what it did before.
+
+**Dark mode.** The theme is resolved in JavaScript and stamped on `<html>` as
+`data-theme`, so a CSS rule has exactly one question to ask -- 'system' never
+reaches the stylesheet. There is an inline script in `index.html` that reads
+the same localStorage cache before first paint, because a white flash in front
+of somebody who chose dark is the one thing a dark mode must not do.
+
+Two things the measuring settled, and both went against the first instinct:
+
+- **The side colours do not move between themes.** Lifting `--you` for a dark
+  background reads better as a line or a tint, and it wrecked the thing they
+  are mostly used for -- a SURFACE with white type on it. White-on-blue went
+  from 5.9 to 3.2, worse than the same nameplate in light. So they stay put.
+  What a brand colour cannot do on near-black is be small text, which is what
+  `--you-ink` is for: the same blue, lifted, used only where the blue IS the
+  text.
+- **A card's `accent` comes out of the database** and was chosen against white;
+  some land at 3.8 on near-black. In dark they are mixed toward the page's ink,
+  which keeps the card its own colour and the name readable. Light leaves them
+  exactly as the card author set them.
+
+Contrast is measured, not eyeballed: every text node's computed colour against
+its effective background, composited through transparency, as a WCAG ratio.
+**Dark has zero failures. Light has three** -- `.vs`, `.orline` and `.savemark`
+-- and all three predate this work. They are listed in the test rather than
+silently tolerated: each is a quiet label the palette deliberately keeps quiet,
+and changing them is a decision about the brand rather than about dark mode.
+**Still open for Jared**, if he wants them lifted.
+
+#### Still to do in Phase D
+
 - **Spanish** translation toggle. UI strings in repo JSON; ability text in DB
-  (`ability_en` / `ability_es`). Jared supplies the ability translations.
+  (`ability_en` / `ability_es`). The Spanish ability text is already written in
+  section 6, so nothing is blocked. `lang` is ALREADY a validated key in 0022,
+  so this needs no migration of its own.
+- A **full / quick / off setting for the cinematic**, which now has a place to
+  live.
 - **Kingdoms**: up to 10 saved decks, renameable, each with a unit-token icon.
   Selected kingdom is used in every mode. A "change kingdom" affordance in a
   corner of every pre-battle screen.
