@@ -92,8 +92,8 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 373 assertions, all green.** `09_combat.sql` is the Phase A file;
-`10_board.sql` is Phase B's. Run the whole thing with `./supabase/tests/run.sh`
+**Current: 411 assertions, all green.** `09_combat.sql` is the Phase A file;
+`10_board.sql` is Phase B's and `11_swings.sql` is Phase C's. Run the whole thing with `./supabase/tests/run.sh`
 -- which now works: it was creating no database while `_helpers.sql` pinned its
 GUCs with `alter database t`, and every psql in it sent stderr to /dev/null, so
 the run died silently. It also globbed `0[1-9]*`, which would have skipped
@@ -241,6 +241,9 @@ It contains:
 
 `0019_board_and_actions.sql` is **run in production** as of 2026-09-11, so the
 8-tall board, the two-activation turn, Defend and Wait are all live.
+
+**`0020_swings.sql` is built and tested but NOT yet run in production.** It is
+Phase C's first half -- see the Phase C section.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -433,6 +436,54 @@ And the last two client pieces, which finish Phase B:
 Nothing of Phase B is left.
 
 ### Phase C — the battle cinematic
+
+**The server half is DONE, in `0020_swings.sql`.** Built and tested
+(`11_swings.sql`, 38 assertions), waiting to be pasted into the Supabase SQL
+editor. Not yet run in production. The client half is not started.
+
+What `0020` does, and what it deliberately does not: it changes **no rule**.
+Not one number is computed differently and no branch is taken differently --
+which is why `09_combat.sql` and `10_board.sql` still pass untouched at 63 and
+35. All it does is write down what `cn_attack` was already deciding and
+throwing away.
+
+The problem it solves is that `fx` reported **sums**, and sums cannot be
+un-added. `dmg 30, counter 45, parries 2, chain 4` has many different fights
+behind it, and a cinematic built on a guess about which one would narrate blows
+that never landed. So the swings are kept in the order they happened and go out
+on `fx.swings`. A swing is:
+
+| field | |
+|---|---|
+| `k` | `hit` / `parry` / `burn` / `down` / `heal` |
+| `by`, `at` | unit ids (a tree's id where the target is a tree) |
+| `dmg` | what it took off |
+| `crit` | the 5% roll came up |
+| `counter` | it was an answer, so it was halved |
+| `def` | the receiver had a guard up, so it was halved again |
+| `first` | it landed BEFORE the blow it answers — Quick Dagger, and only that |
+| `why` | `strike` / `counter` / `quick` / `tree` / `mend`, or for a parry `roll` / `all` |
+
+`why` on a parry is the one worth keeping: Lium catching an answer because he
+is Lium is not the same event as a 5% roll coming up, and a caption that calls
+both of them "parries" is labelling rather than narrating.
+
+`cn_attack` in `0020` is `0019`'s definition with the recording spliced in,
+copied out programmatically rather than retyped -- 330 lines of combat rules is
+not where to find out whether the `deploy_unit` lesson took.
+
+The test file also pinned down two things worth writing down, because both read
+like bugs until you follow the rules through:
+
+- **Lium's catch earns him a free blow.** Catching an answer is a parry, a
+  parry answers if the parrier can reach what it caught, and he is standing
+  next to it -- so the shape is `hit, parry, hit`, three swings, and the third
+  is his. It lands in `riposte`, not `counter`.
+- A killed unit leaves the board for good, so the section that kills somebody
+  has to kill a unit no later section needs. `09_combat.sql` already had to
+  learn this; `11_swings.sql` now does the same thing for the same reason.
+
+Still to build, all client:
 
 - Fire Emblem 1v1: both units enlarge and float with slow tilts, attacker
   charges, clash/parry/counter/heal effects, HP bars beneath each.
