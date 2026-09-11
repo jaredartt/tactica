@@ -92,9 +92,9 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 461 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 476 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
-Phase C's, and `13_settings.sql` is Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+Phase C's, and `13_settings.sql` / `14_ability_es.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
 
 That script has now had **three** silent-failure bugs, which is worth saying out
 loud: if a test run ever looks too quiet, suspect the runner before you suspect
@@ -293,8 +293,9 @@ It contains:
 `0020_swings.sql` and `0021_cinematic_clock.sql` are **run in production** as of
 2026-09-11, so the blow-by-blow record and the paused turn clock are both live.
 
-**`0022_settings.sql` is built and tested but NOT yet run in production.** It is
-Phase D's first piece -- see the Phase D section.
+`0022_settings.sql` is **run in production** as of 2026-09-11.
+
+**`0023_ability_es.sql` is built and tested but NOT yet run in production.**
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -676,12 +677,71 @@ silently tolerated: each is a quiet label the palette deliberately keeps quiet,
 and changing them is a decision about the brand rather than about dark mode.
 **Still open for Jared**, if he wants them lifted.
 
+#### DONE: Spanish
+
+**UI strings** are `src/i18n/en.json` and `es.json`, reached through
+`src/lib/i18n.ts`. English is bundled because it is the fallback and a fallback
+has to be there before anything is fetched; Spanish is a dynamic import.
+`primeLang()` runs at startup so the first paint is not English-then-Spanish. A
+missing key renders its own NAME rather than an empty space -- `lobby.play` on
+screen is a bug reporting itself, and a blank is a layout that looks fine and
+says nothing.
+
+**215 keys, and the checker is the point.** `_to_delete/i18ncheck.cjs` (gone
+with `_to_delete`; rebuild it) asserts four things: the same keys both ways,
+the same `{holes}` in the same strings, nothing empty and nothing identical in
+both languages unless it is on a short list of things that really are, and --
+the one that matters -- **every key the CODE asks for exists**. A translation
+rots quietly: a key added to English and never to Spanish is hidden by the
+fallback and reads fine to the person who wrote it.
+
+**Ability text is in the database**, `cards.ability` (English) and the new
+`cards.ability_es`. There is no `ability_en`: `ability` IS the English one and
+renaming a column `cn_army`, `deck_of` and `random_deck` all read, to gain a
+suffix, is a migration that can only break things. The client looks the text up
+LIVE by slug through `useCards()` rather than reading the snapshot in
+`matches.state` -- units are snapshotted at deploy and that is right for stats,
+but a snapshot cannot hold a translation written after the match began, and
+nobody is disadvantaged by a clearer sentence.
+
+**0023 REPLACES the ability prose rather than translating it.** Jared's
+instruction was to use what he wrote, in both languages, so both columns are
+set from the roster spec in section 6 -- extracted from this file rather than
+retyped, with only the `**A:**` / `**P:**` markers stripped (they say whether a
+thing is an Ability or a Passive, the Spanish table has no equivalent, and
+keeping them would have the two languages saying different amounts).
+
+That replaces prose describing what the engine does today ("Answers a blow from
+one tile away or from two") with the spec's description of what each unit is
+DESIGNED to do -- and most of those abilities are not built. Dione & Grifo
+deals no 15 to everything nearby; Mako plants no bomb. **From 0023 until the
+roster rework, a card's text is a promise rather than a description.** That is
+deliberate and it is Jared's call; it is written down so nobody later reads it
+as a bug.
+
+**The spec's STATS also differ from the live roster**, and 0023 does not touch
+them. Lium is 80 hit points here against the spec's 85; Dereo is a 70-point
+unit against the spec's 110-point Royal. `14_ability_es.sql` asserts the LIVE
+numbers precisely so that a migration claiming to translate cards cannot
+quietly retune eleven of them. The stats are the roster rework's business.
+
+Two things the measuring caught that reading did not:
+
+- The theme segment built its key as `settings.theme${value}`, which for a
+  value of 'system' asked for `settings.themeSystem` while the dictionary says
+  `themeAuto` -- so the button rendered its own key on screen. **No amount of
+  checking the dictionaries against each other could see it**, because a
+  constructed key is invisible to a search. The keys are written out now.
+- A test assertion of mine borrowed Lium's hit points from the spec rather than
+  the database, which is how the stat divergence above was found at all.
+
 #### Still to do in Phase D
 
-- **Spanish** translation toggle. UI strings in repo JSON; ability text in DB
-  (`ability_en` / `ability_es`). The Spanish ability text is already written in
-  section 6, so nothing is blocked. `lang` is ALREADY a validated key in 0022,
-  so this needs no migration of its own.
+- **Kingdoms** -- up to 10 saved decks. The biggest item left.
+- The card and tooltip polish: hover card with the info outside the art, the
+  zoomed card locking left, purple keyword tooltips, long-press on mobile.
+- Deployment showing which units the opponent picked; the "Defeat the king."
+  opening; the admin card editor; the ladder's tournaments column and avatars.
 - A **full / quick / off setting for the cinematic**, which now has a place to
   live.
 - **Kingdoms**: up to 10 saved decks, renameable, each with a unit-token icon.

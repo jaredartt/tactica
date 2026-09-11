@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useT } from '../lib/i18n'
 
 /**
  * The comics, read the way a webcomic is read: pick a chapter, then scroll.
@@ -18,6 +19,7 @@ interface Chapter {
 }
 
 export function Comics() {
+  const t = useT()
   const [chapters, setChapters] = useState<Chapter[] | null>(null)
   const [open, setOpen] = useState<Chapter | null>(null)
   const [failed, setFailed] = useState(false)
@@ -31,14 +33,14 @@ export function Comics() {
     return () => { alive = false }
   }, [])
 
-  if (failed) return <p className="muted">The comics could not be loaded right now.</p>
-  if (!chapters) return <p className="muted">Loading…</p>
+  if (failed) return <p className="muted">{t('comics.failed')}</p>
+  if (!chapters) return <p className="muted">{t('comics.loading')}</p>
 
   if (open) {
     return (
       <div className="comic">
         <button className="linkbtn comic-back" onClick={() => setOpen(null)}>
-          ← All chapters
+          {t('comics.allChapters')}
         </button>
         <h3 className="comic-title">{open.title}</h3>
         {open.note && <p className="muted comic-note">{open.note}</p>}
@@ -47,13 +49,13 @@ export function Comics() {
             <img
               key={src}
               src={`${import.meta.env.BASE_URL}${src}`}
-              alt={`${open.title}, page ${i + 1}`}
+              alt={t('comics.pageAlt', { title: open.title, n: i + 1 })}
               loading={i < 2 ? 'eager' : 'lazy'}
             />
           ))}
         </div>
         <button className="btn ghost comic-foot" onClick={() => setOpen(null)}>
-          Back to the chapters
+          {t('comics.backToChapters')}
         </button>
       </div>
     )

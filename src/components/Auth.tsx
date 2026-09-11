@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useT } from '../lib/i18n'
 import { Logo } from './Logo'
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -24,6 +25,7 @@ function PasswordField({
   id: string
 }) {
   const [show, setShow] = useState(false)
+  const t = useT()
   return (
     <label htmlFor={id}>
       <span>{label}</span>
@@ -41,7 +43,7 @@ function PasswordField({
           type="button"
           className="eye"
           onClick={() => setShow((s) => !s)}
-          aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-label={t(show ? 'auth.hide' : 'auth.show', { what: label.toLowerCase() })}
           aria-pressed={show}
           tabIndex={-1}
         >
@@ -53,6 +55,7 @@ function PasswordField({
 }
 
 export function Auth() {
+  const t = useT()
   const [mode, setMode] = useState<'in' | 'up'>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -80,7 +83,7 @@ export function Auth() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (signingUp && password !== confirm) {
-      setErr('Those two passwords do not match.')
+      setErr(t('auth.mismatch'))
       return
     }
     setBusy(true)
@@ -94,7 +97,7 @@ export function Auth() {
           options: { data: { username: username.trim() } },
         })
         if (error) throw error
-        if (!data.session) setMsg('Check your email to confirm, then sign in.')
+        if (!data.session) setMsg(t('auth.confirmEmail'))
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -111,17 +114,17 @@ export function Auth() {
       <div className="panel auth">
         <Logo className="logo logo-hero" title="Crown Nemesis" />
         <h1 className="wordmark">CROWN<br />NEMESIS</h1>
-        <p className="muted">A competitive tactics arena.</p>
+        <p className="muted">{t('app.tagline')}</p>
 
         <form onSubmit={submit}>
           {signingUp && (
             <label htmlFor="cn-username">
-              <span>Display name</span>
+              <span>{t('auth.displayName')}</span>
               <input
                 id="cn-username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="how you appear in the arena"
+                placeholder={t('auth.displayNamePlaceholder')}
                 minLength={2}
                 maxLength={20}
                 required
@@ -130,7 +133,7 @@ export function Auth() {
           )}
 
           <label htmlFor="cn-email">
-            <span>Email</span>
+            <span>{t('auth.email')}</span>
             <input
               id="cn-email"
               type="email"
@@ -143,7 +146,7 @@ export function Auth() {
 
           <PasswordField
             id="cn-password"
-            label="Password"
+            label={t('auth.password')}
             value={password}
             onChange={setPassword}
             autoComplete={signingUp ? 'new-password' : 'current-password'}
@@ -153,12 +156,12 @@ export function Auth() {
             <>
               <PasswordField
                 id="cn-confirm"
-                label="Repeat password"
+                label={t('auth.repeatPassword')}
                 value={confirm}
                 onChange={setConfirm}
                 autoComplete="new-password"
               />
-              {mismatch && <p className="error">Those two passwords do not match.</p>}
+              {mismatch && <p className="error">{t('auth.mismatch')}</p>}
             </>
           )}
 
@@ -166,12 +169,12 @@ export function Auth() {
           {msg && <p className="notice">{msg}</p>}
 
           <button className="btn primary" disabled={!canSubmit}>
-            {busy ? '…' : signingUp ? 'Create account' : 'Sign in'}
+            {busy ? '…' : t(signingUp ? 'auth.createAccount' : 'auth.signIn')}
           </button>
         </form>
 
         <button className="linkbtn" onClick={switchMode}>
-          {signingUp ? 'Already have an account? Sign in' : 'No account yet? Create one'}
+          {t(signingUp ? 'auth.haveAccount' : 'auth.noAccount')}
         </button>
       </div>
     </div>

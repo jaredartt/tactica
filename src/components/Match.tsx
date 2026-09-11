@@ -16,6 +16,8 @@ import {
   unitPower,
 } from '../lib/types'
 import { flipFor } from '../lib/rules'
+import { abilityText, useT } from '../lib/i18n'
+import { useCardsBySlug } from '../lib/useCards'
 import { playLose, playTurn, playWin } from '../lib/sfx'
 
 export function Match({ matchId, profile, onLeave, onGoTo }: {
@@ -31,6 +33,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
     onLeave()
   }
 
+  const t = useT()
+  // Only for the ability sentence: a unit's numbers come from the snapshot in
+  // matches.state, which is correct, and its words come from the card row,
+  // which is where a translation written after the match began can reach it.
+  const bySlug = useCardsBySlug()
   const { match, refresh } = useMatch(matchId)
   const messages = useMessages(matchId)
   const clockOffset = useServerClock()
@@ -237,7 +244,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   if (!match) {
     return (
       <div className="center-stage">
-        <p className="muted">Loading match…</p>
+        <p className="muted">{t('match.loading')}</p>
       </div>
     )
   }
@@ -277,7 +284,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
     <div className="match">
       <header className="matchbar">
         <button className="linkbtn" onClick={leave}>
-          ← Lobby
+          {t('match.lobby')}
         </button>
 
         <div className="scoreline">
@@ -294,12 +301,12 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
         <div className="matchbar-right">
           <button
             className="roomcode"
-            title="Copy room code"
+            title={t('match.copyCode')}
             onClick={() => navigator.clipboard?.writeText(match.code)}
           >
             {match.code}
           </button>
-          {mySide === null && <span className="pill spectating">watching</span>}
+          {mySide === null && <span className="pill spectating">{t('match.watching')}</span>}
         </div>
       </header>
 
@@ -311,15 +318,17 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
           <div className="timertext">
             {deploying
               ? mySide
-                ? iAmReady ? 'Waiting for your opponent' : 'Place your units'
-                : 'Both sides are deploying'
+                ? t(iAmReady ? 'match.waitingForThem' : 'match.placeUnits')
+                : t('match.bothDeploying')
               : botTurn
-                ? `${match.guest_name} is thinking`
+                ? t('match.thinking', { name: match.guest_name })
               : isMyTurn
-                ? 'Your turn'
+                ? t('match.yourTurn')
                 : mySide
-                  ? 'Opponent thinking'
-                  : `${s.turn === 'host' ? match.host_name : match.guest_name} to act`}
+                  ? t('match.opponentThinking')
+                  : t('match.toAct', {
+                      name: s.turn === 'host' ? match.host_name : match.guest_name,
+                    })}
             {' · '}
             {Math.max(0, Math.ceil(remaining ?? 0))}s
           </div>
@@ -332,11 +341,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
             <div
               className="goes"
               role="img"
-              aria-label={`${actsLeft} of ${actsCapNow} ${actsCapNow === 1 ? 'go' : 'goes'} left`}
-              title={
-                (isMyTurn ? 'Your turn: ' : 'Their turn: ') +
-                `${actsLeft} of ${actsCapNow} left. One go is one unit's move and strike together.`
-              }
+              aria-label={t('match.goesLabel', {
+                left: actsLeft, cap: actsCapNow,
+                word: t(actsCapNow === 1 ? 'match.go' : 'match.goes'),
+              })}
+              title={t('match.goesLeft', { left: actsLeft, cap: actsCapNow })}
             >
               {Array.from({ length: actsCapNow }, (_, i) => (
                 <span key={i} className={`go${i < actsSpent ? ' is-used' : ''}`} />
@@ -358,10 +367,10 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
         <main className="center">
           {match.status === 'waiting' ? (
             <div className="waiting">
-              <p className="muted">Send this code to your opponent</p>
+              <p className="muted">{t('match.sendCode')}</p>
               <div className="bigcode">{match.code}</div>
               <button className="btn" onClick={() => navigator.clipboard?.writeText(match.code)}>
-                Copy code
+                {t('match.copyCodeBtn')}
               </button>
             </div>
           ) : (
@@ -398,22 +407,28 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                 <div className="unitbar" style={{ '--accent': selectedUnit.accent } as React.CSSProperties}>
                   <span className="unitbar-name">{selectedUnit.name}</span>
                   <span className="unitbar-stats">
-                    <b>{selectedUnit.hp}</b>/{selectedUnit.maxHp} HP
+                    <b>{selectedUnit.hp}</b>/{selectedUnit.maxHp} {t('stat.hp')}
                     <i /><b>{unitPower(selectedUnit)}</b>{' '}
-                    {selectedUnit.heals ? 'PWR' : 'DMG'}
-                    <i /><b>{selectedUnit.mov}</b> MOV
-                    <i /><b>{reachText(selectedUnit.rmin, selectedUnit.rmax)}</b> RNG
+                    {t(selectedUnit.heals ? 'stat.pwr' : 'stat.dmg')}
+                    <i /><b>{selectedUnit.mov}</b> {t('stat.mov')}
+                    <i /><b>{reachText(selectedUnit.rmin, selectedUnit.rmax)}</b> {t('stat.rng')}
                   </span>
-                  {selectedUnit.ability && <span className="unitbar-ability">{selectedUnit.ability}</span>}
+                  {/* The card row's sentence, not the snapshot's -- the
+                      snapshot cannot hold a translation written after the
+                      match began. Falls back to the snapshot for a slug that
+                      is no longer in the roster. */}
+                  {(abilityText(bySlug.get(selectedUnit.slug)) || selectedUnit.ability) && (
+                    <span className="unitbar-ability">
+                      {abilityText(bySlug.get(selectedUnit.slug)) || selectedUnit.ability}
+                    </span>
+                  )}
                 </div>
               ) : (
                 /* Mounted even when nothing is selected. If it came and went
                    with the selection it would resize the arena on every tap,
                    and the board would jump under your thumb. */
                 <div className="unitbar is-empty">
-                  <span className="unitbar-stats">
-                    {mySide ? 'Pick a unit to read it' : 'Pick a unit to read it'}
-                  </span>
+                  <span className="unitbar-stats">{t('match.pickToRead')}</span>
                 </div>
               )}
 
@@ -424,11 +439,12 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
               {theyAreAway && (
                 <div className="awaybar">
                   <p>
-                    <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> has not acted
-                    for three turns. If they have dropped, the match is yours.
+                    {t('match.awayNotice', {
+                      name: theirSide === 'host' ? match.host_name : match.guest_name,
+                    })}
                   </p>
                   <button className="btn small" onClick={() => guard(() => claimWin(match.id))}>
-                    Claim the win
+                    {t('match.claimWin')}
                   </button>
                 </div>
               )}
@@ -437,20 +453,22 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                 {s.winner ? (
                   <>
                     <div className="verdict">
-                      {(s.winner === 'host' ? match.host_name : match.guest_name) ?? 'Someone'} wins
-                      {s.winner === mySide ? ' — that is you.' : '.'}
+                      {t('match.wins', {
+                        name: (s.winner === 'host' ? match.host_name : match.guest_name) ?? '—',
+                      })}
+                      {s.winner === mySide ? t('match.winsYou') : '.'}
                     </div>
                     <button className="btn primary" disabled={iAsked} onClick={askRematch}>
-                      {iAsked ? 'Waiting for them…' : 'Rematch'}
+                      {t(iAsked ? 'match.waitingThem' : 'match.rematch')}
                     </button>
                     <span className="hint">
                       {match.bot != null
-                        ? 'Starts a fresh board against the same opponent.'
+                        ? t('match.rematchBot')
                         : iAsked
-                          ? 'It starts the moment they accept. Sides swap.'
+                          ? t('match.rematchAsked')
                           : match.rematch_declined
-                            ? 'They passed on the last one. You can ask again.'
-                            : 'Both of you have to want it.'}
+                            ? t('match.rematchDeclined')
+                            : t('match.rematchBoth')}
                     </span>
                   </>
                 ) : deploying ? (
@@ -461,41 +479,39 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                         disabled={iAmReady}
                         onClick={() => guard(() => setReady(match.id))}
                       >
-                        {iAmReady ? 'Waiting for them…' : 'Ready'}
+                        {t(iAmReady ? 'match.waitingThem' : 'match.ready')}
                       </button>
                       <button className="btn ghost" onClick={() => guard(() => resignMatch(match.id))}>
-                        Leave
+                        {t('common.leave')}
                       </button>
                       <span className="hint">
-                        {iAmReady
-                          ? 'Locked in. It starts when they are ready too.'
-                          : 'Pick a unit, then a lit tile. Drop on your own to swap.'}
+                        {t(iAmReady ? 'match.lockedIn' : 'match.deployHint')}
                       </span>
                     </>
                   ) : (
-                    <span className="hint">Both sides are placing their units.</span>
+                    <span className="hint">{t('match.bothPlacing')}</span>
                   )
                 ) : mySide ? (
                   <>
                     <button className="btn primary" onClick={() => guard(() => endTurn(match.id))} disabled={!isMyTurn}>
-                      End turn
+                      {t('match.endTurn')}
                     </button>
                     <button className="btn ghost" onClick={() => guard(() => resignMatch(match.id))}>
-                      Resign
+                      {t('match.resign')}
                     </button>
                     <span className="hint">
                       {!isMyTurn
-                        ? 'Waiting for your opponent.'
+                        ? t('match.waitingOpponent')
                         : actsLeft === 0
-                          ? 'No goes left. End your turn.'
-                          : `Pick a unit, then choose from its menu. ${actsLeft} of ` +
-                            `${actsCapNow} ${actsCapNow === 1 ? 'go' : 'goes'} left.`}
+                          ? t('match.noGoesLeft')
+                          : t('match.pickThenMenu', {
+                              left: actsLeft, cap: actsCapNow,
+                              word: t(actsCapNow === 1 ? 'match.go' : 'match.goes'),
+                            })}
                     </span>
                   </>
                 ) : (
-                  <span className="hint">
-                    Spectating — you can chat, but the board isn&rsquo;t yours.
-                  </span>
+                  <span className="hint">{t('match.spectating')}</span>
                 )}
               </div>
             </>
@@ -506,15 +522,19 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
       {challenged && (
         <div className="challenge" role="status">
           <p className="challenge-text">
-            <b>{theirSide === 'host' ? match.host_name : match.guest_name}</b> wants a rematch!
+            {t('match.challenge', {
+              name: theirSide === 'host' ? match.host_name : match.guest_name,
+            })}
           </p>
           <div className="challenge-acts">
-            <button className="btn primary small" onClick={askRematch}>Let&rsquo;s battle!</button>
+            <button className="btn primary small" onClick={askRematch}>
+              {t('match.challengeYes')}
+            </button>
             <button
               className="btn small"
               onClick={() => guard(() => declineRematch(match.id))}
             >
-              Not today
+              {t('match.challengeNo')}
             </button>
           </div>
         </div>
@@ -525,20 +545,20 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
 
         <BattleLog log={s.log} open={rail === 'log'} />
 
-        <nav className="railtabs" role="tablist" aria-label="Side panels">
+        <nav className="railtabs" role="tablist" aria-label={t('common.sidePanels')}>
           <button
             role="tab"
             aria-selected={rail === 'chat'}
             onClick={() => setRail((r) => (r === 'chat' ? null : 'chat'))}
           >
-            Chat{messages.length > 0 ? ` (${messages.length})` : ''}
+            {t('rail.chat')}{messages.length > 0 ? ` (${messages.length})` : ''}
           </button>
           <button
             role="tab"
             aria-selected={rail === 'log'}
             onClick={() => setRail((r) => (r === 'log' ? null : 'log'))}
           >
-            Battle log
+            {t('rail.log')}
           </button>
         </nav>
       </div>
@@ -547,10 +567,11 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
 }
 
 function Nameplate({ name, side, active, you }: { name: string; side: Side; active: boolean; you: boolean }) {
+  const t = useT()
   return (
     <span className={`nameplate ${side} ${active ? 'active' : ''}`}>
       {name}
-      {you && <em>you</em>}
+      {you && <em>{t('match.you')}</em>}
     </span>
   )
 }

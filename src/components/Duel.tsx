@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { artUrl, faceUrl } from '../lib/art'
 import { HITSTOP_MS, LEAD_MS, type Beat, type Cine, type Fighter } from '../lib/cine'
+import { useT } from '../lib/i18n'
 import {
   playBurn, playChop, playCounter, playDown, playHit, playMend, playParry,
 } from '../lib/sfx'
@@ -38,6 +39,7 @@ export function Duel({ cine, mySide, onDone }: {
   mySide: 'host' | 'guest' | null
   onDone: () => void
 }) {
+  const t = useT()
   const [i, setI] = useState(-1)          // -1 is the lead-in: squaring up
   const [stop, setStop] = useState(false) // hitstop, the freeze on contact
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -126,7 +128,7 @@ export function Duel({ cine, mySide, onDone }: {
       className={`duel${stop ? ' is-stopped' : ''}${i < 0 ? ' is-opening' : ''}`}
       role="dialog"
       aria-live="polite"
-      aria-label="Battle"
+      aria-label={t('duel.title')}
       onClick={skip}
     >
       <div className="duel-ring" aria-hidden="true" />
@@ -163,7 +165,7 @@ export function Duel({ cine, mySide, onDone }: {
         )}
       </div>
 
-      <button className="duel-skip" onClick={skip}>Skip</button>
+      <button className="duel-skip" onClick={skip}>{t('duel.skip')}</button>
     </div>
   )
 }

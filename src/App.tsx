@@ -5,10 +5,12 @@ import { Match } from './components/Match'
 import { Logo } from './components/Logo'
 import { useWipe } from './components/Wipe'
 import { attachUiSounds } from './lib/sfx'
+import { primeLang, useT } from './lib/i18n'
 import { useAuth } from './lib/useAuth'
 import { configured, supabase } from './lib/supabase'
 
 export default function App() {
+  const t = useT()
   const { session, profile, loading, profileError, retryProfile, patchProfile } = useAuth()
   const [matchId, setMatchId] = useState<string | null>(
     () => new URLSearchParams(location.search).get('m'),
@@ -27,6 +29,12 @@ export default function App() {
   // wired into each one and forgotten on the next.
   useEffect(attachUiSounds, [])
 
+  // Fetch the dictionary for whatever language the cache already says, before
+  // anything asks for a word. Without it the first paint is English and the
+  // second is Spanish, which is a flicker in front of the one person who
+  // notices it most.
+  useEffect(primeLang, [])
+
   // Keep the URL in step, so a match is a link you can paste to a spectator.
   useEffect(() => {
     const url = new URL(location.href)
@@ -39,7 +47,7 @@ export default function App() {
     return (
       <div className="center-stage">
         <div className="panel">
-          <h1 className="wordmark small">Almost there</h1>
+          <h1 className="wordmark small">{t('app.almostThere')}</h1>
           <p className="muted">
             Copy <code>.env.example</code> to <code>.env.local</code>, paste in your Supabase
             project URL and anon key, then restart <code>npm run dev</code>.
@@ -60,12 +68,16 @@ export default function App() {
     return (
       <div className="center-stage">
         <div className="panel">
-          <h1 className="wordmark small">{profileError ? 'Not quite ready' : 'Loading game'}</h1>
-          <p className="muted">{profileError ?? 'Getting everything ready…'}</p>
+          <h1 className="wordmark small">
+            {t(profileError ? 'app.notReady' : 'app.loading')}
+          </h1>
+          <p className="muted">{profileError ?? t('app.gettingReady')}</p>
           {profileError && (
             <div className="actionbar" style={{ marginTop: 18, justifyContent: 'flex-start' }}>
-              <button className="btn" onClick={retryProfile}>Try again</button>
-              <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
+              <button className="btn" onClick={retryProfile}>{t('app.tryAgain')}</button>
+              <button className="btn ghost" onClick={() => supabase.auth.signOut()}>
+                {t('common.signOut')}
+              </button>
             </div>
           )}
         </div>

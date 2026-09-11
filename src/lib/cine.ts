@@ -12,7 +12,19 @@ import type { Fx, Obstacle, Swing, Unit } from './types'
  * All of it is pure. No React, no DOM, no clock of its own: a timeline is a
  * value, and a value can be checked in node against four hundred random
  * fights, which is exactly what it is.
+ *
+ * The translator is INJECTED rather than imported, and that is what keeps the
+ * above true: importing i18n would drag the settings store, the dictionaries
+ * and a dynamic import into a module whose whole value is that it can be run
+ * with nothing around it. A caller has a `t` already; handing it over costs
+ * one argument.
  */
+export type Tr = (key: string, vars?: Record<string, unknown>) => string
+
+/** What a caller with nothing to say uses. Renders the key, which is what
+ *  i18n does for a missing string too -- visibly wrong beats invisibly so. */
+export const rawTr: Tr = (k, v) =>
+  v ? `${k} ${JSON.stringify(v)}` : k
 
 /* ---------------------------------------------------------------------------
  * How long each beat is on screen.
@@ -163,7 +175,7 @@ const n = (v: number | undefined) => v ?? 0
  * survived. Back-calculation would work for the living and silently invent a
  * number for the dead, and the dead are the ones the last beat is about.
  */
-export function buildCine(fx: Fx, a: Fighter, b: Fighter): Cine {
+export function buildCine(fx: Fx, a: Fighter, b: Fighter, t: Tr = rawTr): Cine {
   const swings = swingsOf(fx)
   const beats: Beat[] = []
   let aHp = a.hp
@@ -191,48 +203,45 @@ export function buildCine(fx: Fx, a: Fighter, b: Fighter): Cine {
       shake = Boolean(s.crit)
 
       if (s.why === 'tree') {
-        text = `${actorName} strikes the tree for ${n(s.dmg)}.`
+        text = t('duel.strikesTree', { who: actorName, n: n(s.dmg) })
       } else if (s.why === 'quick') {
-        text = `${actorName} answers first, for ${n(s.dmg)}.`
-        note = 'Quick Dagger — the answer lands before the blow it answers.'
+        text = t('duel.answersFirst', { who: actorName, n: n(s.dmg) })
+        note = t('duel.noteQuick')
       } else if (s.counter) {
-        text = `${actorName} answers for ${n(s.dmg)}.`
-        note = 'A counter, at half.'
+        text = t('duel.answers', { who: actorName, n: n(s.dmg) })
+        note = t('duel.noteCounterOnly')
       } else {
-        text = `${actorName} strikes ${otherName} for ${n(s.dmg)}.`
+        text = t('duel.strikes', { who: actorName, target: otherName, n: n(s.dmg) })
       }
       // Reductions, in the order cn_damage applies them, and only the ones
       // that actually fired. A caption listing rules that did not apply is
       // noise dressed as detail.
       const why: string[] = []
-      if (s.crit) why.push('A critical hit — half again')
-      if (s.counter && s.why !== 'quick') why.push('halved as an answer')
-      if (s.def) why.push('halved again by the raised guard')
+      if (s.crit) why.push(t('duel.noteCrit'))
+      if (s.counter && s.why !== 'quick') why.push(t('duel.noteCounter'))
+      if (s.def) why.push(t('duel.noteGuard'))
       if (why.length) note = why.join(', ') + '.'
       if (s.why === 'quick') {
-        note = 'Quick Dagger — the answer lands before the blow it answers.'
-          + (s.crit ? ' And a critical hit.' : '')
+        note = t('duel.noteQuick') + (s.crit ? t('duel.noteQuickCrit') : '')
       }
     } else if (s.k === 'heal') {
       const onA = s.at === a.id
       pop = n(s.dmg); popAt = onA ? 'a' : 'b'; popKind = 'heal'
       if (onA) aHp = Math.min(a.maxHp, aHp + n(s.dmg))
       else bHp = Math.min(b.maxHp, bHp + n(s.dmg))
-      text = `${actorName} mends ${otherName} for ${n(s.dmg)}.`
-      note = 'A mend is not an exchange — no crit, no parry, nothing comes back.'
+      text = t('duel.mends', { who: actorName, target: otherName, n: n(s.dmg) })
+      note = t('duel.noteMend')
     } else if (s.k === 'parry') {
-      text = `${actorName} parries.`
-      note = s.why === 'all'
-        ? 'Always Ready — Lium catches the answer as well as the blow.'
-        : 'Caught clean. Nothing gets through.'
+      text = t('duel.parries', { who: actorName })
+      note = t(s.why === 'all' ? 'duel.noteParryAll' : 'duel.noteParryRoll')
       shake = true
     } else if (s.k === 'burn') {
       const onA = s.by === a.id
       pop = n(s.dmg); popAt = onA ? 'a' : 'b'; popKind = 'burn'
       if (onA) aHp = Math.max(0, aHp - n(s.dmg))
       else bHp = Math.max(0, bHp - n(s.dmg))
-      text = `${actorName} burns for ${n(s.dmg)}.`
-      note = 'Burning costs you every time you swing.'
+      text = t('duel.burns', { who: actorName, n: n(s.dmg) })
+      note = t('duel.noteBurn')
     } else {
       // The server says this one fell, so the bar reads empty whatever the
       // arithmetic before it came to. In the ordinary case the blow already
@@ -241,7 +250,7 @@ export function buildCine(fx: Fx, a: Fighter, b: Fighter): Cine {
       // cannot place. A full bar under the word "falls" is a lie either way.
       if (s.by === a.id) aHp = 0
       else bHp = 0
-      text = `${actorName} falls.`
+      text = t('duel.falls', { who: actorName })
       shake = true
     }
 

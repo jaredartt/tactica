@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef } from 'react'
 import type { Obstacle, Unit } from '../lib/types'
 import { reachText, unitPower } from '../lib/types'
 import { artUrl } from '../lib/art'
+import { abilityText, useT } from '../lib/i18n'
+import { useCardsBySlug } from '../lib/useCards'
 
 /** Which edge of the board the card opens against. Yours on the left, theirs
  *  on the right, so a card never covers the rail on its own side. */
@@ -53,6 +55,9 @@ function FitName({ children }: { children: string }) {
  * illustration is visible, so the middle two thirds of it stay clear.
  */
 export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
+  const t = useT()
+  const bySlug = useCardsBySlug()
+  const say = abilityText(bySlug.get(unit.slug)) || unit.ability
   return (
     <aside
       className={`bigcard bigcard-${side} ${unit.owner === 'host' ? 'unit-host' : 'unit-guest'}`}
@@ -69,13 +74,15 @@ export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
 
       <div className="bc-bottom">
         <div className="bc-stats">
-          <span><em>{unit.heals ? 'PWR' : 'DMG'}</em><b>{unitPower(unit)}</b></span>
-          <span><em>MOV</em><b>{unit.mov}</b></span>
-          <span><em>RNG</em><b>{reachText(unit.rmin, unit.rmax)}</b></span>
-          {unit.burned && <span className="bc-burn"><b>BURNING</b></span>}
+          <span><em>{t(unit.heals ? 'stat.pwr' : 'stat.dmg')}</em><b>{unitPower(unit)}</b></span>
+          <span><em>{t('stat.mov')}</em><b>{unit.mov}</b></span>
+          <span><em>{t('stat.rng')}</em><b>{reachText(unit.rmin, unit.rmax)}</b></span>
+          {unit.burned && <span className="bc-burn"><b>{t('card.burning')}</b></span>}
         </div>
-        {unit.ability && (
-          <div className="bc-say"><span className="bc-glyph"><Mark /></span><p>{unit.ability}</p></div>
+        {/* The card row's sentence where there is one, the snapshot's
+            otherwise -- same rule as the strip under the board. */}
+        {say && (
+          <div className="bc-say"><span className="bc-glyph"><Mark /></span><p>{say}</p></div>
         )}
       </div>
     </aside>
@@ -86,20 +93,21 @@ export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
  *  is for -- and it is the only way to learn a tree is worth 30 before you
  *  have hit one. */
 export function TreeBigCard({ tree, side }: { tree: Obstacle; side: CardSide }) {
+  const t = useT()
   return (
     <aside className={`bigcard bigcard-${side} bigcard-tree`}>
       <img className="bc-art" src={`${import.meta.env.BASE_URL}tree.webp`} alt="" />
       <div className="bc-top">
-        <div className="bc-id"><FitName>Tree</FitName><p>Terrain</p></div>
+        <div className="bc-id"><FitName>{t('tree.name')}</FitName><p>{t('tree.role')}</p></div>
         <div className="bc-hp"><b>{tree.hp}</b><i>/{tree.maxHp}</i></div>
       </div>
       <div className="bc-bottom">
         <div className="bc-stats">
-          <span><em>BLOCKS</em><b>FEET &amp; ARROWS</b></span>
+          <span><em>{t('tree.blocks')}</em><b>{t('tree.blocksWhat')}</b></span>
         </div>
         <div className="bc-say">
           <span className="bc-glyph"><Mark /></span>
-          <p>Anyone can cut it down. Wuzu simply steps over it.</p>
+          <p>{t('tree.note')}</p>
         </div>
       </div>
     </aside>

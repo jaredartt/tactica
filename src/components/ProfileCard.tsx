@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { setAvatar, setUsername } from '../lib/api'
 import type { Card, Profile } from '../lib/types'
+import { useT } from '../lib/i18n'
 import { Avatar } from './Avatar'
 import { Modal } from './Modal'
 
@@ -19,6 +20,7 @@ export function ProfileCard({
   onClose: () => void
   onChanged: (p: Partial<Profile>) => void
 }) {
+  const t = useT()
   const [roster, setRoster] = useState<Card[]>([])
   const [name, setName] = useState(profile.username)
   const [busy, setBusy] = useState(false)
@@ -54,12 +56,12 @@ export function ProfileCard({
   }
 
   return (
-    <Modal title="Your profile" onClose={onClose}>
+    <Modal title={t('profile.title')} onClose={onClose}>
       <div className="pf">
         <div className="pf-you">
           <Avatar slug={profile.avatar} name={profile.username} size={72} className="is-big" />
           <div className="pf-name">
-            <label htmlFor="pf-username">Name</label>
+            <label htmlFor="pf-username">{t('profile.name')}</label>
             <div className="pf-rename">
               <input
                 id="pf-username" value={name} maxLength={20} autoComplete="off"
@@ -71,16 +73,14 @@ export function ProfileCard({
                 disabled={busy || !name.trim() || name.trim() === profile.username}
                 onClick={rename}
               >
-                {busy ? 'Saving…' : saved ? 'Saved' : 'Save'}
+                {busy ? t('common.saving') : saved ? t('common.saved') : t('profile.save')}
               </button>
             </div>
-            <p className="muted tiny">
-              2 to 20 characters. Letters, numbers, spaces, dots, dashes and underscores.
-            </p>
+            <p className="muted tiny">{t('profile.nameRules')}</p>
           </div>
         </div>
 
-        <h3 className="pf-title">Pick a face</h3>
+        <h3 className="pf-title">{t('profile.pickFace')}</h3>
         <div className="pf-grid">
           {roster.map((c) => (
             <button

@@ -41,6 +41,16 @@ export const IconTheme = (p: { className?: string }) => (
   </svg>
 )
 
+/** A globe. The one glyph that means "language" without being a flag -- a
+ *  flag is a country, and Spanish is not one country. */
+export const IconLang = (p: { className?: string }) => (
+  <svg {...box} {...p} aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3c2.4 2.6 3.6 5.6 3.6 9s-1.2 6.4-3.6 9c-2.4-2.6-3.6-5.6-3.6-9S9.6 5.6 12 3Z" />
+  </svg>
+)
+
 export const IconSignOut = (p: { className?: string }) => (
   <svg {...box} {...p} aria-hidden="true">
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />

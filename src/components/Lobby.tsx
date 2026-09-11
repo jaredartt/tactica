@@ -11,6 +11,7 @@ import {
   unitPower,
 } from '../lib/types'
 import { artUrl } from '../lib/art'
+import { abilityText, useT } from '../lib/i18n'
 import { Avatar } from './Avatar'
 import { IconGear } from './Icons'
 import { Logo } from './Logo'
@@ -40,25 +41,19 @@ interface Props {
  *  Ranked has no picture yet, so its tile is the flat colour until one lands
  *  in public/menu/. A missing background is invisible, not broken. */
 const TILES = [
-  { id: 'ranked',   label: 'Ranked',     tint: '#d92d20', art: 'menu/ranked.webp',   focus: '22%',
-    note: 'Play for a place on the ladder' },
-  { id: 'bot',      label: 'Practice',   tint: '#e8701a', art: 'menu/practice.webp', focus: '0%',
-    note: 'Spar with the machine' },
-  { id: 'friends',  label: 'Vs Friends', tint: '#d9a41b', art: 'menu/friends.webp',  focus: '28%',
-    note: 'Open a room, or join one' },
-  { id: 'spectate', label: 'Watch',      tint: '#2f9e52', art: 'menu/watch.webp',    focus: '32%',
-    note: 'Look in on a live match' },
-  { id: 'ladder',   label: 'Ladder',     tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%',
-    note: 'Who is on top' },
-  { id: 'team',     label: 'My Kingdom',    tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%',
-    note: 'Five of the eleven' },
-  { id: 'comics',   label: 'Comics',     tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%',
-    note: 'The story behind the board' },
+  { id: 'ranked',   tint: '#d92d20', art: 'menu/ranked.webp',   focus: '22%' },
+  { id: 'bot',      tint: '#e8701a', art: 'menu/practice.webp', focus: '0%'  },
+  { id: 'friends',  tint: '#d9a41b', art: 'menu/friends.webp',  focus: '28%' },
+  { id: 'spectate', tint: '#2f9e52', art: 'menu/watch.webp',    focus: '32%' },
+  { id: 'ladder',   tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%' },
+  { id: 'team',     tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%' },
+  { id: 'comics',   tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%'  },
 ] as const
 
 type PageId = (typeof TILES)[number]['id']
 
 export function Lobby({ profile, onEnter, onProfile }: Props) {
+  const t = useT()
   const { zoomTo, close, page, zoomer } = useZoom()
   const [rooms, setRooms] = useState<MatchRow[]>([])
   const [roster, setRoster] = useState<Card[]>([])
@@ -206,11 +201,14 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
       .finally(() => setSaving(false))
   }, [deck, savedDeck])
 
-  const tile = TILES.find((t) => t.id === page)
-  const title = (id: PageId) =>
-    id === 'ranked' ? 'Ranked' : id === 'bot' ? 'Practice' : id === 'friends' ? 'Vs Friends'
-    : id === 'team' ? 'My Kingdom' : id === 'comics' ? 'Comics'
-    : id === 'spectate' ? 'Live matches' : 'Ladder'
+  const tile = TILES.find((x) => x.id === page)
+  // The page a tile opens is usually titled with the tile's own label; Watch
+  // is the one that is not, because "Watch" names an action and the page is a
+  // list of matches.
+  const title = (id: PageId) => t(id === 'spectate' ? 'lobby.liveMatches' : `lobby.${id}`)
+  // Tier names come off the ladder as English words, and a tier is a word
+  // rather than a number, so it is translated the same as anything else.
+  const tierName = (tier: string) => t(`tier.${tier.toLowerCase()}`)
 
   return (
     <div className="menu">
@@ -227,23 +225,23 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
             <Avatar slug={profile.avatar} name={profile.username} size={30} />
             <span className="whoami-name">{profile.username}</span>
             {profile.games > 0 && (
-              <span className="ownrank">{tierOf(profile.lp)} {profile.lp}</span>
+              <span className="ownrank">{tierName(tierOf(profile.lp))} {profile.lp}</span>
             )}
           </button>
-          <button className="iconbtn" onClick={() => setOverlay('settings')} aria-label="Settings">
+          <button className="iconbtn" onClick={() => setOverlay('settings')} aria-label={t('common.settings')}>
             <IconGear />
           </button>
         </div>
       </header>
 
       <nav className="menu-grid">
-        {TILES.map((t) => (
+        {TILES.map((tile_) => (
           <button
-            key={t.id}
-            className={`mtile mt-${t.id}`}
-            style={{ '--tint': t.tint } as React.CSSProperties}
+            key={tile_.id}
+            className={`mtile mt-${tile_.id}`}
+            style={{ '--tint': tile_.tint } as React.CSSProperties}
             disabled={busy}
-            onClick={(e) => zoomTo(e.currentTarget, { id: t.id, tint: t.tint })}
+            onClick={(e) => zoomTo(e.currentTarget, { id: tile_.id, tint: tile_.tint })}
           >
             {/* Three layers: the picture, the colour laid over it, and the
                 words. The picture is counter-skewed and overscaled so the lean
@@ -252,19 +250,19 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
             <span
               className="mtile-art"
               style={{
-                backgroundImage: `url(${import.meta.env.BASE_URL}${t.art})`,
-                backgroundPosition: `center ${t.focus}`,
+                backgroundImage: `url(${import.meta.env.BASE_URL}${tile_.art})`,
+                backgroundPosition: `center ${tile_.focus}`,
               }}
               aria-hidden="true"
             />
             <span className="mtile-wash" aria-hidden="true" />
             <span className="mtile-inner">
-              <span className="mtile-label">{t.label}</span>
+              <span className="mtile-label">{t(`lobby.${tile_.id}`)}</span>
               <span className="mtile-note">
-                {t.id === 'team' && !deckSet ? 'Not chosen yet'
-                 : t.id === 'ladder' && profile.games > 0
-                   ? `You are ${tierOf(profile.lp)} on ${profile.lp} LP`
-                   : t.note}
+                {tile_.id === 'team' && !deckSet ? t('lobby.notChosenYet')
+                 : tile_.id === 'ladder' && profile.games > 0
+                   ? t('lobby.yourStanding', { tier: tierName(tierOf(profile.lp)), lp: profile.lp })
+                   : t(`lobby.${tile_.id}Note`)}
               </span>
             </span>
           </button>
@@ -288,27 +286,26 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                 onClick={() => { since.current = Date.now(); setElapsed(0); setSearching(true) }}
                 disabled={searching}
               >
-                <span className="modecard-name">1 vs 1</span>
+                <span className="modecard-name">{t('ranked.oneVsOne')}</span>
                 <span className="modecard-note">
                   {searching
-                    ? `Looking for an opponent… ${elapsed}s · ${waiting} in the queue`
-                    : 'Paired with someone near your level. The only mode that moves your LP.'}
+                    ? t('ranked.searching', { seconds: elapsed, waiting })
+                    : t('ranked.blurb')}
                 </span>
               </button>
               {searching && (
                 <>
-                  <p className="muted tiny queuenote">
-                    The first minute looks for someone close to you. After that it stops being
-                    fussy, so a wide gap still finds a game.
-                  </p>
+                  <p className="muted tiny queuenote">{t('ranked.fussy')}</p>
                   <button className="btn ghost" onClick={() => { setSearching(false); leaveRanked() }}>
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </>
               )}
               {!deckSet && (
                 <p className="muted tiny queuenote">
-                  You have not picked a deck, so you will field {effectiveDeck.join(', ') || 'the default five'}.
+                  {t('ranked.noDeck', {
+                    deck: effectiveDeck.join(', ') || t('ranked.defaultFive'),
+                  })}
                 </p>
               )}
             </div>
@@ -323,14 +320,14 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                   disabled={busy}
                   onClick={() => run(() => createBotMatch(b.level))}
                 >
-                  <span className="modecard-name">{b.name}</span>
-                  <span className="modecard-note">{b.note}</span>
+                  {/* BOT_LEVELS keeps the level number and nothing else that
+                      is words: CALM, SHARP and RUTHLESS are names and their
+                      notes are sentences, and both belong to the dictionary. */}
+                  <span className="modecard-name">{t(`bot.${b.key}`)}</span>
+                  <span className="modecard-note">{t(`bot.${b.key}Note`)}</span>
                 </button>
               ))}
-              <p className="muted tiny queuenote">
-                It brings five random cards and plays by exactly the rules you do. Nothing here
-                touches your rating.
-              </p>
+              <p className="muted tiny queuenote">{t('bot.blurb')}</p>
             </div>
           )}
 
@@ -340,25 +337,24 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
           {page === 'friends' && (
             <div className="modelist">
               <button className="modecard" disabled={busy} onClick={() => run(createMatch)}>
-                <span className="modecard-name">Open a room</span>
-                <span className="modecard-note">
-                  You get a five-letter code. Send it to whoever you want to play.
-                </span>
+                <span className="modecard-name">{t('friends.openRoom')}</span>
+                <span className="modecard-note">{t('friends.openRoomNote')}</span>
               </button>
-              <div className="orline"><span>or</span></div>
+              <div className="orline"><span>{t('common.or')}</span></div>
               <form
                 className="joinform"
                 onSubmit={(e) => { e.preventDefault(); if (code.trim()) run(() => joinMatch(code)) }}
               >
                 <input
-                  className="codeinput" value={code} maxLength={5} aria-label="Room code"
-                  onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE"
+                  className="codeinput" value={code} maxLength={5} aria-label={t('friends.roomCode')}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder={t('friends.codePlaceholder')}
                 />
-                <button className="btn primary" disabled={busy || !code.trim()}>Join</button>
+                <button className="btn primary" disabled={busy || !code.trim()}>
+                  {t('common.join')}
+                </button>
               </form>
-              <p className="muted tiny queuenote">
-                Nothing you play here touches anybody's rating. That is what Ranked is for.
-              </p>
+              <p className="muted tiny queuenote">{t('friends.noRating')}</p>
             </div>
           )}
 
@@ -366,7 +362,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
 
           {page === 'spectate' && (
             <>
-              {rooms.length === 0 && <p className="muted">Nothing running right now.</p>}
+              {rooms.length === 0 && <p className="muted">{t('spectate.nothing')}</p>}
               <ul className="roomlist">
                 {rooms.map((r) => {
                   const mine = r.host_id === profile.id || r.guest_id === profile.id
@@ -376,14 +372,16 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                       <span className="code">{r.code}</span>
                       <span className="names">
                         {r.host_name}
-                        {r.guest_name ? ` vs ${r.guest_name}` : ' — waiting for an opponent'}
+                        {r.guest_name
+                          ? ` ${t('spectate.vs')} ${r.guest_name}`
+                          : ` — ${t('spectate.waitingForOpponent')}`}
                       </span>
-                      <span className={`pill ${r.status}`}>{r.status}</span>
+                      <span className={`pill ${r.status}`}>{t(`status.${r.status}`)}</span>
                       <button
                         className="btn small" disabled={busy}
                         onClick={() => (open ? run(() => joinMatch(r.code)) : onEnter(r.id))}
                       >
-                        {mine ? 'Return' : open ? 'Join' : 'Watch'}
+                        {t(mine ? 'common.return' : open ? 'common.join' : 'common.watch')}
                       </button>
                     </li>
                   )
@@ -405,7 +403,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                   return (
                     <button
                       key={c.id} type="button" aria-pressed={picked}
-                      aria-label={`${c.name}, ${c.role}`}
+                      aria-label={t('team.cardLabel', { name: c.name, role: c.role })}
                       className={`rtile${picked ? ' is-picked' : ''}${!picked && full ? ' is-spare' : ''}`}
                       style={{ '--accent': c.accent } as React.CSSProperties}
                       onClick={() => toggleCard(c.slug)}
@@ -424,15 +422,18 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                           {c.role && <em>{c.role}</em>}
                         </span>
                         <span className="rti-stats">
-                          <span><i>HP</i><b>{c.hp}</b></span>
-                          <span><i>{c.heals ? 'PWR' : 'DMG'}</i><b>{unitPower(c)}</b></span>
-                          <span><i>MOV</i><b>{c.mov}</b></span>
-                          <span><i>RNG</i><b>{reachText(c.rmin, c.rmax)}</b></span>
-                          <span><i>CTR</i><b>{reachText(c.crmin, c.crmax)}</b></span>
+                          <span><i>{t('stat.hp')}</i><b>{c.hp}</b></span>
+                          <span><i>{t(c.heals ? 'stat.pwr' : 'stat.dmg')}</i><b>{unitPower(c)}</b></span>
+                          <span><i>{t('stat.mov')}</i><b>{c.mov}</b></span>
+                          <span><i>{t('stat.rng')}</i><b>{reachText(c.rmin, c.rmax)}</b></span>
+                          <span><i>{t('stat.ctr')}</i><b>{reachText(c.crmin, c.crmax)}</b></span>
                         </span>
-                        {c.ability && <span className="rti-ability">{c.ability}</span>}
+                        {/* The ability's words come out of the card row, not
+                            the dictionary -- see i18n.ts for why those two
+                            live in different places. */}
+                        {abilityText(c) && <span className="rti-ability">{abilityText(c)}</span>}
                         <span className="rti-cta">
-                          {picked ? 'Remove' : full ? 'Kingdom is full' : 'Add to kingdom'}
+                          {t(picked ? 'team.remove' : full ? 'team.full' : 'team.add')}
                         </span>
                       </span>
                     </button>
@@ -442,15 +443,16 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
 
               <div className="deckfoot">
                 <span className="muted tiny">
-                  {deck.length}/{DECK_SIZE} chosen
+                  {t('team.chosen', { n: deck.length, max: DECK_SIZE })}
                   {deck.length < DECK_SIZE && deckSet &&
-                    ` — still fielding ${savedDeck.join(', ')} until the kingdom is full`}
+                    t('team.stillFielding', { deck: savedDeck.join(', ') })}
                   {deck.length < DECK_SIZE && !deckSet &&
-                    ` — you field ${effectiveDeck.join(', ')} until you pick ${DECK_SIZE}`}
+                    t('team.untilYouPick', { deck: effectiveDeck.join(', '), max: DECK_SIZE })}
                 </span>
                 <span className={`savemark${saving ? ' is-busy' : ''}`}>
-                  {saving ? 'Saving…'
-                   : deck.length === DECK_SIZE && deck.join() === savedDeck.join() ? 'Saved'
+                  {saving ? t('common.saving')
+                   : deck.length === DECK_SIZE && deck.join() === savedDeck.join()
+                     ? t('common.saved')
                    : ''}
                 </span>
               </div>
@@ -459,14 +461,17 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
 
           {page === 'ladder' && (
             <>
-              {ladder.length === 0 && <p className="muted">Nobody has finished a ranked match yet.</p>}
+              {ladder.length === 0 && <p className="muted">{t('ladder.empty')}</p>}
               {ladder.length > 0 && (
                 <table className="ladder">
                   <thead>
                     <tr>
-                      <th className="num">#</th><th>Player</th><th>Tier</th>
-                      <th className="num">LP</th><th className="num">W</th>
-                      <th className="num">L</th><th className="num">Streak</th>
+                      <th className="num">#</th><th>{t('ladder.player')}</th>
+                      <th>{t('ladder.tier')}</th>
+                      <th className="num">{t('ladder.lp')}</th>
+                      <th className="num">{t('ladder.w')}</th>
+                      <th className="num">{t('ladder.l')}</th>
+                      <th className="num">{t('ladder.streak')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -474,24 +479,25 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                       <tr key={r.id} className={r.id === profile.id ? 'is-you' : ''}>
                         <td className="num rank">{i + 1}</td>
                         <td>{r.username}</td>
-                        <td><span className={`tier t-${r.tier.toLowerCase()}`}>{r.tier}</span></td>
+                        <td>
+                          <span className={`tier t-${r.tier.toLowerCase()}`}>
+                            {tierName(r.tier)}
+                          </span>
+                        </td>
                         <td className="num lp">{r.lp}</td>
                         <td className="num">{r.wins}</td>
                         <td className="num">{r.losses}</td>
                         <td className={`num streak ${r.streak > 0 ? 'hot' : r.streak < 0 ? 'cold' : ''}`}>
-                          {r.streak > 0 ? `${r.streak}W` : r.streak < 0 ? `${-r.streak}L` : '—'}
+                          {r.streak > 0 ? `${r.streak}${t('ladder.w')}`
+                           : r.streak < 0 ? `${-r.streak}${t('ladder.l')}`
+                           : t('common.dash')}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               )}
-              <p className="muted tiny laddernote">
-                Only the ranked queue moves these numbers. Points scale with who you beat: taking
-                down someone far above you is worth about 40, beating a beginner about 4, and
-                losing to one costs the same 40. Once you reach a tier you cannot fall out of it
-                this season.
-              </p>
+              <p className="muted tiny laddernote">{t('ladder.note')}</p>
             </>
           )}
           {err && <p className="error">{err}</p>}

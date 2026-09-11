@@ -22,6 +22,7 @@ import { useSyncExternalStore } from 'react'
 import { pushSettings } from './api'
 
 export type Theme = 'system' | 'light' | 'dark'
+export type Lang = 'en' | 'es'
 
 export interface Settings {
   /** 0..1 */
@@ -34,14 +35,21 @@ export interface Settings {
   /** 'system' follows the operating system and is the default. The other two
    *  are a decision, and a decision outranks the operating system. */
   theme: Theme
+  /** The interface's language. NOT the browser's: somebody who reads English
+   *  on a Spanish laptop has said so by choosing, and there is no 'system'
+   *  here because a half-translated screen is worse than a decision. */
+  lang: Lang
 }
 
 const KEY = 'cn.settings'
-const DEFAULTS: Settings = { sfx: 0.5, music: 0.4, reduceMotion: false, theme: 'system' }
+const DEFAULTS: Settings = {
+  sfx: 0.5, music: 0.4, reduceMotion: false, theme: 'system', lang: 'en',
+}
 
 const clamp = (n: number) => Math.max(0, Math.min(1, Number(n) || 0))
 const asTheme = (v: unknown): Theme =>
   v === 'light' || v === 'dark' || v === 'system' ? v : 'system'
+const asLang = (v: unknown): Lang => (v === 'es' ? 'es' : 'en')
 
 /** Mirrors cn_clean_settings() in 0022. The server cleans what it is given; so
  *  does this, because a cache can be edited by hand just as a column can. */
@@ -52,6 +60,7 @@ function clean(v: Partial<Settings> | null | undefined): Settings {
     music: clamp(v.music ?? DEFAULTS.music),
     reduceMotion: Boolean(v.reduceMotion),
     theme: asTheme(v.theme),
+    lang: asLang(v.lang),
   }
 }
 
@@ -90,6 +99,9 @@ function publish() {
   // to answer. The stylesheet then has one question to ask instead of three,
   // and 'system' stops being a third state every rule has to think about.
   root.dataset.theme = resolvedTheme()
+  // So a screen reader, and the browser's own hyphenation and quotes, agree
+  // with what is actually written on the page.
+  root.lang = state.lang
   // So the browser's own furniture -- scrollbars, form controls, the flash of
   // background before paint -- agrees with the page.
   root.style.colorScheme = resolvedTheme()
@@ -156,7 +168,7 @@ export function hydrate(remote: unknown) {
   linked = true
   const r = (remote && typeof remote === 'object' ? remote : {}) as Partial<Settings>
   const missing: Partial<Settings> = {}
-  for (const k of ['sfx', 'music', 'reduceMotion', 'theme'] as const) {
+  for (const k of ['sfx', 'music', 'reduceMotion', 'theme', 'lang'] as const) {
     if (!(k in r)) (missing as Record<string, unknown>)[k] = state[k]
   }
   state = clean({ ...state, ...r })

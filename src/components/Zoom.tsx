@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lessMotion } from '../lib/settings'
+import { useT } from '../lib/i18n'
 
 /**
  * The Smash-menu transition: the tile you pressed grows until it IS the page.
@@ -127,6 +128,7 @@ export function Page({
   wide?: boolean
   children: React.ReactNode
 }) {
+  const t = useT()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -137,7 +139,7 @@ export function Page({
     <section className="page" style={{ '--tint': tint } as React.CSSProperties}>
       <div className="page-wash" aria-hidden="true" />
       <header className="page-head">
-        <button className="page-back" onClick={onClose} aria-label="Back to the menu">←</button>
+        <button className="page-back" onClick={onClose} aria-label={t('common.backToMenu')}>←</button>
         <h2>{title}</h2>
       </header>
       <div className={`page-body${wide ? ' is-wide' : ''}`}>{children}</div>

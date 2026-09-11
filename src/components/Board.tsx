@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import type { Ghost } from '../lib/useGhost'
 import { buildCine, fighterOf, fighterOfTree, type Cine } from '../lib/cine'
+import { useT } from '../lib/i18n'
 import { Duel } from './Duel'
 import { artUrl, faceUrl } from '../lib/art'
 import {
@@ -77,6 +78,7 @@ export function Board({
   state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
   onWait, onDeploy, onHover, ghost = null, onLook, onWatching,
 }: Props) {
+  const t = useT()
   const { w, h } = state.board
   const trees: Obstacle[] = state.obstacles ?? []
   const selected = state.units.find((u) => u.id === selectedId) ?? null
@@ -192,11 +194,14 @@ export function Board({
     lastSeq.current = fx.seq
 
     const a = prev.units.find((u) => u.id === fx.atk)
-    const t = prev.units.find((u) => u.id === fx.tgt)
+    const tgt = prev.units.find((u) => u.id === fx.tgt)
     const wood = prev.trees.find((o) => o.id === fx.tgt)
-    if (!a || (!t && !wood)) return
+    if (!a || (!tgt && !wood)) return
 
-    const next = buildCine(fx, fighterOf(a), t ? fighterOf(t) : fighterOfTree(wood!))
+    // `t` is the translator here; the target unit is `tgt`. They were both
+    // called t once and that is exactly the kind of collision worth renaming
+    // out of existence rather than working around.
+    const next = buildCine(fx, fighterOf(a), tgt ? fighterOf(tgt) : fighterOfTree(wood!), t)
     setQueue((q) => [...q, next])
 
     setBlow({
@@ -205,8 +210,8 @@ export function Board({
       burnAtk: fx.burnAtk ?? 0, burnTgt: fx.burnTgt ?? 0,
       killedTgt: fx.killedTgt, killedAtk: fx.killedAtk,
       atkAt: { x: a.x, y: a.y },
-      tgtAt: t ? { x: t.x, y: t.y } : { x: wood!.x, y: wood!.y },
-      atkUnit: a, tgtUnit: t ?? null,
+      tgtAt: tgt ? { x: tgt.x, y: tgt.y } : { x: wood!.x, y: wood!.y },
+      atkUnit: a, tgtUnit: tgt ?? null,
     })
     // The soundtrack of the exchange used to be scheduled here, against this
     // animation's clock. It belongs to the cinematic now: the cinematic plays
@@ -532,7 +537,7 @@ export function Board({
               menuAt.y > (h - 1) / 2 ? 'is-up' : '',
             ].join(' ')}
             role="menu"
-            aria-label={`${selected.name} — choose an action`}
+            aria-label={t('board.chooseAction', { name: selected.name })}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="actmenu-head">{selected.name}</div>
@@ -541,29 +546,29 @@ export function Board({
               disabled={!canMove || litTiles.size === 0}
               onClick={() => setMode('move')}
             >
-              Move
+              {t('board.move')}
             </button>
             <button
               role="menuitem"
               disabled={!canStrike || targets.size === 0}
               onClick={() => setMode('attack')}
             >
-              {selected.heals ? 'Strike / Mend' : 'Attack'}
+              {t(selected.heals ? 'board.strikeMend' : 'board.attack')}
             </button>
             {/* Kept in the menu, and kept off. Every unit's ability is written
                 on its card already, and leaving the slot out until Phase C
                 would move the other four items under the player's thumb on the
                 day it lands. */}
-            <button role="menuitem" disabled title="Abilities are not built yet.">
-              Ability
+            <button role="menuitem" disabled title={t('board.abilityOff')}>
+              {t('board.ability')}
             </button>
             <button
               role="menuitem"
               disabled={!canStrike}
-              title="Halves what lands on this unit until its next turn."
+              title={t('board.defendNote')}
               onClick={() => { onDefend(selected.id); setMode(null) }}
             >
-              Defend
+              {t('board.defend')}
             </button>
             {/* Only for the unit that is already mid-go. For anyone else there
                 is nothing open to close, and submit_wait would end somebody
@@ -571,7 +576,7 @@ export function Board({
                 the server has open. */}
             {(state.active ?? null) === selected.id && (
               <button role="menuitem" onClick={() => { onWait(); setMode(null) }}>
-                Wait
+                {t('board.wait')}
               </button>
             )}
             <button
@@ -579,7 +584,7 @@ export function Board({
               className="actmenu-cancel"
               onClick={() => { onSelect(null); setMode(null) }}
             >
-              Cancel
+              {t('board.cancel')}
             </button>
           </div>
         </div>
@@ -787,6 +792,7 @@ function UnitCard({
   onHover: (over: boolean) => void
   slotRef: (el: HTMLDivElement | null) => void
 }) {
+  const t = useT()
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
   // The piece on the board no longer leans toward the pointer -- it holds
@@ -853,9 +859,9 @@ function UnitCard({
           </div>
         </div>
 
-        {unit.burned && <div className="unit-burn" title="Burning: loses 5 HP whenever it strikes">🔥</div>}
+        {unit.burned && <div className="unit-burn" title={t('board.burning')}>🔥</div>}
         {unit.defending && (
-          <div className="unit-guard" title="Guard up: halves what lands on it until its next turn">🛡</div>
+          <div className="unit-guard" title={t('board.guarding')}>🛡</div>
         )}
         {target === 'ally' && <div className="unit-crosshair is-mend" />}
         {target === 'foe' && <div className={`unit-crosshair${counters ? ' is-risky' : ''}`} />}

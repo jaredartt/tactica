@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Message, Profile } from '../lib/types'
+import { useT } from '../lib/i18n'
 
 interface Props {
   matchId: string
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function Chat({ matchId, profile, messages, role, open }: Props) {
+  const t = useT()
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
@@ -37,9 +39,9 @@ export function Chat({ matchId, profile, messages, role, open }: Props) {
 
   return (
     <aside className={`side side-left${open ? ' is-open' : ''}`}>
-      <h2 className="side-title">Chat</h2>
+      <h2 className="side-title">{t('chat.title')}</h2>
       <div className="side-body">
-        {messages.length === 0 && <p className="muted tiny">Spectators can talk here too.</p>}
+        {messages.length === 0 && <p className="muted tiny">{t('chat.spectator')}</p>}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.user_id === profile.id ? 'msg-own' : ''}`}>
             <span className="msg-who">{m.username}</span>
@@ -52,11 +54,11 @@ export function Chat({ matchId, profile, messages, role, open }: Props) {
         <input
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder={role === 'spectator' ? 'Comment as a spectator…' : 'Say something…'}
+          placeholder={t(role === 'spectator' ? 'chat.placeholderSpectator' : 'chat.placeholder')}
           maxLength={500}
         />
         <button className="btn small" disabled={!body.trim()}>
-          Send
+          {t('chat.send')}
         </button>
       </form>
     </aside>

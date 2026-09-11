@@ -233,6 +233,9 @@ export interface Card {
   parries: boolean
   blooms: boolean
   ability: string
+  /** The same sentence in Spanish. Null until somebody writes it, and the
+   *  client falls back to English when it is -- see abilityText(). */
+  ability_es: string | null
   accent: string
   /** Relative to the site root, e.g. 'cards/dereo.webp'. Run it through
    *  artUrl() before putting it in a src -- the site is not served from /. */
@@ -299,10 +302,14 @@ export const DEPLOY_SECONDS = 90
 export const DECK_SIZE = 5
 export const AWAY_TURNS = 3
 
+/** The three difficulties. The level is the number the server wants; the key
+ *  is the name of the words, which live in the dictionary now -- CALM, SHARP
+ *  and RUTHLESS are as much a translation as any other sentence, and having
+ *  them here as well would be two places to change one. */
 export const BOT_LEVELS = [
-  { level: 1, name: 'CALM', note: 'Plays roughly. Walks into counters and will let you take a free hit.' },
-  { level: 2, name: 'SHARP', note: 'Plays properly. Trades when the trade is good and rarely wastes a turn.' },
-  { level: 3, name: 'RUTHLESS', note: 'Counts what comes back, and will not stand where you can reach it.' },
+  { level: 1, key: 'calm' },
+  { level: 2, key: 'sharp' },
+  { level: 3, key: 'ruthless' },
 ] as const
 
 export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)

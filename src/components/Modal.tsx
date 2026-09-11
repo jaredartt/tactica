@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { IconClose } from './Icons'
+import { useT } from '../lib/i18n'
 
 /**
  * A panel in the middle of the screen with the app dimmed and blurred behind
@@ -13,6 +14,7 @@ export function Modal({
   onClose: () => void
   children: React.ReactNode
 }) {
+  const t = useT()
   const box = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function Modal({
       >
         <header className="modal-head">
           <h2>{title}</h2>
-          <button className="modal-x" onClick={onClose} aria-label="Close">
+          <button className="modal-x" onClick={onClose} aria-label={t('common.close')}>
             <IconClose />
           </button>
         </header>
