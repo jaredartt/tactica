@@ -63,7 +63,16 @@ select public.set_deck(array['dione-grifo','dereo','mako','wuzu','eva']);
 
 -- A deck saved before 0018 existed, or one whose royal was retired since, is
 -- not an army -- it is a match that could never end. It falls back instead.
-update public.profiles set deck = array['dione-grifo','lium','mako','wuzu','eva']
+--
+-- The kingdoms list is emptied alongside the column because since 0024 that
+-- list is where the truth lives and profiles.deck is a mirror of it. A profile
+-- carrying a deck and no kingdoms is not a contrivance to make this line pass:
+-- it is EXACTLY the account this assertion is about -- one saved before any of
+-- this existed. (0024's own file covers the other half, a crownless kingdom
+-- that is selected.)
+update public.profiles
+   set deck = array['dione-grifo','lium','mako','wuzu','eva'],
+       kingdoms = '[]'::jsonb
  where id = 'cccc0000-0000-0000-0000-00000000000c';
 select t_ok(public.deck_of('cccc0000-0000-0000-0000-00000000000c') = public.default_deck(),
             'a crownless saved deck falls back to the default');

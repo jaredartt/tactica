@@ -92,9 +92,10 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 476 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 555 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
-Phase C's, and `13_settings.sql` / `14_ability_es.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+Phase C's, and `13_settings.sql`, `14_ability_es.sql` and `15_kingdoms.sql`
+are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
 
 That script has now had **three** silent-failure bugs, which is worth saying out
 loud: if a test run ever looks too quiet, suspect the runner before you suspect
@@ -295,7 +296,11 @@ It contains:
 
 `0022_settings.sql` is **run in production** as of 2026-09-11.
 
-**`0023_ability_es.sql` is built and tested but NOT yet run in production.**
+`0023_ability_es.sql` is **run in production** as of 2026-09-11, so every
+live card carries its ability in both languages.
+
+**`0024_kingdoms.sql` is built and tested (`15_kingdoms.sql`, 79 assertions)
+but NOT yet run in production.**
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -735,9 +740,51 @@ Two things the measuring caught that reading did not:
 - A test assertion of mine borrowed Lium's hit points from the spec rather than
   the database, which is how the stat divergence above was found at all.
 
+#### DONE (server half): kingdoms
+
+**`0024_kingdoms.sql` is built and tested but NOT yet run in production.** Two
+columns -- `profiles.kingdoms` jsonb (a list of `{id, name, icon, deck}`) and
+`profiles.kingdom` text (the selected id) -- plus `save_kingdom`,
+`delete_kingdom`, `select_kingdom`, a `cn_clean_kingdoms` cleaner on a trigger,
+and `selected_deck()`. `deck_of()` and `set_deck()` are spliced from `0018`.
+
+A list rather than a table, for the same reason settings is a blob rather than
+a column each: ten short rows that only their owner reads, always read
+together, never joined against anything.
+
+**AN INCOMPLETE KINGDOM IS LEGAL, and that is the whole design.** With one deck
+"a team saves itself the moment it is a team" worked. With ten it does not:
+building a second kingdom means sitting at one, two, three cards for as long as
+it takes to choose, and a store that will not hold that is a store that forgets
+what you were doing every time you leave the page. So the column holds a
+half-built kingdom happily, and being FIELDABLE is asked separately at the
+point of use -- `deck_of()` wants exactly five live cards and exactly one crown
+and falls back to the default otherwise. Relaxed editor, strict match.
+
+The one thing `save_kingdom` **does** refuse is a COMPLETE deck that breaks the
+royal rule. An incomplete deck has not made its mind up; a complete illegal one
+has, and telling somebody the moment they finish beats silently fielding
+something else when the match starts.
+
+An unnamed kingdom keeps a **null** name. "Kingdom 3" is words, and which words
+they are is a question about the reader's language, so the client answers it --
+a default written into the database would be English in a Spanish account
+forever.
+
+`profiles.deck` is kept in step rather than retired, written only ever
+alongside the kingdoms list. Everything still reading the old column keeps
+getting the right answer, `set_deck` writes the SELECTED kingdom, and a client
+one deploy behind keeps working. `selected_deck()` falls back to the column for
+a profile the backfill missed, which is what `09_combat.sql`'s crownless-deck
+assertion now leans on (it empties `kingdoms` alongside the write, because
+since 0024 that list is where the truth lives).
+
+**Still to do: the client half** -- My Kingdom becomes a list of up to ten
+renameable kingdoms with unit-token icons, and a "change kingdom" affordance in
+a corner of every pre-battle screen.
+
 #### Still to do in Phase D
 
-- **Kingdoms** -- up to 10 saved decks. The biggest item left.
 - The card and tooltip polish: hover card with the info outside the art, the
   zoomed card locking left, purple keyword tooltips, long-press on mobile.
 - Deployment showing which units the opponent picked; the "Defeat the king."
@@ -913,9 +960,10 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open, and Phase C is finished. The next piece of work is **Phase D**
--- dark mode, settings saved per account, Spanish, kingdoms, the card editor --
-which is also where the cinematic's full/quick/off setting belongs.
+Nothing is open. Phase D's settings/dark-mode and Spanish slices are live, and
+the kingdoms **server** half is built and tested. The next piece of work is the
+kingdoms **client** half, then the card/tooltip polish, the card editor, and
+the cinematic's full/quick/off setting.
 
 One thing is waiting on Jared rather than on code: the site has to be
 **deployed** for any of the Phase C client to be visible. `./deploy.sh` from an
