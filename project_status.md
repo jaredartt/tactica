@@ -67,6 +67,18 @@ inside the synced folder. For a plain type/build check use:
 npx tsc -b && npx vite build --outDir "$(mktemp -d)" --emptyOutDir
 ```
 
+### Moving files onto the device
+
+`device_commit_files` to a path that ALREADY EXISTS in the synced folder does
+not always land -- it reports success and the old bytes stay. It bit twice in
+one session: a rebuilt `mksite.py` and a rebuilt `src.tgz` both silently kept
+their previous contents, and the second one cost a full build-and-measure round
+against code that had not changed. **Commit to a NEW filename every time**
+(`src-cards.tgz`, `src-cards2.tgz`) and check the md5 on the device before
+trusting it. The same folder cannot unlink, which is the likely cause and is
+also why `tar x` over an existing tree fails with "File exists" -- extract to
+`$HOME/tmpsrc` outside the mount and `cp -R` in, which truncates in place.
+
 ### The git lock dance
 
 `rm` fails inside the synced Documents folder, so git's lock files cannot be
@@ -191,9 +203,11 @@ To restore the native binaries instead, on the Mac:
 `--force` is needed because npm's `--cpu`/`--os` filter dependencies but still
 platform-check a package you name directly.
 
-The Kingdoms slice was checked with 121 (`kingharness.tsx` + `kcheck.cjs`,
+The Kingdoms slice was checked with 131 (`kingharness.tsx` + `kcheck.cjs`,
 `lobbyharness.tsx` + `lcheck.cjs`), against nine mutants rather than against
-the old code -- see Phase D below for why and for the list.
+the old code -- see Phase D below for why and for the list. The card slice
+added 78 more (`cardharness.tsx` + `ccheck.cjs`), and those DO run against the
+previous commit, where 48 of them fail.
 
 Phase C's client was checked with 85 browser assertions (the takeover, the
 beats and their captions, the reductions that are named and the ones that are
@@ -854,25 +868,90 @@ wait for its save, an eleventh kingdom, a quieter note (contrast), a mark that
 ignores a deliberate choice, a switch that shows for one kingdom, and a menu
 tile that names an unfieldable kingdom.
 
+#### DONE: the card
+
+**The illustration is no longer drawn on.** Everything used to be cut into the
+picture -- the name band across the top corner, the numbers and the rules strip
+over the bottom third -- and the stated budget for that was "how much of the art
+is hidden", which came to about half. Nothing is cut into it now: a header
+above, the square illustration, two strips below. The card is taller than it is
+wide as a result, and that is the point -- this is the only place in the app
+where the whole drawing is visible. The rules text gets three lines instead of
+two, because it is no longer paying for itself in picture. The gradient scrim
+that protected white type from a pale patch of sky is gone with the type.
+
+**Pinned left, pointed-at right.** Selecting a unit holds its card open on the
+left; whatever is under the pointer opens on the right; pointing at the pinned
+unit itself opens nothing. This replaces yours-left/theirs-right, which read
+well until a card was pinned and then two of your OWN units wanted the same
+edge and one of them lost. Left and right now mean "the one you chose" and "the
+one you are pointing at", which is the comparison anybody with two cards open is
+making.
+
+**The pinned card drifts** on a nine-second loop; pointing at it settles it into
+a tilt picked at random (within 7 degrees) so the same card caught twice is not
+a still frame; clicking holds it flat and clicking again lets it go. The float
+is an animation on an inner element and the tilt a transition on the outer one,
+which is the only arrangement where both work -- an animation's transform beats
+a transition on the same element. Reduce-motion starts it still.
+
+**Long press on a phone.** `useLongPress` in Board.tsx, touch pointers only,
+420ms, cancelled by 10px of drift; the card lands in the middle of the screen
+for as long as the finger is down. The subtle part, and a real bug found by the
+browser suite: a swallowed click must be **stopped**, not merely ignored. The
+board's own background handler clears the selection, so a click the token
+declines to act on but lets past is a long press that puts the unit down. The
+assertion for it needs a unit ALREADY selected -- with nothing selected the
+escaped click sets the selection to null, which is what it already was, so the
+weaker version of the test passed either way.
+
+**Effect icons** were already upper-left and stacking rightward (0019); nothing
+to do there but say so.
+
+**The three light-theme contrast failures are fixed**: `.vs` 1.73 and `.orline`
+2.07 were `#c4c4d2` and `--faint`, both now `--muted`; `.savemark` 2.31 was
+`--good` on white, and `--good` is a SURFACE colour, so there is now a
+`--good-ink` beside `--you-ink` -- the same green taken down until it clears 4.5
+on both papers, and identical to `--good` in dark, where the bright green is
+already 8.1. Running the suite against the previous commit also turned up two
+nobody had measured: the card's role line at 2.78 in light (a hard-coded
+`#9a9aa8`, now `--muted`) and its rules strip at **1.18 in dark** -- a white
+strip painted with `rgba(255,255,255,0.96)` under `--ink`, which in the dark
+theme is near-white type on a near-white band. Both are gone with the rewrite.
+
+**How far a card may reach over the board is bounded, not zero.** The arena is
+much narrower than the window -- the chat and the log take most of it -- so on
+an ordinary desktop the gap beside the board is about 110px, and a card that
+fitted in it would be too small to read. So the card is as wide as the gap down
+to a 150px floor, and past the floor it reaches a little way over the OUTER
+COLUMN and stops. The bound asserted is one tile: it must never reach the
+second column, where things actually happen. `.arena` carries `--cols`/`--rows`
+for this, because the cards are the board's siblings and cannot read vars set
+on it; the gap formula is the board's own width rule negated, so change one and
+change both.
+
+Measured with **78 browser assertions** (`_to_delete/h/cardharness.tsx` +
+`ccheck.cjs`), which mounts the REAL Match over a faked row rather than the
+cards alone -- the thing being changed is not the card but which card opens
+where, and that rule lives in Match. **48 of the 78 fail against 1e92233**,
+including every geometry claim and `.vs` at exactly the 1.73 it was reported
+at, plus four mutants.
+
+The contrast helper had a bug of its own worth recording: `color-mix()` computes
+to `color(srgb 0.46 0.53 0.98)`, components in 0..1, and a parser that only knew
+`rgb()` read those as bytes and failed a colour that was fine. It failed SAFE,
+which is why it survived two slices unnoticed.
+
 #### Still to do in Phase D
 
-- The card and tooltip polish: hover card with the info outside the art, the
-  zoomed card locking left, purple keyword tooltips, long-press on mobile.
+- Purple keyword tooltips: vague words render in purple and hovering shows a
+  speech bubble with the real number. The remaining half of the card polish.
 - Deployment showing which units the opponent picked; the "Defeat the king."
   opening; the admin card editor; the ladder's tournaments column and avatars.
 - A **full / quick / off setting for the cinematic**, which now has a place to
   live.
-- Hover card: all info **outside** the art (above and below), so hovered cards
-  are no longer square.
-- Clicked unit → zoomed card **locks to the left** so you can read it without
-  hovering.
-- Zoomed card: slow float + slow rotate + slow random tilt on hover; snaps to a
-  static reset view on click.
 - Keyword tooltips: vague words ("slightly", "Burn", "Critical hit") render in
   **purple**; hovering shows a small speech bubble with the real number.
-- **Long-press on mobile** shows the zoomed card.
-- Effect icons at the **upper-left** of a token, stacking rightward as more
-  apply, disappearing with the effect.
 - Deployment: you can see **which units** the opponent picked (but not where
   they place them).
 - Match start: black box, white text, "Defeat the king." in epic motion.
@@ -1028,11 +1107,12 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. Phase D's settings/dark-mode, Spanish and kingdoms slices are
-all built; 0024 is run in production and the kingdoms client is committed. The
-next piece of work is the card and tooltip polish, then the admin card editor,
-the ladder's tournaments column and avatars, and the cinematic's
-full/quick/off setting.
+Nothing is open. Phase D's settings/dark-mode, Spanish, kingdoms and card
+slices are all built, and the three light-theme contrast failures that were
+left open during dark mode are fixed. The next piece of work is the purple
+keyword tooltips, then the admin card editor, the match-feel trio (the
+opponent's picks at deployment, the "Defeat the king." opening, the cinematic's
+full/quick/off setting), and the ladder's tournaments column and avatars.
 
 One thing is waiting on Jared rather than on code: the site has to be
 **deployed** for any of the Phase C client to be visible. `./deploy.sh` from an

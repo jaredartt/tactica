@@ -15,7 +15,6 @@ import {
   type MatchState, type Profile, type Side, type Unit,
   unitPower,
 } from '../lib/types'
-import { flipFor } from '../lib/rules'
 import { abilityText, useT } from '../lib/i18n'
 import { KingdomSwitch } from './KingdomSwitch'
 import { useCardsBySlug } from '../lib/useCards'
@@ -46,6 +45,11 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
 
   const [selected, setSelected] = useState<string | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
+  // The one being held down on a touch screen. Separate from `hovered`
+  // because a phone can have one and never the other, and a desktop the
+  // reverse -- and because a card that arrives under a finger goes in the
+  // middle of the screen rather than against an edge.
+  const [peeked, setPeeked] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
   // Which rail is showing. Only meaningful on a narrow screen, where the two
@@ -253,31 +257,41 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
 
   const s = match.state
 
-  // Your card opens on the left of the board, theirs on the right, so it never
-  // reaches across the middle and never lands on the rail beside it. A tree
-  // belongs to nobody, so it opens on the side of the board it is standing on.
+  // THE PINNED CARD IS THE ONE YOU CHOSE; THE OTHER IS THE ONE YOU ARE
+  // POINTING AT.
+  //
+  // This used to be yours-left and theirs-right, which read well until a card
+  // was pinned open: two of your own units then wanted the same edge and one
+  // of them lost. Left and right now mean "picked" and "pointed at", which is
+  // the comparison anybody with two cards open is actually making -- and it
+  // also means a pinned card never moves, so it can be read while the pointer
+  // goes wandering.
+  //
+  // .arena spans exactly the gap between the two rails, so an edge of it is
+  // outside the board and still clear of the chat and the log.
   const board = shown ?? s
-  const hoverUnit = hovered ? board.units.find((u) => u.id === hovered) : undefined
-  const hoverTree = hovered ? (board.obstacles ?? []).find((o) => o.id === hovered) : undefined
-  const hoverCard = hoverUnit ? (
-    <UnitBigCard
-      unit={hoverUnit}
-      side={hoverUnit.owner === (mySide ?? 'host') ? 'left' : 'right'}
-    />
-  ) : hoverTree ? (
-    <TreeBigCard
-      tree={hoverTree}
-      // Drawn column, not board column: the host sees the board half a turn
-      // round, so a tree on their left is a tree at high x. Board.tsx owns the
-      // flip, and this is the one other place a coordinate reaches the screen
-      // -- which is why the rule itself lives in flipFor() and neither of them
-      // spells it out.
-      side={
-        (flipFor(mySide) ? board.board.w - 1 - hoverTree.x : hoverTree.x)
-          < Math.floor(board.board.w / 2) ? 'left' : 'right'
-      }
-    />
-  ) : null
+  const unitAt = (id: string | null) => (id ? board.units.find((u) => u.id === id) : undefined)
+  const treeAt = (id: string | null) =>
+    (id ? (board.obstacles ?? []).find((o) => o.id === id) : undefined)
+
+  const pinnedUnit = unitAt(selected)
+  const pinnedCard = pinnedUnit
+    ? <UnitBigCard unit={pinnedUnit} side="left" pinned />
+    : null
+
+  // Hovering the one already pinned open opens nothing: it is on screen.
+  const hoverId = hovered && hovered !== selected ? hovered : null
+  const hoverUnit = unitAt(hoverId)
+  const hoverTree = treeAt(hoverId)
+  const hoverCard = hoverUnit ? <UnitBigCard unit={hoverUnit} side="right" />
+    : hoverTree ? <TreeBigCard tree={hoverTree} side="right" />
+    : null
+
+  const peekUnit = unitAt(peeked)
+  const peekTree = treeAt(peeked)
+  const peekCard = peekUnit ? <UnitBigCard unit={peekUnit} side="peek" />
+    : peekTree ? <TreeBigCard tree={peekTree} side="peek" />
+    : null
 
   const pct = remaining === null ? 0 : Math.max(0, Math.min(1, remaining / clockLength))
   const urgent = remaining !== null && remaining <= 8
@@ -381,8 +395,17 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
             </div>
           ) : (
             <>
-              <div className="arena">
+              {/* The board's shape, on the arena as well as on the board.
+                  The cards are the arena's children and the board is their
+                  sibling, so this is the only way they can be sized from the
+                  gap the board leaves rather than from a guess at it. */}
+              <div
+                className="arena"
+                style={{ '--cols': s.board.w, '--rows': s.board.h } as React.CSSProperties}
+              >
+                {pinnedCard}
                 {hoverCard}
+                {peekCard}
                 <Board
                   state={shown ?? s}
                   mySide={mySide}
@@ -398,6 +421,7 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
                     guard(async () => setMyUnits(await deployUnit(match.id, id, x, y)))
                   }
                   onHover={setHovered}
+                  onPeek={setPeeked}
                   ghost={ghost}
                   onLook={look}
                   onWatching={setWatching}

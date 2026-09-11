@@ -14,6 +14,80 @@ import { playMove, playPlace, playSelect } from '../lib/sfx'
 // No pixel sizes here on purpose. The board is a CSS grid that fills whatever
 // space it is given and keeps its aspect ratio.
 const MAX_TILT = 16   // degrees the card leans toward the cursor
+
+/** How long a finger has to stay put before a card opens under it. Long
+ *  enough not to fire on a tap, short enough that nobody thinks it is
+ *  broken -- the same range a phone uses for its own press-and-hold. */
+const LONG_MS = 420
+/** And how far it may drift first. Past this it is a scroll or a drag, not a
+ *  press, and a card that opens while somebody is dragging the board is a
+ *  card in the way. */
+const LONG_SLOP = 10
+
+/**
+ * Press and hold to read a card.
+ *
+ * A phone has no pointer, so the card that opens beside the board on a desktop
+ * has nothing to open for. The strip under the board covers the unit you have
+ * SELECTED, but selecting is also how you move -- so there was no way at all
+ * to read a card belonging to the other side, or a tree, without committing to
+ * something.
+ *
+ * Touch only, on purpose. A mouse already has hover, and a right-hand-side
+ * card that also appeared after holding the left button down would fire every
+ * time somebody started a drag.
+ *
+ * The tap that ends a long press must NOT also select, so the fired flag is
+ * copied into `swallow` on the way up and read by the click handler that comes
+ * after it -- pointerup has already reset everything else by then.
+ */
+function useLongPress(onFire: () => void, onRelease: () => void) {
+  const timer = useRef<number | undefined>(undefined)
+  const from = useRef<{ x: number; y: number } | null>(null)
+  const fired = useRef(false)
+  const swallow = useRef(false)
+
+  const stop = () => {
+    window.clearTimeout(timer.current)
+    from.current = null
+    if (fired.current) { fired.current = false; swallow.current = true; onRelease() }
+  }
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  return {
+    handlers: {
+      onPointerDown(e: React.PointerEvent) {
+        if (e.pointerType !== 'touch') return
+        from.current = { x: e.clientX, y: e.clientY }
+        fired.current = false
+        window.clearTimeout(timer.current)
+        timer.current = window.setTimeout(() => { fired.current = true; onFire() }, LONG_MS)
+      },
+      onPointerMove(e: React.PointerEvent) {
+        const a = from.current
+        if (!a) return
+        if (Math.hypot(e.clientX - a.x, e.clientY - a.y) > LONG_SLOP) stop()
+      },
+      onPointerUp: stop,
+      onPointerCancel: stop,
+      onContextMenu(e: React.MouseEvent) { if (swallow.current) e.preventDefault() },
+    },
+    /**
+     * True once, for the click that follows the press that opened a card.
+     *
+     * A caller that gets `true` must ALSO stop the event. Ignoring it is not
+     * enough: the board's own background handler clears the selection, so a
+     * click the unit declines to act on but lets past is a long press that
+     * puts the unit down -- which is exactly what "reading a card must change
+     * nothing" is not.
+     */
+    swallowed() {
+      if (!swallow.current) return false
+      swallow.current = false
+      return true
+    },
+  }
+}
 const FX_MS = 1300
 
 interface Props {
@@ -33,6 +107,10 @@ interface Props {
   /** The unit or tree the pointer is over. The card it opens is drawn beside
    *  the board, not inside it, so the board reports and Match renders. */
   onHover: (id: string | null) => void
+  /** The unit or tree being held down on a touch screen -- see useLongPress.
+   *  Same shape as onHover and for the same reason: the board knows what is
+   *  being pressed, Match knows where a card goes. */
+  onPeek?: (id: string | null) => void
   /** Where the opponent is looking, and a way to tell them where you are.
    *  Both optional: a board with neither is simply a board with no ghost on
    *  it, which is what deployment and a finished match should be. */
@@ -76,7 +154,7 @@ type Mode = 'menu' | 'move' | 'attack'
 
 export function Board({
   state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
-  onWait, onDeploy, onHover, ghost = null, onLook, onWatching,
+  onWait, onDeploy, onHover, onPeek, ghost = null, onLook, onWatching,
 }: Props) {
   const t = useT()
   const { w, h } = state.board
@@ -442,6 +520,7 @@ export function Board({
           shaking={blow?.tgt === t.id}
           falling={blow?.tgt === t.id && blow.killedTgt}
           onHover={(over) => onHover(over ? t.id : null)}
+          onPeek={(on) => onPeek?.(on ? t.id : null)}
           onClick={(e) => {
             e.stopPropagation()
             if (shownTargets.has(t.id)) { onAttack(t.id); setMode(null) }
@@ -479,6 +558,7 @@ export function Board({
                   : undefined
             }
             onHover={(over) => onHover(over ? u.id : null)}
+            onPeek={(on) => onPeek?.(on ? u.id : null)}
             slotRef={(el) => { if (el) slots.current.set(u.id, el); else slots.current.delete(u.id) }}
             onClick={(e) => { e.stopPropagation(); clickUnit(u) }}
           />
@@ -711,7 +791,7 @@ function ArrowPart({ style, from, to }: {
 /** A tree. A crop of the painting rather than a glyph, because a tile of
  *  woodland reads as cover at a glance and an icon reads as a piece. */
 function Tree({
-  tree, style, targetable, shaking, falling, onClick, onHover,
+  tree, style, targetable, shaking, falling, onClick, onHover, onPeek,
 }: {
   tree: Obstacle
   style: React.CSSProperties
@@ -720,14 +800,17 @@ function Tree({
   falling: boolean
   onClick: (e: React.MouseEvent) => void
   onHover: (over: boolean) => void
+  onPeek: (on: boolean) => void
 }) {
   const pct = Math.max(0, Math.min(100, (tree.hp / tree.maxHp) * 100))
+  const press = useLongPress(() => onPeek(true), () => onPeek(false))
   return (
     <div className="tree-slot" style={style}>
       <div
         className={['tree', targetable ? 'is-target' : '', shaking ? 'is-hit' : '',
                     falling ? 'is-falling' : ''].join(' ')}
-        onClick={onClick}
+        {...press.handlers}
+        onClick={(e) => { if (press.swallowed()) { e.stopPropagation(); return } onClick(e) }}
         onMouseEnter={() => onHover(true)}
         onMouseLeave={() => onHover(false)}
       >
@@ -777,7 +860,7 @@ function GhostCard({ unit }: { unit: Unit }) {
 
 function UnitCard({
   unit, slot, yours, watching, selected, target, counters, slotClass, slotVars, onClick, onHover,
-  slotRef,
+  onPeek, slotRef,
 }: {
   unit: Unit
   slot: React.CSSProperties
@@ -790,9 +873,11 @@ function UnitCard({
   slotVars?: React.CSSProperties
   onClick: (e: React.MouseEvent) => void
   onHover: (over: boolean) => void
+  onPeek: (on: boolean) => void
   slotRef: (el: HTMLDivElement | null) => void
 }) {
   const t = useT()
+  const press = useLongPress(() => onPeek(true), () => onPeek(false))
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
   // The piece on the board no longer leans toward the pointer -- it holds
@@ -846,7 +931,8 @@ function UnitCard({
         onMouseMove={lean}
         onMouseEnter={() => onHover(true)}
         onMouseLeave={(e) => { settle(e); onHover(false) }}
-        onClick={onClick}
+        {...press.handlers}
+        onClick={(e) => { if (press.swallowed()) { e.stopPropagation(); return } onClick(e) }}
       >
         {/* On the board a card is its picture and nothing else. The name and
             the numbers are one hover away; what you need at a glance is who it

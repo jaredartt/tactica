@@ -1,13 +1,27 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { Obstacle, Unit } from '../lib/types'
 import { reachText, unitPower } from '../lib/types'
 import { artUrl } from '../lib/art'
 import { abilityText, useT } from '../lib/i18n'
+import { lessMotion } from '../lib/settings'
 import { useCardsBySlug } from '../lib/useCards'
 
-/** Which edge of the board the card opens against. Yours on the left, theirs
- *  on the right, so a card never covers the rail on its own side. */
-export type CardSide = 'left' | 'right'
+/**
+ * Where the card opens.
+ *
+ * 'left' is the PINNED one -- the unit you have selected, held open so you can
+ * read it while pointing at something else. 'right' is whatever is under the
+ * pointer. 'peek' is the phone: no pointer to hover with, so a long press puts
+ * one card in the middle of the screen for as long as the finger is down.
+ *
+ * Pinned-left and hovered-right rather than yours-left and theirs-right, which
+ * is what this was before ten kingdoms' worth of cards ago. The old rule read
+ * well until a card was pinned, and then two of your own units wanted the same
+ * edge and one of them lost. Left and right now mean "the one you chose" and
+ * "the one you are pointing at", which is exactly the comparison anybody
+ * opening two cards is trying to make.
+ */
+export type CardSide = 'left' | 'right' | 'peek'
 
 /** The three slashes from the mark, small enough to read as a bullet. */
 function Mark() {
@@ -44,32 +58,102 @@ function FitName({ children }: { children: string }) {
   return <h3 ref={ref} className="bc-name">{children}</h3>
 }
 
+/** How far a pinned card leans when you point at it, in degrees. Small: this
+ *  is an object catching the light, not a thing being turned over. */
+const TILT = 7
+
 /**
- * The card as it would be printed: the illustration edge to edge, the name on
- * a white band cut into the top left, the health in a coloured block cut into
- * the top right, and one bar of numbers plus one line of rules text along the
- * bottom.
+ * The chrome, the motion, and nothing about what is on the card.
  *
- * Everything here is measured against how much of the picture it hides. The
- * board already shows a zoomed crop; this is the only place the whole
- * illustration is visible, so the middle two thirds of it stay clear.
+ * A PINNED card drifts -- a slow rise and fall with a little roll in it, on a
+ * nine-second loop so it never syncs with anything else on screen. Pointing at
+ * it settles it into a tilt picked at random, so the same card caught twice
+ * does not look like a still frame. Clicking it stops all of that and leaves it
+ * flat, and clicking again lets it go; a card you are reading carefully should
+ * be a card that holds still when you ask it to.
+ *
+ * The float is on an inner element and the tilt is on the outer one, which is
+ * the only arrangement where both work: an animation's transform beats a
+ * transition on the same element, so a tilt applied to the floating element
+ * would jump between frames instead of easing.
  */
-export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
+function Shell({ side, pinned, accent, tone, children }: {
+  side: CardSide
+  pinned?: boolean
+  accent?: string
+  tone?: string
+  children: React.ReactNode
+}) {
+  const [still, setStill] = useState(false)
+  const [tilt, setTilt] = useState<{ x: number; y: number } | null>(null)
+  const quiet = lessMotion()
+
+  const lean = () => {
+    if (still || quiet) return
+    const r = (n: number) => (Math.random() * 2 - 1) * n
+    setTilt({ x: r(TILT), y: r(TILT) })
+  }
+
+  return (
+    <aside
+      className={[
+        'bigcard', `bigcard-${side}`,
+        pinned ? 'is-pinned' : '',
+        pinned && (still || quiet) ? 'is-still' : '',
+        tone ?? '',
+      ].join(' ').trim()}
+      style={{
+        '--accent': accent,
+        '--ptx': `${tilt ? -tilt.x : 0}deg`,
+        '--pty': `${tilt ? tilt.y : 0}deg`,
+      } as React.CSSProperties}
+      onMouseEnter={pinned ? lean : undefined}
+      onMouseLeave={pinned ? () => setTilt(null) : undefined}
+      onClick={pinned ? () => { setStill((s) => !s); setTilt(null) } : undefined}
+    >
+      <div className="bc-box">{children}</div>
+    </aside>
+  )
+}
+
+/**
+ * The card as it would be printed, with the illustration LEFT ALONE.
+ *
+ * Everything used to be cut into the picture -- the name on a band across the
+ * top corner, the numbers and the rules text over the bottom third -- and the
+ * budget for that was "how much of the art is hidden", which was about half.
+ * Nothing is cut into it now: a header above, the square illustration, and two
+ * strips below. The card is taller than it is wide as a result, and that is the
+ * point. This is the only place in the whole app where the whole drawing is
+ * visible, and a strip of type over somebody's face is a strange thing to
+ * spend it on when there is room underneath.
+ *
+ * The rules text can be three lines now rather than two, because it is no
+ * longer paying for itself in picture.
+ */
+export function UnitBigCard({ unit, side, pinned }: {
+  unit: Unit
+  side: CardSide
+  pinned?: boolean
+}) {
   const t = useT()
   const bySlug = useCardsBySlug()
   const say = abilityText(bySlug.get(unit.slug)) || unit.ability
   return (
-    <aside
-      className={`bigcard bigcard-${side} ${unit.owner === 'host' ? 'unit-host' : 'unit-guest'}`}
-      style={{ '--accent': unit.accent } as React.CSSProperties}
+    <Shell
+      side={side} pinned={pinned} accent={unit.accent}
+      tone={unit.owner === 'host' ? 'unit-host' : 'unit-guest'}
     >
-      {unit.art && <img className="bc-art" src={artUrl(unit.art)!} alt="" />}
       <div className="bc-top">
         <div className="bc-id">
           <FitName>{unit.name}</FitName>
           {unit.role && <p>{unit.role}</p>}
         </div>
         <div className="bc-hp"><b>{unit.hp}</b><i>/{unit.maxHp}</i></div>
+      </div>
+
+      <div className="bc-artwrap">
+        {unit.art && <img className="bc-art" src={artUrl(unit.art)!} alt="" />}
       </div>
 
       <div className="bc-bottom">
@@ -85,7 +169,7 @@ export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
           <div className="bc-say"><span className="bc-glyph"><Mark /></span><p>{say}</p></div>
         )}
       </div>
-    </aside>
+    </Shell>
   )
 }
 
@@ -95,11 +179,13 @@ export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
 export function TreeBigCard({ tree, side }: { tree: Obstacle; side: CardSide }) {
   const t = useT()
   return (
-    <aside className={`bigcard bigcard-${side} bigcard-tree`}>
-      <img className="bc-art" src={`${import.meta.env.BASE_URL}tree.webp`} alt="" />
+    <Shell side={side} tone="bigcard-tree">
       <div className="bc-top">
         <div className="bc-id"><FitName>{t('tree.name')}</FitName><p>{t('tree.role')}</p></div>
         <div className="bc-hp"><b>{tree.hp}</b><i>/{tree.maxHp}</i></div>
+      </div>
+      <div className="bc-artwrap">
+        <img className="bc-art" src={`${import.meta.env.BASE_URL}tree.webp`} alt="" />
       </div>
       <div className="bc-bottom">
         <div className="bc-stats">
@@ -110,6 +196,6 @@ export function TreeBigCard({ tree, side }: { tree: Obstacle; side: CardSide }) 
           <p>{t('tree.note')}</p>
         </div>
       </div>
-    </aside>
+    </Shell>
   )
 }

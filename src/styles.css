@@ -50,6 +50,14 @@
   /* The side colour when it is being read rather than filled. Identical to
      --you here; the dark theme lifts it, and only it. */
   --you-ink: var(--you);
+  /* And the same arrangement for green, for the same reason in reverse.
+     --good is a SURFACE colour -- a health bar, a tick -- and #00c46a on white
+     is 2.31, which was one of three small pieces of type in the light theme
+     measured as unreadable and left that way. This is the same green taken
+     down until it clears 4.5 on both papers, and it is used only where the
+     green IS the text. The dark theme needs no such thing: on near-black the
+     bright green is already 8.1. */
+  --good-ink: #0a8043;
 
   --you:     #2f4bff;   /* your side */
   --foe:     #f2503c;   /* the other side */
@@ -98,6 +106,7 @@
      what --you-ink is for, below -- it is the same blue, lifted, and it is
      used only where the blue IS the text. */
   --you-ink: #8b9dff;
+  --good-ink: var(--good);
 }
 
 * { box-sizing: border-box; }
@@ -577,7 +586,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .matchbar-right { display: flex; align-items: center; gap: 10px; }
 
 .scoreline { display: flex; align-items: center; gap: 14px; }
-.vs { color: #c4c4d2; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+.vs { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
 
 .nameplate {
   position: relative; padding: 6px 14px; border-radius: 999px;
@@ -1146,22 +1155,37 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 
 .bigcard {
   position: absolute; top: 50%;
-  width: clamp(158px, 22cqw, 280px);
-  aspect-ratio: 1;
+  /* As wide as the gap the board leaves, down to a floor of 150px.
+     The inner min() is the BOARD's own width rule (line ~668) negated -- change
+     one, change both. The arena is narrower than it looks (the chat and the log
+     take most of the window), so on an ordinary desktop the gap is around
+     110px and the floor wins: the card reaches a little way over the OUTER
+     COLUMN of tiles and stops. That overlap is deliberate and it is bounded --
+     never as far as the second column -- because the alternative at that width
+     is no card at all, and the outer column is where the least happens. The
+     square card this replaces was 280px wide and covered nearly two columns. */
+  --gap: calc((100cqw - min(100cqw, 560px, 100cqh * var(--cols, 6) / var(--rows, 8))) / 2 - 10px);
+  width: max(150px, min(clamp(150px, 20cqw, 250px), var(--gap)));
   container-type: inline-size;
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--card-back);
-  border: 2px solid var(--side, var(--wood));
-  box-shadow: 0 22px 56px rgba(14, 14, 20, 0.30);
   z-index: 20; pointer-events: none;
-  display: flex; flex-direction: column; justify-content: space-between;
-  /* --brx and --bry are written on .arena by the board's lean handler, so
-     this card tilts by exactly the angles the card under the pointer does. */
+  /* --brx and --bry are written on .arena by the board's lean handler, so the
+     hovered card tilts by exactly the angles the token under the pointer does.
+     --ptx and --pty are the pinned card's own, picked at random per hover. */
   transform: translateY(-50%) perspective(900px)
              rotateX(var(--brx, 0deg)) rotateY(var(--bry, 0deg));
   animation: bc-in 0.15s ease-out;
-  transition: transform 0.12s ease-out, opacity 0.14s ease;
+  transition: transform 0.18s ease-out, opacity 0.14s ease;
+}
+/* The visual card. Separate from the positioning wrapper so the float can be
+   an animation on this and the tilt a transition on that: an animation's
+   transform beats a transition on the SAME element, so a tilt applied to the
+   floating box would jump from frame to frame instead of easing. */
+.bc-box {
+  display: flex; flex-direction: column;
+  border-radius: 10px; overflow: hidden;
+  background: var(--paper);
+  border: 2px solid var(--side, var(--wood));
+  box-shadow: 0 22px 56px rgba(14, 14, 20, 0.30);
 }
 .bigcard-left  { left: 0; }
 .bigcard-right { right: 0; }
@@ -1172,23 +1196,39 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   to   { opacity: 1; transform: translateY(-50%) scale(1); }
 }
 
-.bc-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-/* Just enough shade behind the bands that white type never lands on a pale
-   patch of sky. The middle of the picture is left completely alone. */
-.bigcard::before {
-  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
-  background: linear-gradient(180deg,
-    rgba(0,0,0,0.18) 0, rgba(0,0,0,0) 22%,
-    rgba(0,0,0,0) 62%, rgba(0,0,0,0.30) 100%);
+/* ---- the pinned card -----------------------------------------------------
+   It drifts on a nine-second loop, which is long enough that it reads as an
+   object held up to the light rather than as something animating. Pointing at
+   it settles it into a tilt picked at random in BigCard.tsx, so the same card
+   caught twice does not look like a still frame. Clicking stops all of it. */
+.bigcard.is-pinned { pointer-events: auto; cursor: pointer; }
+.bigcard.is-pinned .bc-box { animation: bc-float 9s ease-in-out infinite; }
+.bigcard.is-pinned:hover {
+  transform: translateY(-50%) perspective(900px)
+             rotateX(var(--ptx, 0deg)) rotateY(var(--pty, 0deg)) scale(1.015);
 }
-.bc-top, .bc-bottom { position: relative; z-index: 2; }
+.bigcard.is-pinned:hover .bc-box { animation-play-state: paused; }
+.bigcard.is-still, .bigcard.is-still:hover { transform: translateY(-50%); }
+.bigcard.is-still .bc-box { animation: none; }
+/* The one piece of feedback that the card is being held still on purpose. */
+.bigcard.is-still .bc-box { box-shadow: 0 10px 26px rgba(14, 14, 20, 0.26); }
 
-.bc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 0; }
-.bc-id {
-  min-width: 0; flex: 0 1 auto;
+@keyframes bc-float {
+  0%, 100% { transform: translateY(-5px) rotate(-0.7deg); }
+  50%      { transform: translateY(5px)  rotate(0.7deg); }
+}
+
+/* ---- above the art -------------------------------------------------------
+   The name on paper, the health in the side colour, and the app's lean in the
+   seam between them rather than cut into anybody's face. */
+.bc-top {
+  display: flex; align-items: stretch; justify-content: space-between;
   background: var(--paper);
-  padding: 2.8cqw 9cqw 2.8cqw 4.5cqw;
-  clip-path: polygon(0 0, 100% 0, calc(100% - 5cqw) 100%, 0 100%);
+}
+.bc-id {
+  min-width: 0; flex: 1 1 auto;
+  padding: 3cqw 2cqw 3cqw 4.5cqw;
+  display: flex; flex-direction: column; justify-content: center;
 }
 /* --fit is set by FitName: it shrinks the name until it stops overflowing,
    because an ellipsis in the one place a character is named is not an
@@ -1202,7 +1242,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .bc-id p {
   margin: 1.2cqw 0 0; font-family: var(--body);
   font-size: 3.9cqw; line-height: 1; letter-spacing: 0.16em;
-  text-transform: uppercase; color: #9a9aa8;
+  text-transform: uppercase; color: var(--muted);
 }
 
 /* Wide enough for 120/120 without the digits ever reflowing. */
@@ -1211,24 +1251,28 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   background: var(--side, var(--wood)); color: #fff;
   padding: 2.6cqw 4.5cqw 2.6cqw 9cqw;
   clip-path: polygon(6cqw 0, 100% 0, 100% 100%, 0 100%);
-  display: flex; align-items: baseline; gap: 0.6cqw;
+  display: flex; align-items: baseline; justify-content: flex-end; gap: 0.6cqw;
   font-variant-numeric: tabular-nums;
 }
 .bc-hp b { font-family: var(--display); font-weight: 900; font-size: 9.5cqw; line-height: 1; }
 .bc-hp i { font-style: normal; font-family: var(--body); font-size: 4.2cqw; opacity: 0.78; }
 
-.bc-bottom {
-  display: flex; flex-direction: column; align-items: flex-start;
-  gap: 1.6cqw; padding-bottom: 3cqw;
+/* ---- the art, edge to edge and covered by nothing ------------------------ */
+.bc-artwrap {
+  position: relative; width: 100%; aspect-ratio: 1;
+  background: var(--card-back); overflow: hidden;
 }
+.bc-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- below it ------------------------------------------------------------ */
+.bc-bottom { display: flex; flex-direction: column; }
 
 /* One bar, not three. Damage, movement and reach are the same kind of fact
-   and they were taking three rows of the picture to say so. */
+   and they were taking three rows to say so. */
 .bc-stats {
   display: flex; align-items: baseline; gap: 4.5cqw;
   background: var(--side, var(--wood)); color: #fff;
-  padding: 1.8cqw 8cqw 1.8cqw 4.5cqw;
-  clip-path: polygon(0 0, 100% 0, calc(100% - 4cqw) 100%, 0 100%);
+  padding: 2.2cqw 4.5cqw 3.6cqw;
 }
 .bc-stats > span { display: flex; align-items: baseline; gap: 1.4cqw; }
 .bc-stats em {
@@ -1238,21 +1282,47 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .bc-stats b { font-family: var(--display); font-weight: 900; font-size: 6.2cqw; line-height: 1; }
 .bc-burn b { color: #ffd166; }
 
-.bc-say { display: flex; align-items: stretch; width: 100%; background: rgba(255, 255, 255, 0.96); }
-.bc-glyph { flex: none; width: 11cqw; display: grid; place-items: center; background: var(--side, var(--wood)); }
+/* The lean lives here now: the rules strip rides up over the numbers bar with
+   a diagonal top edge, so the coloured band shows through above it. */
+.bc-say {
+  display: flex; align-items: stretch; width: 100%;
+  background: var(--paper);
+  margin-top: -2.6cqw;
+  clip-path: polygon(0 2.6cqw, 100% 0, 100% 100%, 0 100%);
+}
+.bc-glyph {
+  flex: none; width: 11cqw; display: grid; place-items: center;
+  background: var(--side, var(--wood));
+}
 .bc-mark { width: 58%; height: auto; fill: #fff; }
 .bc-say p {
-  margin: 0; padding: 2.2cqw 3.6cqw;
-  font-family: var(--body); font-size: 4cqw; line-height: 1.3; color: var(--ink);
-  /* Two lines, and a hard ceiling as well as a clamp: line-clamp alone still
-     let a third line push the strip past the bottom edge of the card. */
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; max-height: calc(2 * 1.3em + 4.4cqw); box-sizing: content-box;
+  margin: 0; padding: 3.4cqw 3.6cqw 2.6cqw;
+  font-family: var(--body); font-size: 4cqw; line-height: 1.35; color: var(--ink);
+  /* Three lines now rather than two: the strip is no longer paying for itself
+     in picture, so there is no reason to cut a sentence short. */
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* A touch screen has no pointer to hover with, and the strip under the board
-   already does this job there. */
-@media (hover: none), (pointer: coarse) { .bigcard { display: none; } }
+/* ---- the phone -----------------------------------------------------------
+   No pointer to hover with, so the card arrives on a LONG PRESS and sits in
+   the middle of the screen for as long as the finger is down. The two side
+   cards are hidden there: an edge card on a 390px screen is a card over the
+   board. */
+@media (hover: none), (pointer: coarse) {
+  .bigcard-left, .bigcard-right { display: none; }
+}
+.bigcard-peek {
+  position: fixed; left: 50%; top: 50%; right: auto;
+  width: min(66vw, 300px);
+  transform: translate(-50%, -50%);
+  animation: bc-peek-in 0.16s ease-out;
+  z-index: 60;
+}
+.bigcard-peek .bc-box { box-shadow: 0 26px 70px rgba(14, 14, 20, 0.5); }
+@keyframes bc-peek-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
 
 /* ---------- states -------------------------------------------------------- */
 
@@ -1497,7 +1567,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   .unit-ghost { display: none; }
   .unit, .tile, .timerfill, .unit-face { transition: none !important; }
   .unit { transform: scale(1) !important; }
-  .bigcard { animation: none !important; }
+  .bigcard, .bigcard .bc-box { animation: none !important; }
 }
 
 /* ==========================================================================
@@ -1744,6 +1814,8 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 :root[data-reduce-motion="1"] .duel-pop,
 :root[data-reduce-motion="1"] .duel-ripple,
 :root[data-reduce-motion="1"] .duel-flash { animation: none !important; }
+:root[data-reduce-motion="1"] .bigcard,
+:root[data-reduce-motion="1"] .bigcard .bc-box { animation: none !important; }
 :root[data-reduce-motion="1"] .duel-pop { opacity: 1; }
 
 /* ---------- password fields ---------------------------------------------- */
@@ -2096,7 +2168,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 .comic-foot { align-self: center; margin-top: 18px; }
 
 .orline {
-  display: flex; align-items: center; gap: 12px; color: var(--faint);
+  display: flex; align-items: center; gap: 12px; color: var(--muted);
   font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
 }
 .orline::before, .orline::after {
@@ -2107,7 +2179,7 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    because by the time you can read it, it is. */
 .savemark {
   font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--good); min-width: 7ch; text-align: right;
+  color: var(--good-ink); min-width: 7ch; text-align: right;
   transition: opacity 0.2s;
 }
 .savemark.is-busy { color: var(--muted); }
