@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { MatchRow, Unit } from './types'
+import type { Kingdom, MatchRow, Unit } from './types'
 
 /**
  * Every one of these is a call to a Postgres function that validates the move
@@ -105,8 +105,47 @@ export async function requestRematch(matchId: string): Promise<string | null> {
   return (data as string | null) ?? null
 }
 
-/** Save your team. The server re-checks the count, the duplicates and that
- *  every card is really in the roster. */
+/**
+ * Save one kingdom, and hand back the whole list.
+ *
+ * A SHORT deck is fine and that is deliberate -- see Kingdom in types.ts. The
+ * one thing the server refuses is a FINISHED deck that breaks the royal rule,
+ * because a deck of five has made its mind up and being told at the moment you
+ * finish beats silently fielding something else when the match starts.
+ *
+ * The id is generated here rather than by the database. It has to exist before
+ * the first save so the page can hold an unsaved kingdom open while you decide
+ * whether it is going to be one at all.
+ */
+export async function saveKingdom(
+  id: string, name: string | null, icon: string | null, deck: string[],
+): Promise<Kingdom[]> {
+  const { data, error } = await supabase.rpc('save_kingdom', {
+    p_id: id, p_name: name, p_icon: icon, p_deck: deck,
+  })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data ?? []) as Kingdom[]
+}
+
+/** Hands back what is left. Deleting the one you were fielding lands you on
+ *  another rather than on nothing -- the server repoints it. */
+export async function deleteKingdom(id: string): Promise<Kingdom[]> {
+  const { data, error } = await supabase.rpc('delete_kingdom', { p_id: id })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data ?? []) as Kingdom[]
+}
+
+/** Field this one. Returns the id actually selected, which is not always the
+ *  one asked for: a selection pointing at nothing lands on the first. */
+export async function selectKingdom(id: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('select_kingdom', { p_id: id })
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as string | null) ?? null
+}
+
+/** The old door, still open. Writes the SELECTED kingdom. Nothing in this
+ *  build calls it any more; it is kept because a tab left open from before
+ *  0024 still does. */
 export async function setDeck(deck: string[]): Promise<string[]> {
   const { data, error } = await supabase.rpc('set_deck', { p_deck: deck })
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))

@@ -1,19 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import {
-  createBotMatch, createMatch, joinMatch, leaveRanked, rankedTick,
-  setDeck as setDeck_, sweepMatches,
+  createBotMatch, createMatch, joinMatch, leaveRanked, rankedTick, sweepMatches,
 } from '../lib/api'
 import { Comics } from './Comics'
 import {
-  BOT_LEVELS, DECK_SIZE, reachText, tierOf,
-  type Card, type LadderRow, type MatchRow, type Profile,
-  unitPower,
+  BOT_LEVELS, DECK_SIZE, tierOf,
+  type LadderRow, type MatchRow, type Profile,
 } from '../lib/types'
-import { artUrl } from '../lib/art'
-import { abilityText, useT } from '../lib/i18n'
+import { fieldable } from '../lib/kingdoms'
+import { useT } from '../lib/i18n'
+import { useCards } from '../lib/useCards'
 import { Avatar } from './Avatar'
 import { IconGear } from './Icons'
+import { Kingdoms } from './Kingdoms'
+import { KingdomSwitch } from './KingdomSwitch'
 import { Logo } from './Logo'
 import { ProfileCard } from './ProfileCard'
 import { SettingsCard } from './SettingsCard'
@@ -56,14 +57,15 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
   const t = useT()
   const { zoomTo, close, page, zoomer } = useZoom()
   const [rooms, setRooms] = useState<MatchRow[]>([])
-  const [roster, setRoster] = useState<Card[]>([])
+  // The roster, from the cache every screen shares. It used to be fetched when
+  // My Kingdom opened; the menu itself now needs it, because which kingdom you
+  // are fielding is a question you cannot answer without knowing which cards
+  // are still in the game.
+  const roster = useCards()
   const [ladder, setLadder] = useState<LadderRow[]>([])
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [deck, setDeckDraft] = useState<string[]>(profile.deck ?? [])
-  const [savedDeck, setSavedDeck] = useState<string[]>(profile.deck ?? [])
-  const [saving, setSaving] = useState(false)
 
   // queue
   const [overlay, setOverlay] = useState<null | 'profile' | 'settings'>(null)
@@ -105,12 +107,6 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
   }, [page])
 
   useEffect(() => {
-    if (page !== 'team' || roster.length) return
-    supabase.from('cards').select('*').eq('is_active', true).order('sort')
-      .then(({ data }) => data && setRoster(data as Card[]))
-  }, [page, roster.length])
-
-  useEffect(() => {
     if (page !== 'ladder') return
     supabase.from('leaderboard').select('*')
       .order('lp', { ascending: false }).order('wins', { ascending: false }).limit(50)
@@ -148,58 +144,19 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
     return () => { window.removeEventListener('pagehide', bye); bye() }
   }, [searching])
 
-  // A team saved before the roster changed still sits in profiles.deck, slug
-  // for slug -- the server never rewrites it, it just refuses to field it and
-  // hands back the default instead. So the draft has to be cleaned when the
-  // roster arrives, or My Team shows "5/5 chosen" over a grid where four of
-  // the five are cards that no longer exist and only one has a number on it.
-  useEffect(() => {
-    if (!roster.length) return
-    const have = new Set(roster.map((c) => c.slug))
-    setDeckDraft((d) => (d.every((s) => have.has(s)) ? d : d.filter((s) => have.has(s))))
-    setSavedDeck((d) => (d.every((s) => have.has(s)) ? d : d.filter((s) => have.has(s))))
-  }, [roster])
-
-  // Mirrors deck_of(): a card retired from the roster invalidates the whole
-  // team, and the server quietly fields the default instead. If the client did
-  // not agree, this page would claim a team was saved while the match used
-  // something else.
-  const live = new Set(roster.map((c) => c.slug))
-  const deckSet = savedDeck.length === DECK_SIZE && savedDeck.every((s) => live.has(s))
-  const effectiveDeck = deckSet ? savedDeck : roster.slice(0, DECK_SIZE).map((c) => c.slug)
-
-  function toggleCard(slug: string) {
-    setErr(null)
-    setDeckDraft((d) =>
-      d.includes(slug) ? d.filter((s) => s !== slug)
-      : d.length >= DECK_SIZE ? d : [...d, slug])
-  }
-
-  /**
-   * There is no Save button: a team saves itself the moment it is a team.
-   *
-   * set_deck takes exactly a full team, so a short draft is not something the
-   * server can hold -- which turns out to be the right behaviour rather than a
-   * limitation. Taking a card out leaves the LAST saved team in place, so
-   * wandering off mid-swap keeps the team you actually had, and putting the
-   * missing one back is what commits the change. A swap is one write.
-   *
-   * A write is a single-row update on your own profile row. Supabase meters
-   * storage and egress, not statements, so this costs nothing that a button
-   * would have saved.
-   */
-  const sent = useRef('')
-  useEffect(() => {
-    if (deck.length !== DECK_SIZE) return
-    const key = deck.join()
-    if (key === savedDeck.join() || key === sent.current) return
-    sent.current = key
-    setSaving(true); setErr(null)
-    setDeck_(deck)
-      .then((d) => setSavedDeck(d))
-      .catch((e) => { setErr((e as Error).message); sent.current = '' })
-      .finally(() => setSaving(false))
-  }, [deck, savedDeck])
+  // Which army the next match will actually use, worked out the same way
+  // deck_of() works it out. The client has to agree with the server here or
+  // the menu claims one kingdom while the board fields another.
+  const bySlug = useMemo(() => new Map(roster.map((c) => [c.slug, c])), [roster])
+  const kingdoms = profile.kingdoms ?? []
+  const current = kingdoms.find((k) => k.id === profile.kingdom) ?? null
+  const deckSet = !!current && roster.length > 0 && fieldable(current.deck, bySlug)
+  const effectiveDeck = deckSet && current
+    ? current.deck
+    : roster.slice(0, DECK_SIZE).map((c) => c.slug)
+  const currentName = current
+    ? current.name || t('kingdom.untitled', { n: kingdoms.indexOf(current) + 1 })
+    : ''
 
   const tile = TILES.find((x) => x.id === page)
   // The page a tile opens is usually titled with the tile's own label; Watch
@@ -260,6 +217,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
               <span className="mtile-label">{t(`lobby.${tile_.id}`)}</span>
               <span className="mtile-note">
                 {tile_.id === 'team' && !deckSet ? t('lobby.notChosenYet')
+                 : tile_.id === 'team' && currentName ? currentName
                  : tile_.id === 'ladder' && profile.games > 0
                    ? t('lobby.yourStanding', { tier: tierName(tierOf(profile.lp)), lp: profile.lp })
                    : t(`lobby.${tile_.id}Note`)}
@@ -281,6 +239,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
         <Page title={title(tile.id)} tint={tile.tint} onClose={close} wide={page === 'team'}>
           {page === 'ranked' && (
             <div className="modelist">
+              <KingdomSwitch profile={profile} onProfile={onProfile} />
               <button
                 className={`modecard${searching ? ' is-live' : ''}`}
                 onClick={() => { since.current = Date.now(); setElapsed(0); setSearching(true) }}
@@ -313,6 +272,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
 
           {page === 'bot' && (
             <div className="modelist">
+              <KingdomSwitch profile={profile} onProfile={onProfile} />
               {BOT_LEVELS.map((b) => (
                 <button
                   key={b.level}
@@ -336,6 +296,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
               want to play a specific person; one of you sends five letters. */}
           {page === 'friends' && (
             <div className="modelist">
+              <KingdomSwitch profile={profile} onProfile={onProfile} />
               <button className="modecard" disabled={busy} onClick={() => run(createMatch)}>
                 <span className="modecard-name">{t('friends.openRoom')}</span>
                 <span className="modecard-note">{t('friends.openRoomNote')}</span>
@@ -390,73 +351,12 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
             </>
           )}
 
-          {/* The roster, edge to edge, art and nothing else -- you pick your
-              five by recognising them, the way you pick a fighter. Everything
-              a card can do is one hover away, laid over a darkened version of
-              the same picture so the words have something to sit on. */}
+          {/* Ten of them now, and the one you field. Everything that used to
+              be here -- the roster grid, the picking, the saving with no save
+              button -- moved into Kingdoms so the page could grow a shelf
+              above it without this file growing a second screen. */}
           {page === 'team' && (
-            <div className="teamwrap">
-              <div className="roster-grid">
-                {roster.map((c) => {
-                  const picked = deck.includes(c.slug)
-                  const full = deck.length >= DECK_SIZE
-                  return (
-                    <button
-                      key={c.id} type="button" aria-pressed={picked}
-                      aria-label={t('team.cardLabel', { name: c.name, role: c.role })}
-                      className={`rtile${picked ? ' is-picked' : ''}${!picked && full ? ' is-spare' : ''}`}
-                      style={{ '--accent': c.accent } as React.CSSProperties}
-                      onClick={() => toggleCard(c.slug)}
-                    >
-                      <span
-                        className="rtile-art"
-                        style={{ backgroundImage: `url(${artUrl(c.art_url) ?? ''})` }}
-                        aria-hidden="true"
-                      />
-                      {picked && <span className="rtile-pick">{deck.indexOf(c.slug) + 1}</span>}
-                      <span className="rtile-name">{c.name}</span>
-
-                      <span className="rtile-info">
-                        <span className="rti-head">
-                          <b>{c.name}</b>
-                          {c.role && <em>{c.role}</em>}
-                        </span>
-                        <span className="rti-stats">
-                          <span><i>{t('stat.hp')}</i><b>{c.hp}</b></span>
-                          <span><i>{t(c.heals ? 'stat.pwr' : 'stat.dmg')}</i><b>{unitPower(c)}</b></span>
-                          <span><i>{t('stat.mov')}</i><b>{c.mov}</b></span>
-                          <span><i>{t('stat.rng')}</i><b>{reachText(c.rmin, c.rmax)}</b></span>
-                          <span><i>{t('stat.ctr')}</i><b>{reachText(c.crmin, c.crmax)}</b></span>
-                        </span>
-                        {/* The ability's words come out of the card row, not
-                            the dictionary -- see i18n.ts for why those two
-                            live in different places. */}
-                        {abilityText(c) && <span className="rti-ability">{abilityText(c)}</span>}
-                        <span className="rti-cta">
-                          {t(picked ? 'team.remove' : full ? 'team.full' : 'team.add')}
-                        </span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="deckfoot">
-                <span className="muted tiny">
-                  {t('team.chosen', { n: deck.length, max: DECK_SIZE })}
-                  {deck.length < DECK_SIZE && deckSet &&
-                    t('team.stillFielding', { deck: savedDeck.join(', ') })}
-                  {deck.length < DECK_SIZE && !deckSet &&
-                    t('team.untilYouPick', { deck: effectiveDeck.join(', '), max: DECK_SIZE })}
-                </span>
-                <span className={`savemark${saving ? ' is-busy' : ''}`}>
-                  {saving ? t('common.saving')
-                   : deck.length === DECK_SIZE && deck.join() === savedDeck.join()
-                     ? t('common.saved')
-                   : ''}
-                </span>
-              </div>
-            </div>
+            <Kingdoms profile={profile} roster={roster} onProfile={onProfile} />
           )}
 
           {page === 'ladder' && (

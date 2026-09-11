@@ -243,6 +243,29 @@ export interface Card {
   sort: number
 }
 
+/**
+ * One saved army.
+ *
+ * `deck` MAY BE SHORT. An incomplete kingdom is legal -- building one means
+ * sitting at two or three cards for as long as it takes to choose, and a store
+ * that will not hold that forgets what you were doing every time you leave the
+ * page. Whether a kingdom can actually be FIELDED is a separate question asked
+ * at the point of use: `fieldable()` in kingdoms.ts, which mirrors the
+ * server's deck_of().
+ *
+ * `name` is null until somebody names it. The words for "Kingdom 3" belong to
+ * whoever is reading, so the client supplies them and the column stays null --
+ * a default written into the database would be English in a Spanish account
+ * forever.
+ */
+export interface Kingdom {
+  id: string
+  name: string | null
+  /** A card slug, or null -- the same shape as Profile.avatar. */
+  icon: string | null
+  deck: string[]
+}
+
 export interface Profile {
   id: string
   username: string
@@ -254,11 +277,17 @@ export interface Profile {
   losses: number
   games: number
   streak: number
+  /** The SELECTED kingdom's deck, kept in step by the server. Still read by
+   *  everything written before 0024, which is why it was not retired. */
   deck: string[] | null
   /** Sound, motion, theme -- see settings.ts. Optional because a client can be
    *  one deploy ahead of the database, which here is a normal state rather
    *  than a hypothetical. */
   settings?: Record<string, unknown> | null
+  /** Up to ten of them. Optional for the same reason settings is. */
+  kingdoms?: Kingdom[] | null
+  /** The id of the one being fielded. */
+  kingdom?: string | null
 }
 
 export interface LadderRow {

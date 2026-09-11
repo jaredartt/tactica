@@ -172,10 +172,28 @@ from this description) does three small jobs:
    hand-written list is wrong the first time a dependency imports a hook nobody
    thought of, which is exactly how it failed once, on `useSyncExternalStore`.
 
+**React 19 ships no UMD build**, so job 3 needs a second path and mksite.py now
+has one: wrap each CommonJS file in a factory, register it under its own name,
+and give them a `require` that resolves among themselves -- about thirty lines,
+no native binary, and every React ships CJS. It picks UMD when the files are
+there and CJS when they are not, and **prints which**, because "the harness ran
+against a different React from the app" should never have to be deduced from a
+symptom. This matters on a machine that has React 19 installed globally and no
+way to `npm install` React 18 (the cloud container's registry access is
+restricted), which is exactly where this came up.
+
+The Supabase shim is no longer inert either. It records every `rpc` call on
+`window.__RPC` and answers from `window.__RPC_REPLY`, so a test can assert what
+WENT OUT as well as what came back -- which for Kingdoms is most of the point.
+
 To restore the native binaries instead, on the Mac:
 `npm install --no-save --force @rollup/rollup-linux-arm64-gnu@$(node -p "require('rollup/package.json').version") @esbuild/linux-arm64@$(node -p "require('esbuild/package.json').version")`.
 `--force` is needed because npm's `--cpu`/`--os` filter dependencies but still
 platform-check a package you name directly.
+
+The Kingdoms slice was checked with 121 (`kingharness.tsx` + `kcheck.cjs`,
+`lobbyharness.tsx` + `lcheck.cjs`), against nine mutants rather than against
+the old code -- see Phase D below for why and for the list.
 
 Phase C's client was checked with 85 browser assertions (the takeover, the
 beats and their captions, the reductions that are named and the ones that are
@@ -299,8 +317,8 @@ It contains:
 `0023_ability_es.sql` is **run in production** as of 2026-09-11, so every
 live card carries its ability in both languages.
 
-**`0024_kingdoms.sql` is built and tested (`15_kingdoms.sql`, 79 assertions)
-but NOT yet run in production.**
+`0024_kingdoms.sql` is **run in production** as of 2026-09-11, so ten kingdoms
+are live.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -779,9 +797,62 @@ a profile the backfill missed, which is what `09_combat.sql`'s crownless-deck
 assertion now leans on (it empties `kingdoms` alongside the write, because
 since 0024 that list is where the truth lives).
 
-**Still to do: the client half** -- My Kingdom becomes a list of up to ten
-renameable kingdoms with unit-token icons, and a "change kingdom" affordance in
-a corner of every pre-battle screen.
+#### DONE (client half): kingdoms
+
+`Kingdoms.tsx` (My Kingdom), `KingdomSwitch.tsx` (the pre-battle chip) and
+`lib/kingdoms.ts` (the client mirror of 0024's rules). Lobby's team page is now
+one line; `Match` takes `onProfile` so the switch works in a waiting room.
+
+**THE ONE RULE THAT DECIDES THE WHOLE SCREEN.** A kingdom becomes the one you
+field the moment it IS a kingdom -- five cards and exactly one crown -- whether
+that is because you just finished it or because you opened one that already
+was. An INCOMPLETE one never displaces a finished one. That is the old "a team
+saves itself the moment it is a team" carried up to ten.
+
+The two alternatives were both worse. *Opening a kingdom fields it, full stop*
+means wandering into a half-built one silently swaps your army for the default
+five -- the exact failure 0024's relaxed-editor/strict-match split exists to
+avoid. *A separate "use this one" button* asks a question nobody has: of course
+the kingdom you just finished is the one you want. The cost of the rule chosen
+is that opening a finished kingdom to look at it does field it, which is why
+what you are fielding is written under the grid, on every chip, on the menu
+tile, and in the corner of every pre-battle screen.
+
+Other decisions worth not re-litigating:
+
+- **Still no save button.** Everything -- a card, a rename, a mark -- is pushed
+  after a 450ms pause, which is also what makes a burst of taps one write.
+- **The select waits for the save.** `select_kingdom` on an id the server has
+  never seen does not fail; the trigger REPOINTS the selection at the first
+  kingdom. So a select that overtakes its own save leaves somebody fielding a
+  different army from the one they just built, silently. There is a browser
+  assertion for this and it is the one that survived the first mutant.
+- **A blank kingdom is never written.** Tapping "new" and wandering off leaves
+  nothing behind; the row appears locally because it is what you are looking
+  at, and goes up the moment it has a name or a card.
+- **The mark** follows the first card in until somebody picks one on purpose,
+  and stops being the mark if its card leaves. Chosen from the cards IN the
+  kingdom, which is the only list that means anything before anything is
+  picked.
+- **The switch is absent with one kingdom.** A switch with one position is not
+  a switch. It is on ranked, practice, friends and the friends WAITING ROOM --
+  `join_match` builds both armies out of `deck_of()`, so an empty room is the
+  last instant this can matter -- and on nothing else.
+- **`unreadyText()` writes its four `t()` calls out in full** rather than
+  building `'kingdom.' + why`. A constructed key is invisible to the check that
+  every key the code asks for exists, and this project has already shipped one
+  of those (`settings.themeSystem`).
+
+Measured with **121 browser assertions** (`_to_delete/h/kingharness.tsx` +
+`kcheck.cjs`, 102; `lobbyharness.tsx` + `lcheck.cjs`, 19) over the shelf, the
+save/field call sequences, the mark, deleting, the switch, Spanish, four widths
+and WCAG contrast in both themes. Almost all of it is NEW surface, so "run it
+against the old code first" does not apply -- **nine mutants** were used
+instead, and each one is named by the assertion that caught it: fielding
+without checking readiness, saving a blank, no debounce, a select that does not
+wait for its save, an eleventh kingdom, a quieter note (contrast), a mark that
+ignores a deliberate choice, a switch that shows for one kingdom, and a menu
+tile that names an unfieldable kingdom.
 
 #### Still to do in Phase D
 
@@ -791,9 +862,6 @@ a corner of every pre-battle screen.
   opening; the admin card editor; the ladder's tournaments column and avatars.
 - A **full / quick / off setting for the cinematic**, which now has a place to
   live.
-- **Kingdoms**: up to 10 saved decks, renameable, each with a unit-token icon.
-  Selected kingdom is used in every mode. A "change kingdom" affordance in a
-  corner of every pre-battle screen.
 - Hover card: all info **outside** the art (above and below), so hovered cards
   are no longer square.
 - Clicked unit → zoomed card **locks to the left** so you can read it without
@@ -960,10 +1028,11 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. Phase D's settings/dark-mode and Spanish slices are live, and
-the kingdoms **server** half is built and tested. The next piece of work is the
-kingdoms **client** half, then the card/tooltip polish, the card editor, and
-the cinematic's full/quick/off setting.
+Nothing is open. Phase D's settings/dark-mode, Spanish and kingdoms slices are
+all built; 0024 is run in production and the kingdoms client is committed. The
+next piece of work is the card and tooltip polish, then the admin card editor,
+the ladder's tournaments column and avatars, and the cinematic's
+full/quick/off setting.
 
 One thing is waiting on Jared rather than on code: the site has to be
 **deployed** for any of the Phase C client to be visible. `./deploy.sh` from an

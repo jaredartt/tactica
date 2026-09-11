@@ -86,7 +86,10 @@ export default function App() {
   if (matchId)
     return (
       <>
-        <Match matchId={matchId} profile={profile} onLeave={leave} onGoTo={goTo} />
+        <Match
+          matchId={matchId} profile={profile} onProfile={patchProfile}
+          onLeave={leave} onGoTo={goTo}
+        />
         {wipe}
       </>
     )

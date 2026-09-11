@@ -17,12 +17,14 @@ import {
 } from '../lib/types'
 import { flipFor } from '../lib/rules'
 import { abilityText, useT } from '../lib/i18n'
+import { KingdomSwitch } from './KingdomSwitch'
 import { useCardsBySlug } from '../lib/useCards'
 import { playLose, playTurn, playWin } from '../lib/sfx'
 
-export function Match({ matchId, profile, onLeave, onGoTo }: {
+export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
   matchId: string
   profile: Profile
+  onProfile: (patch: Partial<Profile>) => void
   onLeave: () => void
   onGoTo: (id: string) => void
 }) {
@@ -372,6 +374,10 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
               <button className="btn" onClick={() => navigator.clipboard?.writeText(match.code)}>
                 {t('match.copyCodeBtn')}
               </button>
+              {/* The last moment this can matter. join_match builds both
+                  armies out of deck_of(), so the room is the final pre-battle
+                  screen -- and the only one that is not in the menu. */}
+              {mySide !== null && <KingdomSwitch profile={profile} onProfile={onProfile} />}
             </div>
           ) : (
             <>

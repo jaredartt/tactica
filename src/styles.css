@@ -1795,6 +1795,155 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .challenge { animation: none; } }
 
+/* ---------- My Kingdom: ten of them ----------------------------------------
+
+   A shelf of chips above the roster grid. Upright and rounded while everything
+   below them leans, which is the whole point: the cards are the art and the
+   chips are the chrome, and one glance should tell you which is which.
+
+   Three states, and they are three different questions. IS-OPEN is "this is
+   the one you are editing" and is marked by weight and by the ring. IS-FIELDED
+   is "this is the one that walks onto the board" and is marked in the side
+   colour, because on this board blue already means yours. They are usually the
+   same chip and the page is better for saying both anyway -- the one time they
+   differ is the one time it matters.
+   ------------------------------------------------------------------------- */
+.kingwrap { display: flex; flex-direction: column; gap: 14px; }
+
+.kshelf {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding-bottom: 2px;
+}
+
+.kchip {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 13px 6px 6px; border-radius: 999px;
+  border: 1.5px solid var(--line-2); background: var(--paper);
+  font: inherit; color: var(--ink); cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.kchip:hover { border-color: var(--ink); }
+.kchip-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.kchip-name {
+  font-size: 13px; font-weight: 600;
+  max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kchip-note {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.kchip.is-open {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+/* The crown, near enough: the chip that is actually going to the battle wears
+   the side colour, and wears it whether or not it is the one open. */
+.kchip.is-fielded .kchip-note { color: var(--you-ink); font-weight: 700; }
+.kchip.is-fielded { border-color: var(--you); }
+.kchip.is-open.is-fielded { box-shadow: inset 0 0 0 1px var(--you); }
+
+.kchip.is-new { border-style: dashed; color: var(--muted); }
+.kchip.is-new:hover { color: var(--ink); }
+.kchip-plus {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--paper-2); font-size: 19px; line-height: 1;
+}
+
+/* ---- the open kingdom's own line: its name, its mark, and the way out ---- */
+.kedit {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.kname {
+  flex: 1 1 14ch; min-width: 0; max-width: 28ch;
+  font: 600 17px/1.4 var(--body); color: var(--ink);
+  background: transparent; border: 0; border-bottom: 1.5px solid var(--line-2);
+  padding: 5px 2px; border-radius: 0;
+}
+.kname:focus { outline: none; border-bottom-color: var(--you); }
+.kname::placeholder { color: var(--faint); font-weight: 400; }
+
+/* The mark is picked from the cards that are IN the kingdom, which is the only
+   list that can be offered before anything else has been chosen. */
+.kmarks { display: flex; gap: 5px; flex-wrap: wrap; }
+.kmark {
+  border: 0; padding: 2px; border-radius: 50%; background: none; cursor: pointer;
+  line-height: 0; box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow 0.15s, opacity 0.15s;
+  opacity: 0.55;
+}
+.kmark:hover { opacity: 1; }
+.kmark.is-on { opacity: 1; box-shadow: inset 0 0 0 2px var(--you); }
+.kdelete { margin-left: auto; }
+
+/* Said plainly and said last, because it is the one sentence on this page that
+   is about the NEXT screen rather than this one. */
+.fieldingnote { margin: -4px 0 0; }
+
+/* ---------- the pre-battle switch -----------------------------------------
+
+   A chip that names the army you are about to take in, and opens a list. It is
+   absent when there is only one kingdom -- see KingdomSwitch.tsx -- so it never
+   appears on an account that has never thought about this.
+   ------------------------------------------------------------------------- */
+.kswitch { position: relative; align-self: flex-end; }
+.kswitch-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 11px 5px 5px; border-radius: 999px;
+  border: 1.5px solid var(--line-2); background: var(--paper);
+  font: inherit; color: var(--ink); cursor: pointer;
+  transition: border-color 0.15s;
+}
+.kswitch-btn:hover:not(:disabled) { border-color: var(--ink); }
+.kswitch-btn:disabled { opacity: 0.5; cursor: default; }
+.kswitch-name {
+  font-size: 13px; max-width: 18ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kswitch-caret { font-size: 10px; color: var(--muted); }
+
+.kswitch-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  margin: 0; padding: 5px; list-style: none;
+  min-width: min(84vw, 270px); max-height: 56vh; overflow-y: auto;
+  background: var(--paper); border: 1.5px solid var(--line-2); border-radius: 13px;
+  box-shadow: 0 14px 34px rgba(14, 14, 20, 0.18);
+}
+.kswitch-menu button {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 9px; border: 0; border-radius: 9px; background: none;
+  font: inherit; color: var(--ink); cursor: pointer; text-align: left;
+}
+.kswitch-menu button:hover:not(:disabled) { background: var(--paper-2); }
+.kswitch-menu button:disabled { cursor: default; }
+/* Greyed, but the NAME stays readable: the row is disabled because the kingdom
+   is not ready, and a name you cannot read is a kingdom you cannot recognise
+   as the one you were half-way through building. */
+.kswitch-menu button:disabled .avatar { opacity: 0.45; }
+.kswitch-menu button.is-on .kswitch-mname { color: var(--you-ink); font-weight: 700; }
+.kswitch-mname {
+  font-size: 13px; flex: none; max-width: 14ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kswitch-mwhy {
+  font-size: 11px; color: var(--muted); margin-left: auto; text-align: right;
+}
+
+/* A destructive confirm is the one button that should not have to be aimed at
+   twice. Solid, in the colour the app already uses for damage. */
+.btn.danger {
+  background: var(--danger); border-color: var(--danger); color: #fff;
+}
+.btn.danger:hover:not(:disabled) { filter: brightness(1.06); border-color: var(--danger); }
+
+@media (max-width: 560px) {
+  .kchip { padding: 5px 11px 5px 5px; }
+  .kchip-name { max-width: 11ch; }
+  .kedit { gap: 9px; }
+  .kname { flex-basis: 100%; max-width: none; font-size: 16px; }
+  .kdelete { margin-left: auto; }
+}
+
 /* ---------- My Kingdom: the roster, edge to edge ------------------------------
 
    Art and nothing else, in the same rhomboid the menu uses, because you pick
