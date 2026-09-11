@@ -10,21 +10,21 @@ insert into auth.users (id, email, raw_user_meta_data) values
 
 -- ---- the roster reads back the way it was specified ---------------------
 select t_ok((select hp=110 and mov=2 and rmin=1 and rmax=1 and crmin=1 and crmax=2
-               and dmin=18 and dmax=26 from public.cards where slug='dione-grifo'),
+               and power=22 and dmin=17 and dmax=27 from public.cards where slug='dione-grifo'),
             'Dione & Grifo');
-select t_ok((select hp=120 and mov=1 and rmax=1 and dmin=30 and dmax=42 and tramples
+select t_ok((select hp=120 and mov=1 and rmax=1 and power=36 and dmin=31 and dmax=41 and tramples
                from public.cards where slug='wuzu'), 'Wuzu');
-select t_ok((select hp=60 and mov=3 and rmax=1 and dmin=20 and dmax=30 and sneaks
+select t_ok((select hp=60 and mov=3 and rmax=1 and power=25 and dmin=20 and dmax=30 and sneaks
                from public.cards where slug='mako'), 'Mako');
-select t_ok((select hp=70 and mov=3 and rmax=1 and dmin=15 and dmax=22 and flies
+select t_ok((select hp=70 and mov=3 and rmax=1 and power=19 and dmin=14 and dmax=24 and flies
                from public.cards where slug='lumea'), 'Lumea');
 select t_ok((select hp=70 and mov=2 and rmin=2 and rmax=2 and crmin=1 and crmax=2
-               and dmin=15 and dmax=25 and burns from public.cards where slug='dereo'), 'Dereo');
+               and power=20 and dmin=15 and dmax=25 and burns from public.cards where slug='dereo'), 'Dereo');
 select t_ok((select hp=65 and mov=2 and rmin=2 and rmax=3 and crmin=3 and crmax=3
-               and dmin=12 and dmax=20 from public.cards where slug='fey'), 'Fey');
-select t_ok((select hp=70 and mov=3 and rmin=1 and rmax=2 and dmin=5 and dmax=15 and heals
+               and power=16 and dmin=11 and dmax=21 from public.cards where slug='fey'), 'Fey');
+select t_ok((select hp=70 and mov=3 and rmin=1 and rmax=2 and power=10 and dmin=5 and dmax=15 and heals
                from public.cards where slug='eva'), 'Eva');
-select t_ok((select hp=95 and mov=1 and rmin=1 and rmax=2 and dmin=10 and dmax=20
+select t_ok((select hp=95 and mov=1 and rmin=1 and rmax=2 and power=15 and dmin=10 and dmax=20
                and heals and cures from public.cards where slug='umiro'), 'Umiro');
 
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);

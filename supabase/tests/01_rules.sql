@@ -232,11 +232,17 @@ select t_set(:'mid','h3','rmin','1'::jsonb); select t_set(:'mid','h3','rmax','1'
 select t_set(:'mid','h4','rmin','1'::jsonb); select t_set(:'mid','h4','rmax','1'::jsonb);
 select t_set(:'mid','h5','rmin','1'::jsonb); select t_set(:'mid','h5','rmax','1'::jsonb);
 
+-- g2 is Dereo, the guest's crown, and he goes LAST on purpose: since 0018 a
+-- fallen royal ends the match on its own, so felling him first would finish
+-- the game with four guests still standing and this test would no longer be
+-- about the last body on the board. The crown has its own section below.
 select public.submit_attack(:'mid','h1','g1');
-select public.submit_attack(:'mid','h2','g2');
 select public.submit_attack(:'mid','h3','g3');
 select public.submit_attack(:'mid','h4','g4');
 select public.submit_attack(:'mid','h5','g5');
+select t_ok((select status from public.matches where id=:'mid') = 'active',
+            'four down and the fifth still standing is not a win');
+select public.submit_attack(:'mid','h2','g2');
 
 select t_ok((select status from public.matches where id=:'mid') = 'finished', 'match finished');
 select t_ok((select winner from public.matches where id=:'mid') = 'host', 'host recorded as winner');

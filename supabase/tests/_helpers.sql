@@ -178,3 +178,16 @@ $$;
 -- Nothing outside this file ever sets it, so production keeps its coin.
 -- ---------------------------------------------------------------------------
 alter database t set cn.first_side = 'host';
+
+-- Parry and crit are 5% rolls (0018). Left alone, every assertion about an
+-- exchange would come apart one run in twenty, and the two rules would each
+-- go untested nineteen runs in twenty. So the test database pins both OFF and
+-- the files that care turn one on for a statement:
+--
+--   set cn.force_parry = 'always';   -- or 'never'
+--   reset cn.force_parry;
+--
+-- Same reasoning and same shape as cn.first_side above. Production sets
+-- neither, so production keeps its dice.
+alter database t set cn.force_parry = 'never';
+alter database t set cn.force_crit  = 'never';

@@ -8,6 +8,7 @@ import { Comics } from './Comics'
 import {
   BOT_LEVELS, DECK_SIZE, reachText, tierOf,
   type Card, type LadderRow, type MatchRow, type Profile,
+  unitPower,
 } from '../lib/types'
 import { artUrl } from '../lib/art'
 import { Avatar } from './Avatar'
@@ -424,7 +425,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                         </span>
                         <span className="rti-stats">
                           <span><i>HP</i><b>{c.hp}</b></span>
-                          <span><i>{c.heals ? 'PWR' : 'DMG'}</i><b>{c.dmin}–{c.dmax}</b></span>
+                          <span><i>{c.heals ? 'PWR' : 'DMG'}</i><b>{unitPower(c)}</b></span>
                           <span><i>MOV</i><b>{c.mov}</b></span>
                           <span><i>RNG</i><b>{reachText(c.rmin, c.rmax)}</b></span>
                           <span><i>CTR</i><b>{reachText(c.crmin, c.crmax)}</b></span>

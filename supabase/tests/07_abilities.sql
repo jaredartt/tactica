@@ -14,7 +14,7 @@ select t_ok((select count(*) from public.cards where is_active and role = '') = 
             'and a class beside the name');
 
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['lumea','mako','umiro','wuzu','eva']);
+select public.set_deck(array['lumea','mako','umiro','wuzu','dereo']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
 select public.set_deck(array['dione-grifo','dereo','fey','eva','umiro']);
 
@@ -117,7 +117,7 @@ select t_raises(format('select public.submit_attack(%L,''h4'',''g3'')', :'m'),
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 -- ---- Lium answers first -------------------------------------------------
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['lium','himanta','mako','wuzu','eva']);
+select public.set_deck(array['lium','himanta','mako','wuzu','dereo']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
 select public.set_deck(array['dione-grifo','dereo','eva','fey','umiro']);
 select t_match('22220000-0000-0000-0000-00000000000b',
@@ -179,7 +179,7 @@ select t_ok(t_get(:'p','h2','hp')::int < t_get(:'p','h2','maxHp')::int,
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 -- ---- Sinie mends everyone at once ---------------------------------------
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
-select public.set_deck(array['sinie','mako','wuzu','lumea','eva']);
+select public.set_deck(array['sinie','mako','wuzu','lumea','dereo']);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
 select public.set_deck(array['dione-grifo','dereo','eva','fey','umiro']);
 select t_match('11110000-0000-0000-0000-00000000000a',

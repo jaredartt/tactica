@@ -21,6 +21,18 @@ export interface Unit {
   crmax: number
   dmin: number
   dmax: number
+  /** The single number a player reads. The roll is pow +/- 5, and dmin/dmax
+   *  are derived from it server-side -- they are the dice, this is the stat.
+   *  Optional because a match that was already in flight when 0018 landed has
+   *  units in its state blob without it; use unitPower() rather than this. */
+  pow?: number
+  /** Percent chances, out of 100. 5 for almost everyone. */
+  parryPct?: number
+  critPct?: number
+  /** Catches any answer-to-a-parry aimed at it. */
+  parryAll?: boolean
+  /** Lose it and you lose the match. A kingdom holds exactly one. */
+  royal?: boolean
   burns: boolean
   heals: boolean
   /** Steps over trees and lands where they stood. */
@@ -151,6 +163,12 @@ export interface Card {
   crmax: number
   dmin: number
   dmax: number
+  /** See Unit.pow. Null only on a card row written before 0018. */
+  power: number | null
+  parry_pct: number
+  crit_pct: number
+  parry_all: boolean
+  royal: boolean
   burns: boolean
   heals: boolean
   tramples: boolean
@@ -218,3 +236,12 @@ export const BOT_LEVELS = [
 ] as const
 
 export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)
+
+/** The single number to print for a unit or a card. Falls back to the middle
+ *  of the old band, which is exactly how 0018 derived `power` in the first
+ *  place -- so a match still running from before the migration reads the same
+ *  number it would have been given. */
+export function unitPower(u: { pow?: number | null; power?: number | null; dmin: number; dmax: number }): number {
+  const p = u.pow ?? u.power
+  return p ?? Math.round((u.dmin + u.dmax) / 2)
+}

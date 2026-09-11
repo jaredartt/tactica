@@ -92,7 +92,14 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 272 assertions, all green.**
+**Current: 336 assertions, all green.** `09_combat.sql` is the Phase A file.
+
+Parry and crit are 5% rolls, so the suite pins them the way it pins the coin
+flip: `cn.force_parry` and `cn.force_crit` are set to `'never'` on the test
+database in `_helpers.sql`, and a section that wants one turns it on with
+`set cn.force_parry = 'always'` and resets it after. A unit at 0% or 100% is
+not rolling at all, so the hatch does not reach it -- that is how one test
+stands a non-parrying unit up in a forced-parry board.
 
 ### The one rule that matters most
 
@@ -157,8 +164,10 @@ It contains:
 
 ### Migrations
 
-`0001`–`0016` are applied in production. **`0017_first_move_coin.sql` has NOT
-been run yet** — Jared must paste it into the Supabase SQL editor.
+`0001`–`0016` are applied in production. **`0017_first_move_coin.sql` and
+`0018_combat_core.sql` have NOT been run yet** — Jared must paste each into the
+Supabase SQL editor, `0017` first. Both print a row of checks; every column
+must say true.
 
 `0017` makes who moves first a coin flip in **every** mode (was: host always
 first; `0012` only randomised the ranked *seat*). It is spliced from `0008`
@@ -186,7 +195,7 @@ pinned per-database in `_helpers.sql`. Measured fair: 149/300.
 
 - Braided girl in white → **Dorme**
 - Crowned figure (pink line art) → **King Stelaris**
-- Black-and-white flame character → **the placeholder** (for Mage B/C/D/E, Flying A, etc.)
+- Black-and-white flame character → **the placeholder** (for Velmor, Sarrave, Thalgrim, Nyxara, Zephyra, etc.)
 - Effect icons: blue shield = **Defend**, gold sparkles = **Stunned**, purple spiral = **Poisoned**, red = **Burned**
 
 ---
@@ -195,24 +204,45 @@ pinned per-database in `_helpers.sql`. Measured fair: 149/300.
 
 Jared's spec. Phased in the agreed order. **Nothing below is started.**
 
-### Phase A — combat core (SQL)
+### Phase A — combat core (SQL) — **DONE, in `0018_combat_core.sql`**
 
-- Counter **always** happens when attacked *and the defender can reach back*.
-  Counter deals **50%** of the counter-attacker's damage.
-- **5% parry chance** on any attack: blocks it completely, then counters for 50%
-  if in reach. Parries can chain (a parry of a parry of a parry…) — **needs a
-  recursion cap**; propose ~8 exchanges so it always terminates.
-- **5% crit** on attacks, counters, and post-parry counters: +50% damage.
-- Passives cannot be parried. Only attacks and abilities can.
-- Damage is now a **single number ±5** (a 50-power unit rolls 45–55). Display
-  the single number, not the range.
-- Heals never crit, never get parried, never draw a counter.
-- **Damage order needs confirming with Jared** — proposed: base roll → ×1.5 crit
-  → ×0.5 counter → ×(1 + attacker bonuses) → ×(1 − defender resists) → ×0.5 if
-  defending → round.
-- **Losing your king/queen loses the game.**
-- Every kingdom must contain a royal or it cannot be saved. **Open question:
-  exactly one royal, or at least one?**
+Built, tested (`09_combat.sql`), and waiting to be pasted into the Supabase SQL
+editor. Not yet run in production. What it does:
+
+- Counter **always** happens when attacked and the defender can reach back,
+  for **50%** of the counter-attacker's roll. Halving it is what let it become
+  automatic: trading blows is now the normal shape of a fight rather than a
+  punishment for attacking into reach.
+- **5% parry** on any attack: blocks it completely, then answers for 50% if the
+  parrier can reach what it caught. Parries chain, **capped at 8 swings**
+  (`cn_parry_cap()`), which is the only thing that can reach the cap.
+- **5% crit**, +50%, on attacks, counters, and post-parry counters.
+- Passives cannot be parried. Lium's answer-first is a passive and lands
+  through a parry for that reason.
+- Damage is a **single number ±5**: `cards.power` is the stat, `dmin`/`dmax`
+  are derived from it and are now just the dice. The client prints the single
+  number via `unitPower()`, which falls back to the middle of the old band for
+  a match that was already in flight when this landed.
+- Heals never crit, are never parried, never draw a counter.
+- **Damage order**, confirmed by Jared and implemented once in `cn_damage()`:
+  base roll → ×1.5 crit → ×0.5 counter → ×(1 + attacker bonuses) →
+  ×(1 − defender resists) → ×0.5 if defending → round. Bonuses multiply before
+  resists so a 20% bonus and a 20% resist do not cancel exactly. `p_bonus`,
+  `p_resist` and `p_defending` are the hooks Phase B and the royal passives
+  hang on — nothing passes anything but zero yet.
+- **Losing your royal loses the match**, with four of your units still
+  standing if that is how it falls.
+- **Exactly one royal per kingdom** (Jared's answer), enforced in `set_deck`,
+  and `deck_of` falls back to the default for a deck saved before the rule
+  existed. `random_deck()` draws the bot's five under the same rule.
+
+Left for the roster rework, and deliberately: **Dereo is the only royal on the
+board**, so "exactly one" is a forced pick today. Queen Miah and King Stelaris
+need art before they can be added, and the rule had to exist first or every
+deck saved in the meantime would be illegal the day they land. Lium keeps his
+old answer-first passive *and* gains the doubled rates and parries-all-parries
+the spec gives him; the roster rework should split those apart and move
+answer-first to Dorme, where it belongs.
 
 ### Phase B — turn and board
 
@@ -312,14 +342,14 @@ the word immediately before it is the purple keyword.
 | Fey | Mage | 85 | 15 | 2 | 3 | **A:** Cursed Wall — Summons an underworld wall with 20 HP. Can resummon if destroyed. |
 | Umiro | Mage | 75 | 25 | 1 | 2 | **P:** Swamp Bringer — Nearby units cannot use Passives or Abilities. |
 | Sinie | Mage | 65 | 30 | 2 | 3 | **A:** Healing Petals — Heals 30 HP to a target. |
-| Mage A | Mage | 70 | 20 | 2 | 2 | **A:** Fireball — Burns 2 tiles in a line and deals them 15 damage. |
-| Mage B | Mage | 70 | 35 | 2 | 2 | **A:** Cursed Blade — Poisons the target and deals 10 damage. |
-| Mage C | Mage | 80 | 15 | 1 | 1 | **P:** At the start of their turn, poisons all adjacent tiles. |
-| Mage D | Mage | 80 | 15 | 1 | 1 | **P:** Deals an extra 25 damage if the target is poisoned. |
-| Mage E | Mage | 65 | 15 | 2 | 2 | **P:** Cursed Body — Heals for 100% of damage dealt. |
+| Ashvar | Mage | 70 | 20 | 2 | 2 | **A:** Fireball — Burns 2 tiles in a line and deals them 15 damage. |
+| Velmor | Mage | 70 | 35 | 2 | 2 | **A:** Cursed Blade — Poisons the target and deals 10 damage. |
+| Sarrave | Mage | 80 | 15 | 1 | 1 | **P:** At the start of their turn, poisons all adjacent tiles. |
+| Thalgrim | Mage | 80 | 15 | 1 | 1 | **P:** Deals an extra 25 damage if the target is poisoned. |
+| Nyxara | Mage | 65 | 15 | 2 | 2 | **P:** Cursed Body — Heals for 100% of damage dealt. |
 | Wuzu | Flying | 85 | 25 | 3 | 2 | **P:** Regenerative Body — Heals slightly (5%) every turn. |
 | Lumea | Flying | 75 | 20 | 4 | 2 | **A:** Gale Summoner — Creates a tornado. If stepped on, choose where to throw them (15s limit). |
-| Flying A | Flying | 65 | 20 | 4 | 1 | **P:** Cyclone — Stuns the target on hit. |
+| Zephyra | Flying | 65 | 20 | 4 | 1 | **P:** Cyclone — Stuns the target on hit. |
 
 ### Spanish ability text
 
@@ -337,14 +367,14 @@ the word immediately before it is the purple keyword.
 | Fey | Muro Maldito — Invoca un muro con 20 PV. Puede volver a invocarlo si es destruido. |
 | Umiro | Portador del Pantano — Las unidades cercanas no pueden usar Pasivas ni Habilidades. |
 | Sinie | Pétalos Curativos — Cura 30 PV a un objetivo. |
-| Mage A | Bola de Fuego — Quema 2 casillas en línea y les inflige 15 de daño. |
-| Mage B | Espada Maldita — Envenena al objetivo e inflige 10 de daño. |
-| Mage C | Al inicio de su turno, envenena todas las casillas adyacentes. |
-| Mage D | Inflige 25 de daño adicional si el objetivo está envenenado. |
-| Mage E | Cuerpo Maldito — Se cura el 100% del daño infligido. |
+| Ashvar | Bola de Fuego — Quema 2 casillas en línea y les inflige 15 de daño. |
+| Velmor | Espada Maldita — Envenena al objetivo e inflige 10 de daño. |
+| Sarrave | Al inicio de su turno, envenena todas las casillas adyacentes. |
+| Thalgrim | Inflige 25 de daño adicional si el objetivo está envenenado. |
+| Nyxara | Cuerpo Maldito — Se cura el 100% del daño infligido. |
 | Wuzu | Cuerpo Regenerativo — Se cura levemente (5%) cada turno. |
 | Lumea | Invocador de Vendavales — Crea un tornado. Si una unidad entra, elige a dónde lanzarlo (límite 15s). |
-| Flying A | Ciclón — Aturde al objetivo al golpearlo. |
+| Zephyra | Ciclón — Aturde al objetivo al golpearlo. |
 
 ### Rules notes attached to the roster
 
@@ -355,8 +385,8 @@ the word immediately before it is the purple keyword.
 - **Summons** (tornado, wall, trap) are placed within the summoner's Range.
 - **Lumea's tornado**: only when an *opponent* unit steps in does Lumea's
   controller get 15 seconds to choose where to throw it.
-- Unnamed units (Mage A–E, Flying A) use the placeholder art. **Ask Jared
-  whether he wants real names invented or the letters kept.**
+- The six units that had no name (Mage A–E, Flying A) are now Ashvar, Velmor,
+  Sarrave, Thalgrim, Nyxara and Zephyra. They still use the placeholder art.
 
 ---
 
@@ -407,8 +437,11 @@ So:
 
 ## 8. Still open — ask Jared
 
-1. Damage multiplication order (proposal in Phase A).
-2. Parry-chain recursion cap (proposal: 8 exchanges).
-3. Exactly one royal per kingdom, or at least one?
-4. Real names for Mage A–E and Flying A, or keep the letters?
-5. Forest battlefield background — still wanted, just never attached.
+1. ~~Damage multiplication order.~~ Confirmed: the proposal in Phase A, built.
+2. ~~Parry-chain recursion cap.~~ Confirmed: 8, `cn_parry_cap()`.
+3. ~~Exactly one royal per kingdom, or at least one?~~ **Exactly one.** Built.
+4. ~~Real names for Mage A–E and Flying A?~~ Invented: Ashvar, Velmor, Sarrave,
+   Thalgrim, Nyxara, Zephyra. The roster in section 6 uses them.
+5. ~~Forest battlefield background.~~ Dropped — not wanted for now.
+
+Nothing is open. The next thing to ask about is Phase B.

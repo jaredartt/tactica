@@ -11,6 +11,7 @@ import {
 import {
   DEPLOY_SECONDS, TURN_SECONDS, reachText,
   type MatchState, type Profile, type Side, type Unit,
+  unitPower,
 } from '../lib/types'
 import { playLose, playTurn, playWin } from '../lib/sfx'
 
@@ -343,7 +344,7 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                   <span className="unitbar-name">{selectedUnit.name}</span>
                   <span className="unitbar-stats">
                     <b>{selectedUnit.hp}</b>/{selectedUnit.maxHp} HP
-                    <i /><b>{selectedUnit.dmin}–{selectedUnit.dmax}</b>{' '}
+                    <i /><b>{unitPower(selectedUnit)}</b>{' '}
                     {selectedUnit.heals ? 'PWR' : 'DMG'}
                     <i /><b>{selectedUnit.mov}</b> MOV
                     <i /><b>{reachText(selectedUnit.rmin, selectedUnit.rmax)}</b> RNG

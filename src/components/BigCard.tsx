@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { Obstacle, Unit } from '../lib/types'
-import { reachText } from '../lib/types'
+import { reachText, unitPower } from '../lib/types'
 import { artUrl } from '../lib/art'
 
 /** Which edge of the board the card opens against. Yours on the left, theirs
@@ -69,7 +69,7 @@ export function UnitBigCard({ unit, side }: { unit: Unit; side: CardSide }) {
 
       <div className="bc-bottom">
         <div className="bc-stats">
-          <span><em>{unit.heals ? 'PWR' : 'DMG'}</em><b>{unit.dmin}–{unit.dmax}</b></span>
+          <span><em>{unit.heals ? 'PWR' : 'DMG'}</em><b>{unitPower(unit)}</b></span>
           <span><em>MOV</em><b>{unit.mov}</b></span>
           <span><em>RNG</em><b>{reachText(unit.rmin, unit.rmax)}</b></span>
           {unit.burned && <span className="bc-burn"><b>BURNING</b></span>}
