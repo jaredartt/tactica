@@ -92,7 +92,12 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 336 assertions, all green.** `09_combat.sql` is the Phase A file.
+**Current: 373 assertions, all green.** `09_combat.sql` is the Phase A file;
+`10_board.sql` is Phase B's. Run the whole thing with `./supabase/tests/run.sh`
+-- which now works: it was creating no database while `_helpers.sql` pinned its
+GUCs with `alter database t`, and every psql in it sent stderr to /dev/null, so
+the run died silently. It also globbed `0[1-9]*`, which would have skipped
+`10_board.sql` without a word. Both fixed, and it now exits non-zero on failure.
 
 Parry and crit are 5% rolls, so the suite pins them the way it pins the coin
 flip: `cn.force_parry` and `cn.force_crit` are set to `'never'` on the test
@@ -131,7 +136,22 @@ both versions proves nothing.
 Profile icons + settings panel, UI sounds, reduce-motion, battle sound effects
 (11 synthesised sounds — WebAudio, no files), plus everything before that.
 
-### Committed locally but NOT pushed
+### Pushed and live
+
+`afc4f7f`, `c93311a`, `595b32d`, `4c80f8f` are on `origin/main`. The quick fixes
+below are in them.
+
+**Still not deployed.** `./deploy.sh` force-pushes `gh-pages`, and no session has
+been able to reach GitHub to do it: the device sandbox gets a proxy 403 on
+CONNECT, and the cloud container is refused by its git proxy with
+`jaredartt/tactica is not in this session's authorized repository set`. That is a
+policy denial, not a credentials problem -- it lands identically with a personal
+access token and with none, because the repo is rejected before any credential is
+read. Two tokens were pasted into chat trying to solve it and neither could; both
+should be treated as burned and rotated. The fix is to add the repo to the
+session's sources, or to run `./deploy.sh` from an ordinary terminal.
+
+### What those four commits contain
 
 **`afc4f7f` — "Quick fixes: the blank rematch page, a top bar that stays, and
 the roster"**
@@ -164,14 +184,13 @@ It contains:
 
 ### Migrations
 
-`0001`–`0016` and **`0018_combat_core.sql`** are applied in production —
-Jared ran `0018` on 2026-09-11.
+`0001`–`0018` are applied in production. Jared ran `0017` and `0018` on
+2026-09-11, so the coin flip below is live and the host no longer always opens.
 
-**`0017_first_move_coin.sql` is still unconfirmed.** It was never reported as
-run, and `0018` does not depend on it (`0018` never touches `cn_set_ready`), so
-running them out of order changed nothing — but until `0017` is in, the host
-still moves first in every mode. Check `cn_set_ready` in the SQL editor before
-assuming either way.
+**`0019_board_and_actions.sql` is built and tested but NOT yet run in
+production.** It is Phase B's first half -- see the Phase B section.
+
+`0017` is confirmed run, so who opens is now a coin flip in every mode.
 
 `0017` makes who moves first a coin flip in **every** mode (was: host always
 first; `0012` only randomised the ranked *seat*). It is spliced from `0008`
@@ -250,21 +269,55 @@ answer-first to Dorme, where it belongs.
 
 ### Phase B — turn and board
 
-- 2 unit-actions per turn. Exception: the very first player's very first turn is
-  1 unit only.
-- "End turn" available at any time.
-- Board → **8 tall × 6 wide** (currently 6×6, set in `cn_fresh_map`, `v_w`/`v_h`).
-- **4 trees per side** (currently 3). No trees in the board corners, none in the
-  row nearest each player's edge.
-- **Back to top/bottom sides, chess.com style** — board flips per player. You
-  are always at the bottom, yours always blue, theirs always red at the top.
-  (This reverts the left/right change from `0011_sides.sql`.)
+**The server half is DONE, in `0019_board_and_actions.sql`.** Built and tested
+(`10_board.sql`, 35 assertions), waiting to be pasted into the Supabase SQL
+editor. Not yet run in production. The client half is untouched.
+
+Done in `0019`:
+
+- **A turn is two activations.** One activation is one unit's whole go — move,
+  then strike, or either alone — and each unit gets at most one per turn, so a
+  turn is two *different* units doing something real. Jared's answers: move +
+  strike is ONE go, and a unit cannot go twice. The opening player's first turn
+  is one activation, not two.
+- `cn_begin_act` is the only place the budget is charged, so `cn_move`,
+  `cn_attack` and `cn_defend` cannot disagree about what a go costs. State
+  carries `acts` (spent this turn) and `active` (the unit mid-go); units carry
+  `spent`. Matches already in flight read all three through `coalesce`.
+- **Defend**: `submit_defend` raises a guard that halves incoming damage until
+  that unit's own next turn — so it is still up while the opponent swings, which
+  is the only time it could matter. It costs an activation and ends it. This is
+  the first thing to pass `cn_damage`'s `p_defending` anything but false; the
+  hook has been sitting there unused since 0018.
+- **Wait**: `submit_wait` closes an activation for a unit that moved and does
+  not want to strike. Without it a go stays open and the menu has no Cancel.
+- "End turn" already worked at any time and still does.
+- Board → **8 tall × 6 wide**. The halves are rows again: host holds 0–3, guest
+  4–7. Nothing is rotated in the database — the CLIENT flips per player, which
+  is the part still to build. `cn_own_side` was dropped and recreated rather
+  than replaced, because its parameters now mean y and h (the same reason 0011
+  dropped `cn_own_half`).
+- **4 trees per side**, none on either home row — which subsumes the
+  no-corners rule, since every corner sits in a home row. `10_board.sql` rolls
+  the generator a hundred times rather than once, because the placement is
+  random and a rule that holds for one layout and not the next is the bug worth
+  catching.
+- **The bot plays by it.** It always *was* bound — it calls the same `cn_*`
+  functions and they refused it — but `bot_step` kept proposing a third action
+  until the server raised, which is how 06 and 07 found this. It now skips spent
+  units and, once the budget is gone, considers only the unit already mid-go.
+
+Still to build, all client:
+
 - Fire Emblem action menu on clicking a unit: Move / Attack / Ability / Defend /
-  Cancel.
-- **Defend**: halves incoming damage, costs one of your two actions.
+  Cancel. The server calls behind it all exist now.
+- **The board flip.** You are always at the bottom, yours blue, theirs red at
+  the top. Server coordinates do not change; only the drawing does.
 - Movement arrow from unit to hovered tile, Fire Emblem style.
 - **Duelyst-style opponent presence**: show which tile the opponent is hovering,
   and their targeting highlights while they aim. Hidden for Rogue secret actions.
+- The client must also show the budget — two pips, or something like them.
+  Nothing on screen currently says how many goes you have left.
 
 ### Phase C — the battle cinematic
 
@@ -448,4 +501,9 @@ So:
    Thalgrim, Nyxara, Zephyra. The roster in section 6 uses them.
 5. ~~Forest battlefield background.~~ Dropped — not wanted for now.
 
-Nothing is open. The next thing to ask about is Phase B.
+6. ~~What counts as one of the two unit-actions, and can one unit spend both?~~
+   **A whole activation — move + strike is one.** And **no**: two different
+   units. Both built in `0019`.
+
+Nothing is open. The next thing is Phase B's client half — the action menu, the
+per-player board flip, and somewhere on screen to show the two goes.

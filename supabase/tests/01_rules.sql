@@ -37,19 +37,27 @@ select t_ok((select jsonb_array_length(state->'units') from public.matches where
             'no armies until someone joins');
 select t_ok((select (state->'board'->>'w')::int from public.matches where id=:'mid') = 6,
             'the board is 6 wide');
+select t_ok((select (state->'board'->>'h')::int from public.matches where id=:'mid') = 8,
+            'the board is 8 tall');
 
 -- ---- the map ------------------------------------------------------------
-select t_ok((select jsonb_array_length(state->'obstacles') from public.matches where id=:'mid') = 6,
-            'six trees, three a side');
+select t_ok((select jsonb_array_length(state->'obstacles') from public.matches where id=:'mid') = 8,
+            'eight trees, four a side');
 select t_ok((select count(*) = 0 from public.matches m, jsonb_array_elements(m.state->'obstacles') o
               where m.id=:'mid'
-                and ((o->>'x')::int in (0,5)) and ((o->>'y')::int in (0,5))),
+                and ((o->>'x')::int in (0,5)) and ((o->>'y')::int in (0,7))),
             'no tree in a corner');
-select t_ok((select count(*) filter (where (o->>'x')::int < 3) = 3
-               and count(*) filter (where (o->>'x')::int >= 3) = 3
+-- The halves are rows since 0019, so the home rows are 0 and 7. Nothing may
+-- stand in either: that is where the armies deploy, and a tree there costs
+-- somebody a starting square.
+select t_ok((select count(*) = 0 from public.matches m, jsonb_array_elements(m.state->'obstacles') o
+              where m.id=:'mid' and (o->>'y')::int in (0, 7)),
+            'no tree on either home row');
+select t_ok((select count(*) filter (where (o->>'y')::int < 4) = 4
+               and count(*) filter (where (o->>'y')::int >= 4) = 4
                from public.matches m, jsonb_array_elements(m.state->'obstacles') o
               where m.id=:'mid'),
-            'three trees on each half');
+            'four trees on each half');
 select t_ok((select bool_and(public.cn_cheb((a.a->>'x')::int,(a.a->>'y')::int,
                                             (b.b->>'x')::int,(b.b->>'y')::int) >= 2)
                from public.matches m,
@@ -76,11 +84,11 @@ select t_ok((select jsonb_array_length(state->'units') from public.matches where
 select t_ok(t_dcount(:'mid','host') = 5 and t_dcount(:'mid','guest') = 5,
             'both armies exist, one private row each');
 select t_ok((select count(*) = 5 from public.match_deploy d, jsonb_array_elements(d.units) u
-              where d.match_id=:'mid' and d.side='host' and (u->>'x')::int < 3),
-            'the host army starts on the left');
+              where d.match_id=:'mid' and d.side='host' and (u->>'y')::int < 4),
+            'the host army starts at the bottom');
 select t_ok((select count(*) = 5 from public.match_deploy d, jsonb_array_elements(d.units) u
-              where d.match_id=:'mid' and d.side='guest' and (u->>'x')::int >= 3),
-            'the guest army starts on the right');
+              where d.match_id=:'mid' and d.side='guest' and (u->>'y')::int >= 4),
+            'the guest army starts at the top');
 select t_ok(t_dget(:'mid','guest','g1','name') = 'Wuzu', 'the guest fields the deck they chose');
 select t_ok(t_dget(:'mid','host','h2','name') = 'Dereo', 'the host fields the deck they chose');
 select t_ok((select count(*) = 0 from public.match_deploy d,
@@ -93,33 +101,34 @@ select t_ok((select count(*) = 0 from public.match_deploy d,
 select t_raises(format('select public.submit_move(%L,''g1'',1,1)', :'mid'),
                 'not running', 'no moving until deployment ends');
 
--- x=2 is the host's column now, whatever the row
-select t_raises(format('select public.deploy_unit(%L,''g1'',2,4)', :'mid'),
+-- y=2 is the host's ground now, whatever the column
+select t_raises(format('select public.deploy_unit(%L,''g1'',4,2)', :'mid'),
                 'not your half', 'you cannot deploy into the opponent half');
-select t_raises(format('select public.deploy_unit(%L,''h1'',5,1)', :'mid'),
+select t_raises(format('select public.deploy_unit(%L,''h1'',1,5)', :'mid'),
                 'not your unit', 'you cannot deploy the opponent army');
 select t_raises(format('select public.deploy_unit(%L,''g1'',9,9)', :'mid'),
                 'off the board', 'deployment stays on the board');
 
--- Park the guest's five in a known column so the squares used below are
--- free whatever the opening formation happens to be.
+-- Park the guest's five along a known row so the squares used below are
+-- free whatever the opening formation happens to be. The guest holds rows
+-- 4-7 since 0019, so row 7 is their back rank and row 4 their near one.
 select t_trees(:'mid', '[]'::jsonb);
-select t_dplace(:'mid','guest','g1',5,0), t_dplace(:'mid','guest','g2',5,1),
-       t_dplace(:'mid','guest','g3',5,4), t_dplace(:'mid','guest','g4',5,5),
-       t_dplace(:'mid','guest','g5',4,5);
-select t_ok(public.deploy_unit(:'mid','g1',3,5) is not null,
-            'the near column of your own side is yours too');
-select public.deploy_unit(:'mid', 'g1', 3, 2);
-select t_ok(t_dget(:'mid','guest','g1','x') = '3' and t_dget(:'mid','guest','g1','y') = '2',
+select t_dplace(:'mid','guest','g1',0,7), t_dplace(:'mid','guest','g2',1,7),
+       t_dplace(:'mid','guest','g3',4,7), t_dplace(:'mid','guest','g4',5,7),
+       t_dplace(:'mid','guest','g5',5,6);
+select t_ok(public.deploy_unit(:'mid','g1',3,4) is not null,
+            'the near row of your own side is yours too');
+select public.deploy_unit(:'mid', 'g1', 3, 5);
+select t_ok(t_dget(:'mid','guest','g1','x') = '3' and t_dget(:'mid','guest','g1','y') = '5',
             'unit deployed');
 
-select t_dplace(:'mid', 'guest', 'g2', 4, 2);
-select public.deploy_unit(:'mid', 'g1', 4, 2);
+select t_dplace(:'mid', 'guest', 'g2', 4, 5);
+select public.deploy_unit(:'mid', 'g1', 4, 5);
 select t_ok(t_dget(:'mid','guest','g1','x') = '4' and t_dget(:'mid','guest','g2','x') = '3',
             'dropping onto your own unit swaps the two');
 
-select t_trees(:'mid', '[{"id":"t1","x":4,"y":1,"hp":30,"maxHp":30}]'::jsonb);
-select t_raises(format('select public.deploy_unit(%L,''g1'',4,1)', :'mid'),
+select t_trees(:'mid', '[{"id":"t1","x":4,"y":6,"hp":30,"maxHp":30}]'::jsonb);
+select t_raises(format('select public.deploy_unit(%L,''g1'',4,6)', :'mid'),
                 'tree', 'you cannot deploy into a tree');
 
 select set_config('app.uid', '33333333-3333-3333-3333-333333333333', false);
@@ -236,10 +245,13 @@ select t_set(:'mid','h5','rmin','1'::jsonb); select t_set(:'mid','h5','rmax','1'
 -- fallen royal ends the match on its own, so felling him first would finish
 -- the game with four guests still standing and this test would no longer be
 -- about the last body on the board. The crown has its own section below.
-select public.submit_attack(:'mid','h1','g1');
-select public.submit_attack(:'mid','h3','g3');
-select public.submit_attack(:'mid','h4','g4');
-select public.submit_attack(:'mid','h5','g5');
+-- t_reset between the blows: this section is about the win condition, not
+-- about the two-activation budget (0019), and five kills is more goes than a
+-- turn now holds. The budget itself is 10_board.sql's business.
+select public.submit_attack(:'mid','h1','g1'); select t_reset(:'mid');
+select public.submit_attack(:'mid','h3','g3'); select t_reset(:'mid');
+select public.submit_attack(:'mid','h4','g4'); select t_reset(:'mid');
+select public.submit_attack(:'mid','h5','g5'); select t_reset(:'mid');
 select t_ok((select status from public.matches where id=:'mid') = 'active',
             'four down and the fifth still standing is not a win');
 select public.submit_attack(:'mid','h2','g2');

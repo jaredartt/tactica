@@ -27,18 +27,45 @@ trap cleanup EXIT
 "$PGBIN/pg_ctl" -D "$DATA" -o "-k $SOCK -p 5455 -c listen_addresses=" -l "$DATA/log" start >/dev/null
 sleep 1
 
+# _helpers.sql pins the coin flip and the parry/crit dice with `alter database
+# t`, so the tests have to run in a database actually called t. Without this
+# they ran in the default one, that statement failed, and -- because every psql
+# below used to redirect stderr to /dev/null -- the run died with no message at
+# all.
+psql -q -d postgres -v ON_ERROR_STOP=1 -o /dev/null -c "create database t;"
+export PGDATABASE=t
+
 psql -q -v ON_ERROR_STOP=1 -o /dev/null -c "create extension if not exists pgcrypto;"
-psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/tests/00_supabase_stub.sql 2>/dev/null
+psql -q -v ON_ERROR_STOP=1 -o /dev/null -f supabase/tests/00_supabase_stub.sql \
+  2>&1 | grep -Ev 'wal_level|logical' || true
 HELPERS=supabase/tests/_helpers.sql
+
+# Errors are shown, not swallowed. A migration that fails to apply makes every
+# assertion after it meaningless, so it has to be loud.
 for m in supabase/migrations/*.sql; do
-  psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$m" 2>/dev/null
+  if ! psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$m" 2>/tmp/cn_mig_err; then
+    echo "MIGRATION FAILED: $m"; sed 's/^psql:[^ ]* //' /tmp/cn_mig_err; exit 1
+  fi
 done
 
 # helpers go in after the migrations, because they lean on the real tables
-psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$HELPERS" 2>/dev/null
+if ! psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$HELPERS" 2>/tmp/cn_help_err; then
+  echo "HELPERS FAILED"; sed 's/^psql:[^ ]* //' /tmp/cn_help_err; exit 1
+fi
 
-for t in supabase/tests/0[1-9]*.sql; do
+# Numbered files in order, however many there are. The old glob was 0[1-9]*,
+# which quietly stopped at 09 -- 10_board.sql would have been skipped without a
+# word, and a skipped test file looks exactly like a passing one.
+fail=0
+for t in $(ls supabase/tests/[0-9][0-9]_*.sql | grep -v '/00_' | sort); do
   echo "--- $(basename "$t")"
-  psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 \
-    | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ERROR|---'
+  out="$(psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 | sed 's/^psql:[^ ]* //')"
+  echo "$out" | grep -E 'PASS|FAIL|ERROR' || true
+  echo "$out" | grep -qE 'FAIL|ERROR' && fail=1
 done
+
+echo
+if [ "$fail" = 0 ]
+  then echo "all green"
+  else echo "SOMETHING FAILED"; exit 1
+fi

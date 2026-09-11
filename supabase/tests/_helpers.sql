@@ -105,29 +105,45 @@ end $$;
 
 -- Clear every unit's move/attack flags without ending the turn, so one test
 -- match can play out a dozen separate exchanges.
+--
+-- Since 0019 a turn is also a budget of two activations, and "without ending
+-- the turn" has to mean that too: the flags below are per unit, but 'acts' and
+-- 'active' are per turn, and a reset that left them alone would hand the next
+-- assertion an 'no actions left this turn' instead of the rule it was written
+-- to test. Most of this suite is testing reach, or a counter, or an ability --
+-- not the budget. The budget is 10_board.sql's job, and that file never calls
+-- this.
 create or replace function t_reset(p_m uuid) returns void
 language sql as $$
-  update public.matches set state = jsonb_set(state, '{units}', (
-    select jsonb_agg(jsonb_set(jsonb_set(u, '{moved}', 'false'), '{acted}', 'false'))
-      from jsonb_array_elements(state->'units') u))
+  update public.matches set state =
+    jsonb_set(
+      jsonb_set(
+        jsonb_set(state, '{units}', (
+          select jsonb_agg(jsonb_set(jsonb_set(jsonb_set(
+                   u, '{moved}', 'false'), '{acted}', 'false'), '{spent}', 'false'))
+            from jsonb_array_elements(state->'units') u)),
+        '{acts}', '0'::jsonb),
+      '{active}', 'null'::jsonb)
    where id = p_m;
 $$;
 
 -- Park an army out of the way so a test can reason about two units alone.
--- Each side goes down its own back column: the two columns are five apart on
--- a six-wide board, which is further than anything can reach. Counting per
--- side and not across the whole list matters -- a single counter walked the
--- guests off the right-hand edge, where nothing could ever be attacked and a
--- test would silently assert about a unit standing outside the board.
+-- Each side goes along its own home row: since 0019 the halves are top and
+-- bottom, so the two rows are seven apart on an eight-tall board -- further
+-- than anything can reach, where the old back columns were five apart on a
+-- six-wide one. Counting per side and not across the whole list matters -- a
+-- single counter walked the guests off the far edge, where nothing could ever
+-- be attacked and a test would silently assert about a unit standing outside
+-- the board.
 create or replace function t_park(p_m uuid, p_ids text[]) returns void
 language plpgsql as $$
-declare hi int := 0; gi int := 0; u text; v_w int;
+declare hi int := 0; gi int := 0; u text; v_h int;
 begin
-  select (state->'board'->>'w')::int into v_w from public.matches where id = p_m;
+  select (state->'board'->>'h')::int into v_h from public.matches where id = p_m;
   foreach u in array p_ids loop
     if left(u, 1) = 'h'
-      then perform t_place(p_m, u, 0, hi);         hi := hi + 1;
-      else perform t_place(p_m, u, v_w - 1, gi);   gi := gi + 1;
+      then perform t_place(p_m, u, hi, 0);         hi := hi + 1;
+      else perform t_place(p_m, u, gi, v_h - 1);   gi := gi + 1;
     end if;
   end loop;
 end $$;
