@@ -754,6 +754,81 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 }
 .tile-deploy:hover { background: rgba(0, 196, 106, 0.24); animation: none; }
 
+/* ---------- the movement arrow --------------------------------------------
+   One piece per tile of the route, each an ordinary grid item in its own cell.
+   No pixel arithmetic anywhere, which is the point: FLIP and the board have
+   both been broken before by something measured in screen rectangles.
+   It sits above the tiles and below the pieces, and takes no clicks -- the
+   tile underneath is what you are actually pressing.
+   -------------------------------------------------------------------------- */
+.arrowpart {
+  width: 100%; height: 100%;
+  align-self: stretch; justify-self: stretch;
+  z-index: 3; pointer-events: none;
+  overflow: visible;
+  fill: var(--you);
+  stroke: var(--you);
+  stroke-width: 13;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.9));
+}
+.arrowpart polyline { fill: none; }
+.arrowpart polygon { stroke-width: 6; }
+.arrowpart circle { stroke: none; }
+
+/* ---------- the opponent's pointer ----------------------------------------
+   Duelyst's trick: you can see them thinking. Everything here is drawn in
+   THEIR colour and kept pale, because none of it is a fact about the match --
+   it is a fact about a mouse, and it must never be mistaken for a move that
+   has happened. useGhost.ts holds the rule about what never reaches it.
+   -------------------------------------------------------------------------- */
+.ghosttile, .ghostsel, .ghostaim { pointer-events: none; z-index: 2; }
+.ghosttile {
+  display: grid; place-items: center;
+  border-radius: clamp(3px, 8%, 8px);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--foe) 55%, transparent);
+}
+/* A small mark in the middle of the tile, so the outline is still legible when
+   their pointer is resting on one of their own pieces and the ring is hidden
+   behind it. */
+.ghosttile i {
+  width: 16%; aspect-ratio: 1; border-radius: 50%;
+  background: var(--foe); opacity: 0.55;
+  animation: ghostbeat 1.6s ease-in-out infinite;
+}
+@keyframes ghostbeat { 50% { opacity: 0.2; transform: scale(0.7); } }
+
+/* The unit they have picked up. Outside the piece rather than on it: the rim
+   is already saying whose it is, and a second colour on the card itself would
+   read as a state of the unit rather than a state of their attention. */
+.ghostsel {
+  z-index: 12;
+  margin: -4%;
+  border-radius: 16%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--foe) 70%, transparent);
+  animation: ghostbeat 1.6s ease-in-out infinite;
+}
+/* What they are lining up to hit. Dotted, and in their colour, so it cannot be
+   confused with your own crosshair -- which is solid when it will cost you. */
+.ghostaim {
+  z-index: 12;
+  margin: -7%;
+  border: 1.5px dotted var(--foe);
+  border-radius: 20%;
+  opacity: 0.75;
+}
+/* Where they could walk. The faintest thing on the board on purpose: it is
+   the least certain -- they have not chosen yet. */
+.tile-theirlook {
+  background: color-mix(in srgb, var(--foe) 9%, var(--tile-a));
+}
+.tile-mine.tile-theirlook {
+  background: color-mix(in srgb, var(--foe) 9%, var(--tile-mine));
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghosttile i, .ghostsel { animation: none; }
+}
 /* ---------- the action menu ----------------------------------------------
    Fire Emblem's: it opens ON the piece you clicked rather than beside the
    board, so your eye never has to leave the unit you are giving an order to.

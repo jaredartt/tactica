@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
+import type { Ghost } from '../lib/useGhost'
 import { artUrl, faceUrl } from '../lib/art'
 import {
-  canAct, deployTiles, draw, drawSign, flipFor, key, ownSide, reachable, targetsFor,
-  willCounter,
+  canAct, deployTiles, draw, drawSign, flipFor, key, ownSide, pathTo, reachable,
+  targetsFor, undraw, willCounter,
 } from '../lib/rules'
 import {
   playBurn, playChop, playCounter, playDown, playHit, playMend, playMove, playParry,
@@ -32,6 +33,12 @@ interface Props {
   /** The unit or tree the pointer is over. The card it opens is drawn beside
    *  the board, not inside it, so the board reports and Match renders. */
   onHover: (id: string | null) => void
+  /** Where the opponent is looking, and a way to tell them where you are.
+   *  Both optional: a board with neither is simply a board with no ghost on
+   *  it, which is what deployment and a finished match should be. */
+  ghost?: Ghost | null
+  onLook?: (g: { tile: { x: number; y: number } | null; unit: string | null;
+                 mode: 'menu' | 'move' | 'attack' | null }) => void
 }
 
 const watching = (side: Side | null) => side === null
@@ -64,7 +71,7 @@ type Mode = 'menu' | 'move' | 'attack'
 
 export function Board({
   state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
-  onWait, onDeploy, onHover,
+  onWait, onDeploy, onHover, ghost = null, onLook,
 }: Props) {
   const { w, h } = state.board
   const trees: Obstacle[] = state.obstacles ?? []
@@ -237,6 +244,69 @@ export function Board({
   // Which way a piece leans when it swings. Drawn direction again, for the
   // same reason the travel above is: half a turn of the board turns a lunge
   // north into a lunge south.
+  // Which tile the pointer is over, in BOARD coordinates.
+  //
+  // One handler on the board rather than one per tile, because it has to keep
+  // reporting while the pointer is over a unit or a tree as well -- those sit
+  // in the cells, on top of them, and a tile's own mouseenter never fires
+  // under them. Reading the position off the board's rect and its real tile
+  // pitch costs one getBoundingClientRect per move and gets the answer right
+  // over anything that happens to be standing there.
+  //
+  // Only ever set when the tile CHANGES, so a pointer wandering inside one
+  // square does not re-render the board sixty times a second.
+  const [overTile, setOverTile] = useState<{ x: number; y: number } | null>(null)
+  const boardRef = useRef<HTMLDivElement | null>(null)
+
+  function trackPointer(e: React.PointerEvent<HTMLDivElement>) {
+    const el = boardRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const gs = getComputedStyle(el)
+    const gapX = parseFloat(gs.columnGap) || 0
+    const gapY = parseFloat(gs.rowGap) || 0
+    const pitchX = (r.width + gapX) / w
+    const pitchY = (r.height + gapY) / h
+    const dx = Math.floor((e.clientX - r.left) / pitchX)
+    const dy = Math.floor((e.clientY - r.top) / pitchY)
+    if (dx < 0 || dy < 0 || dx >= w || dy >= h) { setOverTile(null); return }
+    // Drawn tile back to a board tile. draw() is its own inverse, which is
+    // what undraw() is saying out loud.
+    const b = undraw({ x: dx, y: dy }, w, h, flip)
+    setOverTile((prev) => (prev && prev.x === b.x && prev.y === b.y ? prev : b))
+  }
+
+  // The route the selected unit would walk to the tile under the pointer.
+  // Only while Move is the open question: an arrow drawn at any other moment
+  // is a promise about a click that would not move anything.
+  const arrow = useMemo(() => {
+    if (!selected || !showTiles || deploying || !overTile) return null
+    if (!shownTiles.has(key(overTile.x, overTile.y))) return null
+    return pathTo(state, selected, overTile.x, overTile.y)
+  }, [state, selected, showTiles, deploying, overTile, shownTiles])
+
+  // Tell the other side where we are looking. Driven off an effect rather
+  // than the pointer handler so that picking a unit or opening Attack is
+  // reported too -- those change what you are about to do without the pointer
+  // having moved at all.
+  useEffect(() => {
+    onLook?.({ tile: overTile, unit: selectedId, mode })
+  }, [overTile, selectedId, mode, onLook])
+
+  // And what to draw of theirs. The highlights are RECOMPUTED here rather than
+  // sent: the board is public, the rules are in rules.ts, and three small
+  // fields down the wire beat a list of tiles that would go stale in flight.
+  // Gated the same way ours are, so their ghost never shows a go they have
+  // already spent.
+  const theirs = useMemo(() => {
+    const gu = ghost?.unit ? state.units.find((u) => u.id === ghost.unit) : null
+    if (!gu || gu.owner === mySide) return { unit: null, tiles: new Set<string>(), aims: new Set<string>() }
+    const tiles = ghost?.mode === 'move' && !gu.moved ? reachable(state, gu) : new Set<string>()
+    const aims = ghost?.mode === 'attack' && !gu.acted
+      ? new Set(targetsFor(state, gu).keys()) : new Set<string>()
+    return { unit: gu, tiles, aims }
+  }, [ghost, state, mySide])
+
   // Where the menu hangs, in drawn coordinates. Null when there is no menu.
   const menuAt = mode === 'menu' && selected ? draw(selected, w, h, flip) : null
 
@@ -303,6 +373,9 @@ export function Board({
 
   return (
     <div
+      ref={boardRef}
+      onPointerMove={trackPointer}
+      onPointerLeave={() => setOverTile(null)}
       className={`board${blow ? ' fx-playing' : ''}${watching(mySide) ? ' is-watching' : ''}`}
       style={{ '--cols': w, '--rows': h } as React.CSSProperties}
       onClick={() => { onSelect(null); setMode(null) }}
@@ -323,6 +396,7 @@ export function Board({
               'tile',
               ownSide(halfSide, y, h) ? 'tile-mine' : 'tile-theirs',
               lit ? (deploying ? 'tile-deploy' : 'tile-move') : '',
+              theirs.tiles.has(k) ? 'tile-theirlook' : '',
             ].join(' ')}
             onClick={(e) => { e.stopPropagation(); clickTile(x, y) }}
           />
@@ -391,6 +465,41 @@ export function Board({
           />
         )
       })}
+
+      {/* Them. A pale echo of the board they are looking at: the tile under
+          their pointer, a ring round the unit they have picked up, and a mark
+          on whatever they are lining it up to hit. Nothing here is a fact about
+          the match -- it is a fact about a pointer, and it goes the moment they
+          move it. See useGhost.ts for what deliberately never reaches it. */}
+      {ghost?.tile && (
+        <div className="ghosttile" style={at(ghost.tile)} aria-hidden="true">
+          <i />
+        </div>
+      )}
+      {theirs.unit && (
+        <div className="ghostsel" style={at(theirs.unit)} aria-hidden="true" />
+      )}
+      {[...theirs.aims].map((id) => {
+        const t = state.units.find((u) => u.id === id)
+          ?? (state.obstacles ?? []).find((o) => o.id === id)
+        return t ? <div key={id} className="ghostaim" style={at(t)} aria-hidden="true" /> : null
+      })}
+
+      {/* The movement arrow. Drawn the way Fire Emblem draws it: one piece of
+          arrow per tile of the route rather than one line across the board.
+          Every piece is an ordinary grid item in its own cell, so it needs no
+          pixel arithmetic and cannot drift when the board is resized -- the
+          bug that this project has been bitten by twice.
+          Purely a picture of what clicking would do; the click itself is the
+          tile's, underneath. */}
+      {arrow && arrow.length > 1 && arrow.map((p, i) => (
+        <ArrowPart
+          key={`${p.x},${p.y}`}
+          style={at(p)}
+          from={i > 0 ? side(draw(arrow[i - 1], w, h, flip), draw(p, w, h, flip)) : null}
+          to={i < arrow.length - 1 ? side(draw(arrow[i + 1], w, h, flip), draw(p, w, h, flip)) : null}
+        />
+      ))}
 
       {/* The action menu. Anchored to the tile the unit is standing on and
           drawn over the board rather than beside it, so your eye never leaves
@@ -490,6 +599,77 @@ export function Board({
         </>
       )}
     </div>
+  )
+}
+
+type Edge = 'n' | 's' | 'e' | 'w'
+
+/** Which edge of `cell` the neighbouring tile `other` lies across. Both are
+ *  DRAWN coordinates -- the arrow is a picture, so it is built in the same
+ *  space it is looked at, and the flip has already happened by here. */
+function side(other: { x: number; y: number }, cell: { x: number; y: number }): Edge {
+  if (other.y < cell.y) return 'n'
+  if (other.y > cell.y) return 's'
+  if (other.x < cell.x) return 'w'
+  return 'e'
+}
+
+const EDGE: Record<Edge, [number, number]> = {
+  n: [50, 0], s: [50, 100], e: [100, 50], w: [0, 50],
+}
+/** Which way that edge lies from the middle of the cell. */
+const AWAY: Record<Edge, [number, number]> = {
+  n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0],
+}
+
+/**
+ * One tile's worth of arrow, in its own grid cell.
+ *
+ * `from` is the edge the route came in by and `to` the edge it leaves by;
+ * either being null is what makes this the tail or the head. Drawing it as
+ * "in-edge to middle to out-edge" means the straight piece, the corner, the
+ * tail and the shaft of the head are all the same two lines with different
+ * ends -- there is no set of sprites to keep consistent with each other.
+ *
+ * The viewBox is a square and the cells are square, so nothing here is
+ * stretched: the arrowhead is the same shape in every cell of the board.
+ */
+function ArrowPart({ style, from, to }: {
+  style: React.CSSProperties
+  from: Edge | null
+  to: Edge | null
+}) {
+  const C: [number, number] = [50, 50]
+  const pts: [number, number][] = []
+  if (from) pts.push(EDGE[from])
+  pts.push(C)
+  if (to) pts.push(EDGE[to])
+
+  // The head. It points the way the route was travelling, which is away from
+  // the edge it arrived by -- so the tip is drawn from `from`, not from `to`,
+  // and a route that ends after one step still gets one.
+  let head: string | null = null
+  if (!to && from) {
+    const [ax, ay] = AWAY[from]
+    const tx = -ax, ty = -ay                 // the direction of travel
+    const px = -ty, py = tx                  // and across it
+    const tip: [number, number] = [50 + tx * 34, 50 + ty * 34]
+    const base: [number, number] = [50 - tx * 4, 50 - ty * 4]
+    head = [tip, [base[0] + px * 21, base[1] + py * 21],
+                 [base[0] - px * 21, base[1] - py * 21]]
+      .map((q) => q.join(',')).join(' ')
+    // Stop the shaft short of the head so the two do not overlap into a blob.
+    pts[pts.length - 1] = base
+  }
+
+  return (
+    <svg className="arrowpart" style={style} viewBox="0 0 100 100" aria-hidden="true">
+      <polyline points={pts.map((q) => q.join(',')).join(' ')} />
+      {head && <polygon points={head} />}
+      {/* A route that has not left the first tile yet still needs something
+          at the start, or the arrow appears to begin in mid-air. */}
+      {!from && <circle cx="50" cy="50" r="9" />}
+    </svg>
   )
 }
 

@@ -4,6 +4,7 @@ import { Chat } from './Chat'
 import { BattleLog } from './BattleLog'
 import { TreeBigCard, UnitBigCard } from './BigCard'
 import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
+import { useGhost } from '../lib/useGhost'
 import {
   botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
   myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitDefend, submitMove,
@@ -91,6 +92,15 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
   const botTurn = Boolean(
     match?.bot != null && match.status === 'active' && state?.turn === 'guest' && !state?.winner,
   )
+
+  // Where they are looking, and a way to tell them where we are. Only while
+  // the match is genuinely running: during deployment a pointer would give the
+  // setup away a tile at a time, and a finished board has nothing to watch.
+  // A bot has no pointer, so there is nothing to join for.
+  const ghostLive = Boolean(
+    match?.status === 'active' && !state?.winner && match?.bot == null,
+  )
+  const { ghost, look } = useGhost(matchId, mySide, ghostLive)
 
   // The turn's budget. It belongs to whoever is to move -- there is only one
   // of it -- so this is as true while you are watching them spend it as while
@@ -370,6 +380,8 @@ export function Match({ matchId, profile, onLeave, onGoTo }: {
                     guard(async () => setMyUnits(await deployUnit(match.id, id, x, y)))
                   }
                   onHover={setHovered}
+                  ghost={ghost}
+                  onLook={look}
                 />
               </div>
 

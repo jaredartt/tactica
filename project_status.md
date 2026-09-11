@@ -136,12 +136,30 @@ do this alone. The arrangement that works:
 3. Measure PIXELS: element rects and the board's own tile pitch, never the grid
    styles the component wrote, because the style is the thing under test.
 
-Phase B's client was checked this way -- 66 assertions over the flip, the tints,
-the half line, the whole menu flow, the budget gates and the pips, at 320 / 390
-/ 768 / 1280 px. Every one was also run against `c74c47d`'s files first, where
-the seven geometry assertions and the entire menu suite failed. That is the only
-thing that proves they are testing anything. The harness itself lived in
-`_to_delete/` and is gone; the recipe above is what to rebuild it from.
+Phase B's client was checked this way -- 109 browser assertions over the flip,
+the tints, the half line, the whole menu flow, the budget gates, the pips, the
+movement arrow and the opponent's ghost, at 320 / 390 / 768 / 1280 px. Every one
+was also run against the previous commit's files first, where they fail. That is
+the only thing that proves they are testing anything.
+
+**Not everything needs a browser.** Two things were better checked in node, by
+bundling a test with the local esbuild (`node_modules/.bin/esbuild x.ts --bundle
+--platform=node --format=cjs`; anything that reaches `supabase.ts` needs
+`--define:import.meta.env='{...}'` or it dies on a missing env var at import):
+
+- `pathTo()` against `reachable()` over 400 random boards, 19,200 tiles: every
+  route starts on the unit, ends on the tile, steps one square at a time, and
+  stands only on tiles `reachable()` agrees with. This is the check that keeps
+  the arrow honest.
+- The ghost's throttle, on a hand-cranked clock. Worth doing: reading it back
+  is what found a real bug, where the dedupe key was stringified WITH the side
+  attached on one side of the comparison and without it on the other, so the
+  two never matched and every pointer move went down the wire. The rate limiter
+  is now `throttler()`, exported from `useGhost.ts` with its clock and its
+  timers injected, precisely so it can be tested without a browser.
+
+The harnesses lived in `_to_delete/` and are gone; the recipes above are what to
+rebuild them from.
 
 ### Security constraints (non-negotiable)
 
@@ -163,8 +181,8 @@ Profile icons + settings panel, UI sounds, reduce-motion, battle sound effects
 
 ### Pushed and live
 
-`afc4f7f`, `c93311a`, `595b32d`, `4c80f8f`, `c74c47d` are on `origin/main`.
-Jared pushed `c74c47d` (Phase B's server half) himself on 2026-09-11.
+`afc4f7f`, `c93311a`, `595b32d`, `4c80f8f`, `c74c47d`, `6e0d9b0` are on
+`origin/main`. Jared pushed the last two himself on 2026-09-11.
 
 **Pushing from a session is still blocked, and the shape of the block has
 changed.** The cloud container can now READ the repo -- `git ls-remote` and
@@ -221,8 +239,8 @@ It contains:
 `0001`–`0018` are applied in production. Jared ran `0017` and `0018` on
 2026-09-11, so the coin flip below is live and the host no longer always opens.
 
-**`0019_board_and_actions.sql` is built and tested but NOT yet run in
-production.** It is Phase B's first half -- see the Phase B section.
+`0019_board_and_actions.sql` is **run in production** as of 2026-09-11, so the
+8-tall board, the two-activation turn, Defend and Wait are all live.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -303,9 +321,9 @@ answer-first to Dorme, where it belongs.
 
 ### Phase B — turn and board
 
-**The server half is DONE, in `0019_board_and_actions.sql`.** Built and tested
-(`10_board.sql`, 35 assertions), waiting to be pasted into the Supabase SQL
-editor. Not yet run in production. The client half is untouched.
+**Phase B is DONE, both halves.** The server half is `0019_board_and_actions.sql`
+(`10_board.sql`, 35 assertions), run in production on 2026-09-11. The client
+half is `6e0d9b0` plus the arrow and the ghost below.
 
 Done in `0019`:
 
@@ -384,11 +402,35 @@ still at `0018` those two functions do not exist and the board is still 8 wide
 by 6 tall, so Defend and Wait would error and the tints would be drawn across
 the wrong axis.
 
-Still to build, all client:
+And the last two client pieces, which finish Phase B:
 
-- Movement arrow from unit to hovered tile, Fire Emblem style.
-- **Duelyst-style opponent presence**: show which tile the opponent is hovering,
-  and their targeting highlights while they aim. Hidden for Rogue secret actions.
+- **The movement arrow.** `pathTo()` in `rules.ts` is `reachable()`'s walk again
+  with a predecessor kept for each tile, so the two cannot disagree about where
+  a unit may go -- the arrow is a promise about a click and the server keeps or
+  breaks it using those rules. Breadth first, so the first route to a tile is a
+  shortest one. A flier gets the straight hop, because it is not walking.
+  It is drawn Fire Emblem's way: **one piece of arrow per tile**, each an
+  ordinary grid item in its own cell, built as "in-edge to middle to out-edge"
+  so the straight, the corner, the tail and the shaft of the head are all the
+  same two lines with different ends. No pixel arithmetic anywhere -- which is
+  deliberate, since screen-rectangle maths is what broke FLIP and the board
+  height before. It shows only while Move is the open question.
+- **The opponent's pointer**, in `useGhost.ts`. A Realtime BROADCAST channel,
+  no database, no migration. Three small fields travel -- the tile under their
+  pointer, the unit they picked up, and which menu item they are on -- and the
+  receiving client RECOMPUTES the highlights from the shared state with the
+  same `reachable()` / `targetsFor()` everything else uses. Sending tiles would
+  be more bytes and would go stale in flight.
+  Its security model is that none of it is a fact about the game: a cheater can
+  lie about where their mouse is, and the prize is that you get a wrong idea
+  about where their mouse is. **What must never reach it** is the part to keep
+  an eye on, and there are two things: it does not run during **deployment**
+  (the half-boards are deliberately unreadable to each other, and a pointer
+  would give a setup away one square at a time), and when Mist lands a Rogue
+  aiming from inside it must go quiet -- `mute` is the argument waiting for
+  that. It is also off against the bot, which has no pointer.
+
+Nothing of Phase B is left.
 
 ### Phase C — the battle cinematic
 
@@ -576,13 +618,10 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. Phase B is now built end to end apart from the movement arrow
-and the opponent-presence overlay; the next real piece of work is Phase C, the
-battle cinematic.
+Nothing is open, and Phase B is finished. The next piece of work is **Phase C,
+the battle cinematic**.
 
-Two things are waiting on Jared rather than on code:
-
-1. **Run `0019` in production**, before the new client is deployed. See the
-   ordering note in the Phase B section -- the client needs it.
-2. **Push the client commit**, or add the repo to the session's sources so that
-   a session can push it itself.
+One thing is still waiting on Jared rather than on code: the site has not been
+**deployed** since any of this landed. `./deploy.sh` has to be run from an
+ordinary terminal -- see the git section. Everything Phase B needs is already
+live in the database.

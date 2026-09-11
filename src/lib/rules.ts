@@ -66,6 +66,13 @@ export const draw = (
  */
 export const flipFor = (side: Side | null) => side === 'host'
 
+/** draw() is its own inverse -- turning a board half a turn twice puts it back
+ *  -- so the same call converts a screen tile back into a board tile. Named
+ *  separately because a reader should not have to work that out at the call
+ *  site, and because it stops being true the day the flip becomes anything but
+ *  a half turn. */
+export const undraw = draw
+
 /** And the sign a direction picks up on the way through it. A lunge to the
  *  east is drawn as a lunge to the west on a flipped board. */
 export const drawSign = (flip: boolean) => (flip ? -1 : 1)
@@ -141,6 +148,66 @@ export function reachable(state: MatchState, u: Unit): Set<string> {
       }
     }
     front = next
+  }
+  return out
+}
+
+/**
+ * The route a unit would actually walk to get there, as the tiles it stands on,
+ * starting with the one it is on now and ending on the target.
+ *
+ * reachable() answers WHETHER; this answers HOW, and the two have to agree or
+ * the arrow will promise a road the server refuses. So it is the same walk --
+ * same orthogonal steps, same blocking, same breadth-first order -- keeping a
+ * predecessor for each tile instead of only the fact that it was seen. Breadth
+ * first means the first route found to a tile is a shortest one, which is the
+ * one to draw.
+ *
+ * A flier is not walking. It goes over everything in the way, so the honest
+ * picture is the straight hop: where it stands, and where it lands.
+ *
+ * Null when the tile is not reachable at all -- the caller should not be
+ * asking, but a hover can outrun a state update by a frame.
+ */
+export function pathTo(
+  state: MatchState, u: Unit, tx: number, ty: number,
+): { x: number; y: number }[] | null {
+  if (tx === u.x && ty === u.y) return null
+  if (u.flies) {
+    return reachable(state, u).has(key(tx, ty))
+      ? [{ x: u.x, y: u.y }, { x: tx, y: ty }]
+      : null
+  }
+
+  const { w, h } = state.board
+  const body = new Set(state.units.map((v) => key(v.x, v.y)))
+  const wood = new Set((state.obstacles ?? []).map((o) => key(o.x, o.y)))
+  const blocked = (k: string) => body.has(k) || (!u.tramples && wood.has(k))
+
+  const from = new Map<string, string | null>([[key(u.x, u.y), null]])
+  let front = [{ x: u.x, y: u.y }]
+  for (let step = 0; step < u.mov && front.length; step++) {
+    const next: { x: number; y: number }[] = []
+    for (const p of front) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = p.x + dx
+        const ny = p.y + dy
+        const k = key(nx, ny)
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+        if (from.has(k) || blocked(k)) continue
+        from.set(k, key(p.x, p.y))
+        next.push({ x: nx, y: ny })
+      }
+    }
+    front = next
+  }
+
+  const end = key(tx, ty)
+  if (!from.has(end)) return null
+  const out: { x: number; y: number }[] = []
+  for (let at: string | null = end; at !== null; at = from.get(at) ?? null) {
+    const [x, y] = at.split(',').map(Number)
+    out.unshift({ x, y })
   }
   return out
 }
