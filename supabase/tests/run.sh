@@ -59,7 +59,13 @@ fi
 fail=0
 for t in $(ls supabase/tests/[0-9][0-9]_*.sql | grep -v '/00_' | sort); do
   echo "--- $(basename "$t")"
-  out="$(psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 | sed 's/^psql:[^ ]* //')"
+  # `|| true` is load-bearing, and its absence was a silent-failure bug of
+  # exactly the kind this file has had before. ON_ERROR_STOP makes psql exit
+  # non-zero on the first failed assertion; with `set -e` and `pipefail` above,
+  # a failing command substitution ended the whole script THERE -- before the
+  # echo below ever ran. So a broken test file printed its name, nothing else,
+  # and no verdict. It looked like a file that had no assertions in it.
+  out="$(psql -q -v ON_ERROR_STOP=1 -o /dev/null -f "$t" 2>&1 | sed 's/^psql:[^ ]* //')" || true
   echo "$out" | grep -E 'PASS|FAIL|ERROR' || true
   echo "$out" | grep -qE 'FAIL|ERROR' && fail=1
 done

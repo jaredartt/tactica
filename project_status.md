@@ -92,12 +92,25 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 411 assertions, all green.** `09_combat.sql` is the Phase A file;
-`10_board.sql` is Phase B's and `11_swings.sql` is Phase C's. Run the whole thing with `./supabase/tests/run.sh`
--- which now works: it was creating no database while `_helpers.sql` pinned its
-GUCs with `alter database t`, and every psql in it sent stderr to /dev/null, so
-the run died silently. It also globbed `0[1-9]*`, which would have skipped
-`10_board.sql` without a word. Both fixed, and it now exits non-zero on failure.
+**Current: 429 assertions, all green.** `09_combat.sql` is the Phase A file;
+`10_board.sql` is Phase B's, and `11_swings.sql` and `12_clock.sql` are
+Phase C's. Run the whole thing with `./supabase/tests/run.sh`.
+
+That script has now had **three** silent-failure bugs, which is worth saying out
+loud: if a test run ever looks too quiet, suspect the runner before you suspect
+the tests.
+
+1. It created no database while `_helpers.sql` pinned its GUCs with
+   `alter database t`, and every psql sent stderr to /dev/null -- so the run
+   died with no message at all.
+2. It globbed `0[1-9]*`, which would have skipped `10_board.sql` without a
+   word, and a skipped file looks exactly like a passing one.
+3. The capture line had no `|| true`. With `set -e` and `pipefail`, psql
+   exiting non-zero on the first failed assertion killed the script *inside the
+   command substitution* -- before the `echo` that prints what it captured. A
+   failing file printed its own name and then nothing, and the run ended with
+   no verdict. This is how `12_clock.sql` appeared to contain no assertions
+   while it was in fact failing one. Fixed.
 
 Parry and crit are 5% rolls, so the suite pins them the way it pins the coin
 flip: `cn.force_parry` and `cn.force_crit` are set to `'never'` on the test
@@ -242,8 +255,9 @@ It contains:
 `0019_board_and_actions.sql` is **run in production** as of 2026-09-11, so the
 8-tall board, the two-activation turn, Defend and Wait are all live.
 
-**`0020_swings.sql` is built and tested but NOT yet run in production.** It is
-Phase C's first half -- see the Phase C section.
+**`0020_swings.sql` and `0021_cinematic_clock.sql` are built and tested but NOT
+yet run in production.** They are Phase C's server half and they go together --
+see the Phase C section.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -437,9 +451,15 @@ Nothing of Phase B is left.
 
 ### Phase C — the battle cinematic
 
-**The server half is DONE, in `0020_swings.sql`.** Built and tested
-(`11_swings.sql`, 38 assertions), waiting to be pasted into the Supabase SQL
-editor. Not yet run in production. The client half is not started.
+**The server half is DONE, in `0020_swings.sql` and `0021_cinematic_clock.sql`.**
+Built and tested (`11_swings.sql` 38 assertions, `12_clock.sql` 18), waiting to
+be pasted into the Supabase SQL editor **in that order**. Neither is run in
+production yet. The client half is not started.
+
+Jared's two answers that shaped this: the cinematic is a **full takeover** of
+the screen, and **the turn clock is paused for it**. There is no off switch for
+now -- a full/quick/off setting was offered and deferred to Phase D with the
+rest of the settings work.
 
 What `0020` does, and what it deliberately does not: it changes **no rule**.
 Not one number is computed differently and no branch is taken differently --
@@ -482,6 +502,34 @@ like bugs until you follow the rules through:
 - A killed unit leaves the board for good, so the section that kills somebody
   has to kill a unit no later section needs. `09_combat.sql` already had to
   learn this; `11_swings.sql` now does the same thing for the same reason.
+
+### What `0021` does
+
+The cinematic is two to six seconds of a thirty-second turn, so left alone it
+would be charged to the attacker's thinking time and the correct way to play
+would be to turn it off. A cinematic you are penalised for watching is not a
+feature. So `submit_attack` pushes the deadline by exactly `cn_cine_ms()` of
+the swings that were just recorded.
+
+Three things about that, each load-bearing:
+
+- **It is in `submit_attack`, not `cn_attack`.** `cn_attack` holds the rules and
+  the bot calls it directly; the bot has no screen and no clock, and giving it
+  seconds would be giving it nothing. The turn clock is already `submit_*`'s
+  business -- that is where "your time ran out" is raised.
+- **There is no "give me more time" call to abuse.** The length is computed
+  from the server's own record of the fight. The only way to buy a second is to
+  make the server play a longer fight, and the only way to do that is to have
+  one. Moving and defending buy nothing, and `12_clock.sql` asserts it.
+- **It is capped at twelve seconds**, comfortably above the longest fight that
+  can happen today (an eight-parry chain), because abilities are coming and one
+  that swings fifty times should not hand its owner a minute to think in.
+
+`cn_cine_ms` is mirrored in the client as `cineMs()` in `src/lib/cine.ts`. The
+two have to agree: the server is buying time for a picture the client is
+drawing, and if the client's picture runs longer than the server's budget the
+player loses their turn watching it. Change a beat length in one, change it in
+the other.
 
 Still to build, all client:
 
