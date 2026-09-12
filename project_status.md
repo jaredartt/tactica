@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 681 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 692 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own, and `19_tournaments.sql` is Phase E's. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, `19_tournaments.sql` is Phase E's, and `20_toast.sql` is a bug fix of its own. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1379,7 +1379,64 @@ are all built; the three light-theme contrast failures left open during dark
 mode are fixed, and so are two nobody had measured and a SQL test that had been
 passing on luck since it was written.
 
-#### THE WHITE SCREEN, and why there is now a crash panel
+#### THE WHITE SCREEN: POSTGRES DOES NOT REPLICATE AN UNCHANGED TOASTED COLUMN
+
+**`0029_toasted_state.sql` is built and tested (`20_toast.sql`) but NOT yet run
+in production.** This is the cause, and the crash panel below is what found it.
+
+The panel caught `TypeError: Cannot read properties of undefined (reading
+'units')` -- the match screen reading `match.state.units` on a match with no
+state. `matches.state` is `jsonb not null`, so no such row was ever stored. The
+row that ARRIVED was missing it.
+
+A value too big to sit in the row -- over about two kilobytes, which
+`matches.state` passes the moment there are units on the board -- is stored out
+of line, and an UPDATE that does not ASSIGN it leaves the pointer alone.
+Logical decoding then has nothing to send for that column. Measured in the WAL
+with `test_decoding`, which is what turned a theory into a cause:
+
+```
+update m set turn_deadline = turn_deadline + '2 seconds' where id = 1;
+  -> state[jsonb]:unchanged-toast-datum
+update m set turn_deadline = ..., state = v where id = 1;
+  -> state[jsonb]:'[{"id": "d77b5ae2...
+```
+
+**And 0021 added exactly that UPDATE, on exactly the attack path.** The
+cinematic clock pushes the turn deadline in a SECOND statement, after
+`cn_attack` has already written the board -- one column, state untouched, state
+toasted. So every attack sent every client a match row with no board on it.
+Which is the report, exactly: on attacking, every time, on every device, and
+never in a match young enough for the state to still sit inline.
+`deploy_unit`'s closing touch (`set updated_at = now()`) has the same shape and
+the same effect, on every drag of a unit during deployment.
+
+Fixed on **both** sides, because they fix different things.
+
+**The server** (0029) assigns `state` in those two statements, from a plpgsql
+variable -- a value already detoasted in memory, so the assignment writes a
+fresh datum and the column goes back into the WAL. It costs rewriting the blob
+twice per turn, which at this scale is nothing. The rematch pair still sends
+half-rows and is left alone on purpose: it fires once, at the end of a match,
+on a screen with no board on it. `20_toast.sql` names it, so the list cannot
+quietly grow, and asserts the splice did not cost 0021's clock push.
+
+**The client** treats a realtime row that does not carry a whole row as what it
+actually is -- news that something changed -- and refetches. That is the
+general fix and it covers every path, including the ones 0029 leaves alone; the
+migration only removes the round trip from the two that would otherwise pay for
+it constantly. Deliberately NOT "patch the missing fields from the old row": a
+half-row merged into a whole one is a board from one moment and a status from
+another, which is a worse bug and much harder to see. `Match` also renders its
+own loading state rather than assuming a board, which is the second lock on the
+same door.
+
+Verified by pushing the exact payload -- `errors: ['Error 413: Payload Too
+Large']`, a row with `id` and `updated_at` and no `state` -- through the fake
+server into the real match screen: board alive, nothing thrown. With the guards
+removed it throws, which is the mutation that proves the test.
+
+#### THE CRASH PANEL, which is how the above was found
 
 Reported from a real game: "every time that I attack, then suddenly everything
 turns white", on a phone and on a Mac, staying white until a reload. That

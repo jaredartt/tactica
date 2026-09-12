@@ -51,6 +51,42 @@ export function useMatch(matchId: string | null) {
         { event: 'UPDATE', schema: 'public', table: 'matches', filter: `id=eq.${matchId}` },
         (payload) => {
           const row = payload.new as MatchRow
+
+          // A REALTIME ROW IS A HINT, NOT THE TRUTH.
+          //
+          // This is what the white screen was. `matches.state` is `jsonb not
+          // null`, so the database never holds a match without a board -- but
+          // the row that arrives down the websocket is not always the whole
+          // row. Realtime has a payload cap, and a message over it arrives
+          // with the offending columns MISSING and an `errors` field set. The
+          // state blob is by far the largest column and it GROWS ALL MATCH
+          // (the log is appended to for ever), so the first message to go over
+          // the cap is the one carrying the biggest single addition -- an
+          // exchange, which adds an fx with its whole list of swings and two
+          // log lines at once. Which is exactly the report: it goes white when
+          // you attack, in a match that has been going a while, on every
+          // device, and never in a fresh one.
+          //
+          // Installing that row put `match.state === undefined` into a screen
+          // that had every right to assume otherwise, and the first thing to
+          // touch it threw. So: a message that does not carry a whole row is
+          // treated as what it actually is -- news that SOMETHING changed --
+          // and the row is fetched. The poll underneath would have healed it
+          // within five seconds anyway; this just does not wait, and does not
+          // crash in the meantime.
+          //
+          // Deliberately not "patch the missing fields from the old row": a
+          // half-row merged into a whole one is a board from one moment and a
+          // status from another, which is a worse bug than this one and much
+          // harder to see.
+          if (!row || !row.state || !row.updated_at) {
+            if (import.meta.env.DEV) {
+              console.warn('[match] partial realtime row, refetching', payload)
+            }
+            void pull()
+            return
+          }
+
           if (row.updated_at >= seen.current) {
             seen.current = row.updated_at
             setMatch(row)

@@ -296,7 +296,14 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
     }
   }
 
-  if (!match) {
+  // A match with no board is not a match yet. `matches.state` is `jsonb not
+  // null`, so this cannot come from the database -- it can only come from a
+  // row that arrived incomplete, which useMatch now refuses and refetches.
+  // This is the second lock on the same door, and it is here because EVERY
+  // line below assumes a board: a screen that renders its own loading state
+  // for half a second is the correct answer to "the board has not arrived",
+  // and a white page is not.
+  if (!match || !match.state) {
     return (
       <div className="center-stage">
         <p className="muted">{t('match.loading')}</p>
