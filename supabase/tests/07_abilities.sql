@@ -70,15 +70,19 @@ select t_reset(:'m'); select t_trees(:'m', '[]'::jsonb);
 select t_place(:'m','h2',2,3); select t_place(:'m','g1',2,2);   -- Mako vs Dione & Grifo
 select t_hp(:'m','h2',60);
 select public.submit_attack(:'m','h2','g1');
-select t_ok(t_get(:'m','h2','hp')::int = 60,
-            'Dione & Grifo answer at one tile -- but not a thief');
-select t_ok(t_fx(:'m','counter')::int = 0, 'no counter is recorded at all');
+-- Mako could not be answered until 0033, from a card that read "Never takes a
+-- blow in return" before 0023 replaced it with the spec's trap. The trap is
+-- F4's; until then Mako is exactly what its numbers say, and takes the answer
+-- like anybody.
+select t_ok(t_get(:'m','h2','hp')::int < 60,
+            'AND A THIEF IS ANSWERED LIKE ANYBODY NOW — sneaking was never in the spec');
+select t_ok(t_fx(:'m','counter')::int > 0, 'and the counter is recorded like anybody else''s');
 
--- and the pair DO answer anybody else
-select t_reset(:'m'); select t_place(:'m','h4',2,3); select t_hp(:'m','h4',120);
+-- and they answer everybody else too
+select t_reset(:'m'); select t_place(:'m','h4',2,3); select t_hp(:'m','h4',85);
 select t_full(:'m','g1');   -- it has to survive to answer
 select public.submit_attack(:'m','h4','g1');
-select t_ok(t_get(:'m','h4','hp')::int < 120, 'Wuzu takes the answer Mako did not');
+select t_ok(t_get(:'m','h4','hp')::int < 85, 'Wuzu takes the answer too');
 
 -- The pair used to answer from TWO tiles while striking at one -- a counter
 -- reach of its own, which is the thing 0030 removed. "Range and reach IS THE
@@ -89,30 +93,25 @@ select t_ok(t_get(:'m','h4','hp')::int < 120, 'Wuzu takes the answer Mako did no
 -- This is the old behaviour asserted as gone, deliberately, rather than
 -- deleted -- so that anybody who brings it back finds out here.
 select t_reset(:'m'); select t_place(:'m','g1',2,1); select t_place(:'m','h4',2,3);
-select t_set(:'m','h4','rmax','2'::jsonb); select t_hp(:'m','h4',120);
+select t_set(:'m','h4','rmax','2'::jsonb); select t_hp(:'m','h4',85);
 select t_full(:'m','g1');
 select public.submit_attack(:'m','h4','g1');
-select t_ok(t_get(:'m','h4','hp')::int = 120,
+select t_ok(t_get(:'m','h4','hp')::int = 85,
             'AND NOT FROM TWO: since 0030 a unit answers only what it could have struck');
 
--- ---- Umiro puts a fire out ----------------------------------------------
+-- ---- NOTHING PUTS A FIRE OUT ANY MORE ------------------------------------
+-- Umiro cured, and mended, because 0010 made him a Herbalist; the spec makes
+-- him a Swamp Bringer and 0033 took both away. Jared's decision with it: burn
+-- and poison are permanent until the unit dies. So this section, which used to
+-- prove that a fire could be put out, proves that it cannot -- and that is a
+-- rule somebody will want to find written down when they wonder why a unit
+-- burned all match.
 select t_reset(:'m');
-select t_set(:'m','h1','burned','true'::jsonb); select t_hp(:'m','h1',40);
-select t_place(:'m','h3',2,4); select t_place(:'m','h1',2,3);   -- Umiro beside Lumea
-select t_ok(t_get(:'m','h3','cures') = 'true', 'Umiro cures');
-select public.submit_attack(:'m','h3','h1');
-select t_ok(t_get(:'m','h1','burned') = 'false', 'mending an ally puts the fire out');
--- 20-30 since 0031: the spec gives Umiro a 25 where the live roster had 15.
-select t_ok(t_get(:'m','h1','hp')::int between 60 and 70, 'and mends 20-30 while doing it');
-select t_ok(t_fx(:'m','cured') = 'true', 'the clients are told, so they can show it');
-
--- Eva mends but does not cure
-select t_reset(:'m');
-select t_set(:'m','h1','burned','true'::jsonb); select t_hp(:'m','h1',40);
-select t_set(:'m','h3','cures','false'::jsonb);        -- stand Eva in for Umiro
-select public.submit_attack(:'m','h3','h1');
-select t_ok(t_get(:'m','h1','burned') = 'true', 'a herbalist who does not cure leaves it burning');
-select t_set(:'m','h3','cures','true'::jsonb);
+select t_ok(t_get(:'m','h3','cures') = 'false', 'Umiro does not cure');
+select t_ok((select count(*) from public.cards where is_active and cures) = 0,
+            'AND NOTHING IN THE GAME DOES — a burn is permanent now, by decision');
+select t_ok((select count(*) from public.cards where is_active and blooms) = 0,
+            'nor does anything water the whole garden: Sinie aims now');
 
 -- ---- Fey reaches three, and only another three answers -------------------
 select t_reset(:'m'); select t_park(:'m', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
@@ -216,54 +215,24 @@ select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 select t_trees(:'b', '[]'::jsonb);
 select t_park(:'b', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'b','h1','name') = 'Sinie', 'the host fields Sinie in slot 1');
-select t_ok(t_get(:'b','h1','blooms') = 'true', 'and she carries the flag');
 
--- three allies hurt: one clicked, one in reach, one out of it
+-- ---- THE BLOOM IS GONE, and mending is an ability ------------------------
+-- Sinie watered every ally in reach off one roll, as a passive that fired when
+-- she "attacked" a friend. The spec calls it Healing Petals -- 30 hit points,
+-- to a target you point at -- and 0033 made it an ability. Everything the
+-- bloom used to prove (one roll spent on everyone, a full ally skipped, wood
+-- stopping it) was proving a rule that no longer exists. What is asserted here
+-- is that it is gone; what replaced it is in 24_abilities.sql.
+select t_ok(t_get(:'b','h1','blooms') = 'false', 'and she no longer carries the flag');
+select t_ok(t_get(:'b','h1','abilityKind') = 'heal_any',
+            'she carries an ABILITY instead, aimed rather than sprayed');
 select t_reset(:'b');
--- Sinie reaches THREE since 0031, and a 6x6 board has no tile further than
--- three from the middle -- so she starts in the corner, or "out of reach"
--- cannot exist to be tested.
-select t_place(:'b','h1',0,0);          -- Sinie, reach 1-3
-select t_place(:'b','h2',0,1);          -- clicked
-select t_place(:'b','h3',1,1);          -- in reach, not clicked
-select t_place(:'b','h4',5,5);          -- far away
-select t_hp(:'b','h2',10); select t_hp(:'b','h3',10); select t_hp(:'b','h4',10);
-select public.submit_attack(:'b','h1','h2');
-select t_ok(t_get(:'b','h2','hp')::int > 10, 'the ally you clicked is mended');
-select t_ok(t_get(:'b','h3','hp')::int > 10, 'and so is the one merely standing near her');
-select t_ok(t_get(:'b','h4','hp')::int = 10, 'but not one outside her reach');
-select t_ok(t_get(:'b','h2','hp')::int = t_get(:'b','h3','hp')::int,
-            'one roll, spent on each of them -- a lucky roll is lucky once');
-select t_ok(jsonb_array_length(t_fx(:'b','bloom')::jsonb) = 1,
-            'the clients are told who else was caught in it');
-
--- a full ally is not counted
-select t_reset(:'b'); select t_hp(:'b','h2',10);
-select t_full(:'b','h3'); select t_full(:'b','h4');
-select public.submit_attack(:'b','h1','h2');
-select t_ok(jsonb_array_length(t_fx(:'b','bloom')::jsonb) = 0,
-            'nobody at full health is swept up in it');
-
--- a tree between them blocks the bloom, the same as a shot
-select t_reset(:'b'); select t_hp(:'b','h2',10); select t_hp(:'b','h3',10);
-select t_full(:'b','h4');
-select t_trees(:'b', '[{"id":"t1","x":3,"y":2,"hp":30,"maxHp":30}]'::jsonb);
-select t_place(:'b','h3',4,2);
-select public.submit_attack(:'b','h1','h2');
-select t_ok(t_get(:'b','h3','hp')::int = 10, 'and wood stops it, the same as an arrow');
-
--- an ordinary healer still mends exactly one
-select t_reset(:'b'); select t_trees(:'b', '[]'::jsonb);
-select public.end_turn(:'b');            -- still the host's to give away
-select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);
-select t_ok(t_get(:'b','g3','name') = 'Eva', 'the guest fields Eva');
-select t_park(:'b', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_place(:'b','g3',2,2); select t_place(:'b','g1',2,3); select t_place(:'b','g2',3,1);
-select t_hp(:'b','g1',10); select t_hp(:'b','g2',10);
-select public.submit_attack(:'b','g3','g1');
-select t_ok(t_get(:'b','g1','hp')::int > 10 and t_get(:'b','g2','hp')::int = 10,
-            'Eva mends the one she was pointed at and nobody else');
-select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
+select t_place(:'b','h1',0,0); select t_place(:'b','h2',0,1); select t_place(:'b','h3',1,1);
+select t_hp(:'b','h2',10); select t_hp(:'b','h3',10);
+select t_raises(format('select public.submit_attack(%L,''h1'',''h2'')', :'b'),
+                'friendly fire', 'and she cannot mend by attacking an ally at all');
+select t_ok(t_get(:'b','h3','hp')::int = 10,
+            'so nobody standing near her is watered by accident any more');
 
 select id as bm from public.create_bot_match(3) \gset
 select public.set_ready(:'bm');

@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 749 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 779 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, `21_reach.sql` is 0030's, `22_auras.sql` is F1's, and `23_ghosts.sql` is 0032's. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, `21_reach.sql` is 0030's, `22_auras.sql` is F1's, `23_ghosts.sql` is 0032's, and `24_abilities.sql` is F3's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1371,6 +1371,36 @@ migration. That is not passing, it is being lucky.
 - **An open hole worth naming now:** nothing in the new spec removes burn or
   poison. Umiro cures today; the spec gives Umiro the Swamp instead. Either a
   unit gains a cure or both effects are permanent until death.
+
+### F3 · The ability engine — SERVER HALF DONE, client half next
+
+**`0033_abilities.sql` is built and tested (`24_abilities.sql`) but NOT yet run
+in production, and it must go out WITH the client**: it adds a swing kind the
+cinematic has to narrate (`mist`), and an old client would caption a dodge as
+an ordinary blow for nought.
+
+It started with Jared looking at the live game: *"I still don't understand why
+Umiro can heal, it's not written in his abilities"* and *"why Mako doesn't
+receive counters, what the heck"*. Both were leftovers from 0010, which built
+eleven cards out of flavour text -- Umiro a Herbalist, Mako a Bandit whose card
+read "Never takes a blow in return". 0023 replaced every card's TEXT with the
+spec's and deliberately changed no behaviour; F1 restated the numbers and left
+the same gap. **After 0033 no card does anything its own description does not
+say.** Five gain what they promised; six lose what they never advertised, and
+four of those six are plain fighters until F4, F5 and F6.
+
+**An ability substitutes the attack**, so `submit_ability` is the same citizen
+as `submit_attack` -- same shell, same `cn_begin_act` budget, same clock push --
+and `24_abilities.sql` asserts exactly that as hard as it asserts the abilities
+themselves.
+
+Two things worth knowing for F4 onwards. **Strike Twice cost almost nothing**
+because 0020 made the swing chain uniform: "a second hit when Himanta attacks,
+counters or parries" is one branch, because all three are the same thing in
+that loop. And **`jsonb_set`'s `create_missing` only creates the LAST step of a
+path** -- writing `['mist','host']` into a state with no `mist` key does
+nothing at all, silently, which is the worst way a jsonb write can fail. The
+mist key is created first, explicitly.
 
 ### F3 · The ability engine, and every ability that needs nothing new
 

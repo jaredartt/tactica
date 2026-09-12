@@ -207,10 +207,18 @@ select t_hp(:'mid','h2',70); select t_hp(:'mid','g1',70);
 select t_set(:'mid','g1','burned','false'::jsonb);
 select t_dmg(:'mid','h2',10);
 select public.submit_attack(:'mid','h2','g1');
-select t_ok(t_get(:'mid','g1','burned') = 'true', 'a burn is applied on hit');
+-- Dereo set things alight until 0033, and it was never in the spec: his
+-- passive is the aura F1 gave him. Asserted as GONE rather than deleted, so
+-- that the day somebody gives a card `burns` again it is a decision.
+select t_ok(t_get(:'mid','g1','burned') = 'false',
+            'KING DEREO NO LONGER SETS ANYTHING ALIGHT — his passive is his aura');
 select t_ok(t_get(:'mid','g1','hp')::int = 60, 'and costs nothing in the exchange that lit it');
 
+-- Nothing applies a burn any more -- Ashvar's fireball is F2's -- so the fire
+-- is lit by hand here. The RULE is unchanged and still worth asserting: a unit
+-- that swings while alight pays for it.
 select t_reset(:'mid'); select t_hp(:'mid','g1',60); select t_hp(:'mid','h2',70);
+select t_set(:'mid','g1','burned','true'::jsonb);
 select t_dmg(:'mid','h2',10);
 select public.submit_attack(:'mid','h2','g1');
 select t_ok(t_fx(:'mid','burnTgt')::int = 5, 'a burned unit that counters burns for 5');
@@ -222,37 +230,26 @@ select public.submit_attack(:'mid','h1','g1');
 select t_ok(t_fx(:'mid','burnAtk')::int = 5, 'a burned attacker burns for 5 too');
 select t_set(:'mid','h1','burned','false'::jsonb);
 
--- ---- mending --------------------------------------------------------------
+-- ---- mending is an ABILITY now ---------------------------------------------
+-- Eva and Umiro mended because 0010 made them Herbalists; 0033 took it away,
+-- because neither card has ever said so. Nothing can be healed by attacking it
+-- any more -- friendly fire is refused outright for everybody.
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_raises(format('select public.submit_attack(%L,''h1'',''h2'')', :'mid'),
-                'friendly fire', 'only a herbalist may target an ally');
+                'friendly fire', 'NOBODY MENDS BY ATTACKING AN ALLY ANY MORE');
+select t_ok((select count(*) from public.cards where is_active and heals) = 0,
+            'and no playable card heals as a passive at all');
 
-select t_match('bbbbbbbb-0000-0000-0000-000000000002',
-               'aaaaaaaa-0000-0000-0000-000000000001') as m2 \gset
-select set_config('app.uid', 'bbbbbbbb-0000-0000-0000-000000000002', false);
-select t_trees(:'m2', '[]'::jsonb);
-select t_park(:'m2', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_ok(t_get(:'m2','h2','name') = 'Eva', 'ben hosts with Eva in slot 2');
-
-select t_reset(:'m2'); select t_place(:'m2','h2',1,3); select t_place(:'m2','h4',1,4);
-select t_hp(:'m2','h4',40);
-select public.submit_attack(:'m2','h2','h4');
--- 15-25 since 0031: the spec gives Eva a 20 where the live roster had 10, and
--- a mender mends for what it would have hurt for.
-select t_ok(t_get(:'m2','h4','hp')::int between 55 and 65, 'Eva mends an ally for 15-25');
-select t_ok(t_fx(:'m2','heal')::int > 0, 'recorded as a heal, not damage');
-
--- h4 is Lumea, whose maximum is 75 since 0031 (it was 70).
-select t_reset(:'m2'); select t_hp(:'m2','h4',73);
-select public.submit_attack(:'m2','h2','h4');
-select t_ok(t_get(:'m2','h4','hp')::int = 75, 'mending never goes over maximum HP');
-
-select t_reset(:'m2'); select t_place(:'m2','g1',1,1);
-select public.submit_attack(:'m2','h2','g1');
-select t_ok(t_get(:'m2','g1','hp')::int < 110, 'a herbalist can also hit, at two tiles');
-select t_reset(:'m2'); select t_place(:'m2','g1',1,2);
-select public.submit_attack(:'m2','h2','g1');
-select t_ok(t_get(:'m2','g1','hp')::int < 110, 'and at one');
+-- Eva fights like anything else, at one tile and at two. The second match
+-- this block used to need went with the mending.
+select t_reset(:'mid'); select t_noauras(:'mid');
+select t_place(:'mid','h5',1,3); select t_place(:'mid','g1',1,1);
+select t_full(:'mid','g1');
+select public.submit_attack(:'mid','h5','g1');
+select t_ok(t_get(:'mid','g1','hp')::int < 110, 'Eva hits at two tiles');
+select t_reset(:'mid'); select t_place(:'mid','g1',1,2); select t_full(:'mid','g1');
+select public.submit_attack(:'mid','h5','g1');
+select t_ok(t_get(:'mid','g1','hp')::int < 110, 'and at one');
 
 -- ---- trees ----------------------------------------------------------------
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);

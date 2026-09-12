@@ -195,7 +195,8 @@ select t_duel(:'m'); select t_place(:'m','h3',2,2); select t_place(:'m','g3',2,3
 select t_dmg(:'m','h3',40); select t_set(:'m','h3','parryPct','0'::jsonb);
 select public.submit_attack(:'m','h3','g3');
 select t_ok(t_get(:'m','g3','hp')::int = 110, 'Mako''s blow is caught like anyone else''s');
-select t_ok(t_get(:'m','h3','hp')::int = 60, 'but the parry does not answer a thief');
+select t_ok(t_get(:'m','h3','hp')::int < 60,
+            'and the parry answers it, because nothing sneaks any more');
 
 -- A passive is not a blow, so nothing catches it. Quick Dagger answers first
 -- THROUGH an attacker who parries absolutely everything.
@@ -209,18 +210,14 @@ select t_ok(t_get(:'m','h1','hp')::int < 110,
             'the answer-first is a passive, so the attacker cannot parry it');
 reset cn.force_parry;
 
--- ---- mending is not an exchange ------------------------------------------
-set cn.force_parry = 'always'; set cn.force_crit = 'always';
+-- ---- mending is not an exchange, and is not an attack either -------------
+-- This section used to mend by ATTACKING an ally, which is how Eva, Umiro and
+-- Sinie worked until 0033. Healing is an ability now and lives in
+-- 24_abilities.sql; what is left here is the rule that replaced it.
 select t_reset(:'m');
 select t_place(:'m','h5',2,2); select t_place(:'m','h1',2,3);
-select t_dmg(:'m','h5',10); select t_hp(:'m','h1',40);
-select public.submit_attack(:'m','h5','h1');
-select t_ok(t_get(:'m','h1','hp')::int = 50, 'a mend is its roll -- a heal never crits');
-select t_ok(t_fx(:'m','parry') = 'false', 'and is never parried');
-select t_ok(t_fx(:'m','counter')::int = 0, 'and never answered');
-select t_ok(t_get(:'m','h5','hp')::int = t_get(:'m','h5','maxHp')::int,
-            'the mender takes nothing for mending');
-reset cn.force_parry; reset cn.force_crit;
+select t_raises(format('select public.submit_attack(%L,''h5'',''h1'')', :'m'),
+                'friendly fire', 'an ally cannot be attacked, by anybody, for any reason');
 
 -- ---- the crown ------------------------------------------------------------
 -- Its own match: the one above has to survive the assertions after it.
