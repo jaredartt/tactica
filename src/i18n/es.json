@@ -273,5 +273,10 @@
   "tourney.bye": "pasa",
   "tourney.done": "jugada",
   "tourney.waiting": "aún no",
-  "tourney.play": "Jugar"
+  "tourney.play": "Jugar",
+  "class.royal": "Realeza",
+  "class.rogue": "Furtivo",
+  "class.knight": "Caballero",
+  "class.mage": "Mago",
+  "class.flying": "Volador"
 }

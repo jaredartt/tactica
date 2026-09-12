@@ -79,9 +79,13 @@ select t_ok((select count(*) from public.cards
 -- retuned eleven cards while claiming to translate them would be the worst
 -- kind. This assertion is the guard on that, which is why it carries the live
 -- number rather than the spec's.
-select t_ok((select hp from public.cards where slug = 'lium') = 80,
-            'Lium still has the hit points the live roster gave him, not the spec''s');
-select t_ok((select hp from public.cards where slug = 'dereo') = 70,
-            'and Dereo is still the unit he was, not the spec''s Royal');
+-- ...and 0031 is the migration that WAS allowed to, because restating the
+-- roster to the spec is the whole of what it does. Lium is the spec's 85 now.
+-- The assertion stays, pinned to the new number: it is still the guard, it is
+-- simply guarding a roster that has finally caught up with its own text.
+select t_ok((select hp from public.cards where slug = 'lium') = 85,
+            'and Lium finally has the hit points the spec always gave him');
+select t_ok((select hp from public.cards where slug = 'dereo') = 110,
+            'and Dereo is the spec''s 110-point Royal at last');
 select t_ok((select count(*) from public.cards where is_active) = 11,
             'and the roster is still eleven cards');

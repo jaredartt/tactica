@@ -8,35 +8,118 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'a@x.com', '{"username":"ann"}'),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'b@x.com', '{"username":"ben"}');
 
--- ---- the roster reads back the way it was specified ---------------------
--- crmax was 2 until 0030 -- the pair struck at one and answered at two. There
--- is no separate counter reach any more ("range and reach IS THE SAME thing"),
--- so it is 1, and this line is pinned to the live numbers on purpose: the
--- whole point of asserting them is that a migration named for one rule cannot
--- quietly retune a card on its way past.
-select t_ok((select hp=110 and mov=2 and rmin=1 and rmax=1 and crmin=1 and crmax=1
-               and power=22 and dmin=17 and dmax=27 from public.cards where slug='dione-grifo'),
-            'Dione & Grifo');
-select t_ok((select hp=120 and mov=1 and rmax=1 and power=36 and dmin=31 and dmax=41 and tramples
-               from public.cards where slug='wuzu'), 'Wuzu');
-select t_ok((select hp=60 and mov=3 and rmax=1 and power=25 and dmin=20 and dmax=30 and sneaks
+-- ---- THE ROSTER IS THE SPEC'S, unit by unit -----------------------------
+--
+-- Every row of section 6 of project_status.md, asserted one card at a time.
+-- This block has always existed and has always been pinned to whatever the
+-- database happened to hold, on purpose: "a migration named for one rule
+-- cannot quietly retune a card on its way past". 0031 is the migration that is
+-- ALLOWED to retune them, because retuning them to the spec is the whole of
+-- what it does -- so the pins move here, once, and go back to being a guard.
+--
+-- The derived columns are asserted too, and that is the point of asserting
+-- them: nothing below sets rmin, rmax, crmin, crmax, dmin, dmax, flies or
+-- royal. All eight come out of the card trigger, and a card that arrived any
+-- other way would show up here.
+select t_ok((select name='King Dereo' and role='royal' and hp=110 and power=30 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=25 and dmax=35 and flies=false and royal=true
+               from public.cards where slug='dereo'), 'King Dereo');
+select t_ok((select name='Queen Miah' and role='royal' and hp=110 and power=25 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=20 and dmax=30 and flies=false and royal=true
+               from public.cards where slug='miah'), 'Queen Miah');
+select t_ok((select name='King Stelaris' and role='royal' and hp=120 and power=30 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=25 and dmax=35 and flies=false and royal=true
+               from public.cards where slug='stelaris'), 'King Stelaris');
+select t_ok((select name='Dione & Grifo' and role='knight' and hp=95 and power=30 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=25 and dmax=35 and flies=false and royal=false
+               from public.cards where slug='dione-grifo'), 'Dione & Grifo');
+select t_ok((select name='Lium' and role='knight' and hp=85 and power=35 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=30 and dmax=40 and flies=false and royal=false
+               from public.cards where slug='lium'), 'Lium');
+select t_ok((select name='Mako' and role='rogue' and hp=60 and power=35 and mov=2
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=30 and dmax=40 and flies=false and royal=false
                from public.cards where slug='mako'), 'Mako');
-select t_ok((select hp=70 and mov=3 and rmax=1 and power=19 and dmin=14 and dmax=24 and flies
-               from public.cards where slug='lumea'), 'Lumea');
--- rmin was 2 until 0030: Dereo could hit at exactly two tiles and not at one,
--- so a mage with a sword at its throat was safe from the one thing that should
--- beat it. A range is one number now and it starts at 1.
-select t_ok((select hp=70 and mov=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
-               and power=20 and dmin=15 and dmax=25 and burns from public.cards where slug='dereo'), 'Dereo');
--- Fey was 2-3 and answered only at exactly 3 -- the one card in the roster
--- with a counter reach of its own. 0030 collapsed the four reach numbers into
--- one: 1 to 3, striking and answering alike.
-select t_ok((select hp=65 and mov=2 and rmin=1 and rmax=3 and crmin=1 and crmax=3
-               and power=16 and dmin=11 and dmax=21 from public.cards where slug='fey'), 'Fey');
-select t_ok((select hp=70 and mov=3 and rmin=1 and rmax=2 and power=10 and dmin=5 and dmax=15 and heals
+select t_ok((select name='Eva' and role='rogue' and hp=80 and power=20 and mov=2
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=15 and dmax=25 and flies=false and royal=false
                from public.cards where slug='eva'), 'Eva');
-select t_ok((select hp=95 and mov=1 and rmin=1 and rmax=2 and power=15 and dmin=10 and dmax=20
-               and heals and cures from public.cards where slug='umiro'), 'Umiro');
+select t_ok((select name='Himanta' and role='rogue' and hp=70 and power=25 and mov=2
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=20 and dmax=30 and flies=false and royal=false
+               from public.cards where slug='himanta'), 'Himanta');
+select t_ok((select name='Dorme' and role='rogue' and hp=65 and power=30 and mov=2
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=25 and dmax=35 and flies=false and royal=false
+               from public.cards where slug='dorme'), 'Dorme');
+select t_ok((select name='Fey' and role='mage' and hp=85 and power=15 and mov=2
+               and range=3 and rmin=1 and rmax=3 and crmin=1 and crmax=3
+               and dmin=10 and dmax=20 and flies=false and royal=false
+               from public.cards where slug='fey'), 'Fey');
+select t_ok((select name='Umiro' and role='mage' and hp=75 and power=25 and mov=1
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=20 and dmax=30 and flies=false and royal=false
+               from public.cards where slug='umiro'), 'Umiro');
+select t_ok((select name='Sinie' and role='mage' and hp=65 and power=30 and mov=2
+               and range=3 and rmin=1 and rmax=3 and crmin=1 and crmax=3
+               and dmin=25 and dmax=35 and flies=false and royal=false
+               from public.cards where slug='sinie'), 'Sinie');
+select t_ok((select name='Ashvar' and role='mage' and hp=70 and power=20 and mov=2
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=15 and dmax=25 and flies=false and royal=false
+               from public.cards where slug='ashvar'), 'Ashvar');
+select t_ok((select name='Velmor' and role='mage' and hp=70 and power=35 and mov=2
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=30 and dmax=40 and flies=false and royal=false
+               from public.cards where slug='velmor'), 'Velmor');
+select t_ok((select name='Sarrave' and role='mage' and hp=80 and power=15 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=10 and dmax=20 and flies=false and royal=false
+               from public.cards where slug='sarrave'), 'Sarrave');
+select t_ok((select name='Thalgrim' and role='mage' and hp=80 and power=15 and mov=1
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=10 and dmax=20 and flies=false and royal=false
+               from public.cards where slug='thalgrim'), 'Thalgrim');
+select t_ok((select name='Nyxara' and role='mage' and hp=65 and power=15 and mov=2
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=10 and dmax=20 and flies=false and royal=false
+               from public.cards where slug='nyxara'), 'Nyxara');
+select t_ok((select name='Wuzu' and role='flying' and hp=85 and power=25 and mov=3
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=20 and dmax=30 and flies=true and royal=false
+               from public.cards where slug='wuzu'), 'Wuzu');
+select t_ok((select name='Lumea' and role='flying' and hp=75 and power=20 and mov=4
+               and range=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
+               and dmin=15 and dmax=25 and flies=true and royal=false
+               from public.cards where slug='lumea'), 'Lumea');
+select t_ok((select name='Zephyra' and role='flying' and hp=65 and power=20 and mov=4
+               and range=1 and rmin=1 and rmax=1 and crmin=1 and crmax=1
+               and dmin=15 and dmax=25 and flies=true and royal=false
+               from public.cards where slug='zephyra'), 'Zephyra');
+
+-- Twenty exist; eleven can be fielded. The nine that arrived with 0031 are
+-- inactive until the ability their sentence describes exists.
+-- Scoped to the twenty by name rather than counting the table: earlier files
+-- in this suite add cards of their own, and a bare count would make this
+-- assertion about whichever test ran first.
+select t_ok((select count(*) from public.cards where slug in (
+              'dereo','miah','stelaris','dione-grifo','lium','mako','eva','himanta',
+              'dorme','fey','umiro','sinie','ashvar','velmor','sarrave','thalgrim',
+              'nyxara','wuzu','lumea','zephyra')) = 20,
+            'all twenty units of the spec are in the game');
+select t_ok((select count(*) from public.cards where is_active and slug in (
+              'miah','stelaris','dorme','ashvar','velmor','sarrave','thalgrim',
+              'nyxara','zephyra')) = 0,
+            'and the nine that arrived with 0031 are still only words — none is playable');
+select t_ok((select count(*) from public.cards where royal and is_active) = 1,
+            'ONE playable crown, so every kingdom is still a forced pick');
+select t_ok((select count(*) from public.cards where tramples) = 0,
+            'and nothing tramples any more — trampling is nowhere in the spec');
 
 select set_config('app.uid', 'aaaaaaaa-0000-0000-0000-000000000001', false);
 select public.set_deck(array['dione-grifo','dereo','mako','wuzu','eva']);
@@ -50,53 +133,60 @@ select t_trees(:'mid', '[]'::jsonb);
 select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 
 -- ---- movement is orthogonal; reach counts diagonals ---------------------
-select t_reset(:'mid'); select t_place(:'mid','h4',2,5);       -- Wuzu, mov 1
-select t_raises(format('select public.submit_move(%L,''h4'',3,4)', :'mid'),
+-- h2 rather than h4: Wuzu was the slow one until 0031 and is now a flier with
+-- three tiles of movement. The spec's slowest walkers are the Royals, so the
+-- crown is what cannot cover a diagonal in one step.
+select t_reset(:'mid'); select t_place(:'mid','h2',2,5);       -- King Dereo, mov 1
+select t_raises(format('select public.submit_move(%L,''h2'',3,4)', :'mid'),
                 'cannot reach', 'one move does not cover a diagonal');
-select public.submit_move(:'mid','h4',2,4);
-select t_ok(t_get(:'mid','h4','y')='4', 'Wuzu moves its one tile');
+select public.submit_move(:'mid','h2',2,4);
+select t_ok(t_get(:'mid','h2','y')='4', 'the crown moves its one tile');
 
 -- Column 3, not column 0: t_park stacks five down the back column now, so
 -- column 0 is a wall rather than a corridor.
-select t_reset(:'mid'); select t_place(:'mid','h3',3,5);       -- Mako, mov 3
-select public.submit_move(:'mid','h3',3,2);
-select t_ok(t_get(:'mid','h3','y')='2', 'Mako crosses three tiles');
+select t_reset(:'mid'); select t_place(:'mid','h3',3,5);       -- Mako, mov 2
+select public.submit_move(:'mid','h3',3,3);
+select t_ok(t_get(:'mid','h3','y')='3', 'Mako crosses two tiles');
 
 -- ---- one to two, and who can answer it ----------------------------------
--- Until 0030 Dereo reached EXACTLY two and this block asserted that it could
--- not strike the thing in its face. That was the engine's invention, not the
--- design's: "range 2 means being able to attack 1 and 2 tiles far away". A
--- range is one number now and every tile from 1 to it is in reach.
+-- Until 0030 this asserted that a range-2 unit could not strike the thing in
+-- its face -- the engine's invention, not the design's. And until 0031 that
+-- unit was Dereo, who the spec makes a range-1 Royal; Wuzu is the range-2 one
+-- on this side now.
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_place(:'mid','h2',0,3);          -- Dereo, range 2, so one tile or two
+select t_noauras(:'mid');
+select t_place(:'mid','h4',0,3);          -- Wuzu, range 2, so one tile or two
 select t_place(:'mid','g4',0,2);          -- Lumea, one tile away
-select t_hp(:'mid','g4',70);
-select public.submit_attack(:'mid','h2','g4');
-select t_ok(t_get(:'mid','g4','hp')::int < 70,
-            'DEREO CAN STRIKE THE THING IN ITS FACE — a range of 2 is 1 and 2');
+select t_hp(:'mid','g4',75);
+select public.submit_attack(:'mid','h4','g4');
+select t_ok(t_get(:'mid','g4','hp')::int < 75,
+            'A RANGE-2 UNIT CAN STRIKE THE THING IN ITS FACE — a range of 2 is 1 and 2');
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_place(:'mid','h2',0,3);
+select t_place(:'mid','h4',0,3);
 select t_place(:'mid','g4',0,0);
-select t_raises(format('select public.submit_attack(%L,''h2'',''g4'')', :'mid'),
+select t_raises(format('select public.submit_attack(%L,''h4'',''g4'')', :'mid'),
                 'out of range', 'but not three tiles off — the number is still the number');
 
--- Dereo took an answer in the block above -- Lumea reaches one tile and Dereo
--- was standing in it -- so its health is set back explicitly here. t_reset
--- puts the flags back, not the hit points.
-select t_place(:'mid','g4',0,1);
-select t_hp(:'mid','h2',70);
--- ...and Lumea's, for the same reason: the roll below is measured against a
--- full 70, and it took one from Dereo a moment ago.
-select t_hp(:'mid','g4',70);
-select public.submit_attack(:'mid','h2','g4');
-select t_ok(t_get(:'mid','h2','hp')::int = 70,
-            'Lumea answers at one tile, so it cannot answer at two');
-select t_ok(t_get(:'mid','g4','hp')::int between 45 and 55, 'Dereo rolled 15-25');
-select t_ok(t_fx(:'mid','counter')::int = 0, 'and no counter is recorded');
+-- Who answers is decided by the RECEIVER's own range, which is the whole
+-- point of collapsing the four reach numbers into one. Mako reaches a single
+-- tile, so a blow from two tiles away is one it cannot answer.
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
+select t_noauras(:'mid');
+select t_place(:'mid','h4',0,3); select t_hp(:'mid','h4',85);   -- Wuzu, range 2
+select t_place(:'mid','g5',0,1); select t_hp(:'mid','g5',60);   -- Mako, range 1
+select public.submit_attack(:'mid','h4','g5');
+select t_ok(t_get(:'mid','h4','hp')::int = 85,
+            'Mako answers at one tile, so it cannot answer at two');
+select t_ok(t_get(:'mid','g5','hp')::int between 30 and 40, 'and Wuzu rolled its 20-30');
+select t_ok(t_fx(:'mid','counter')::int = 0, 'with no counter recorded at all');
 
-select t_reset(:'mid'); select t_place(:'mid','g1',2,1); select t_place(:'mid','h2',2,3);
-select public.submit_attack(:'mid','h2','g1');   -- Dereo on Dereo
-select t_ok(t_get(:'mid','h2','hp')::int < 70, 'another Dereo DOES answer at two');
+-- And a receiver that DOES reach two answers from two.
+select t_reset(:'mid'); select t_noauras(:'mid');
+select t_place(:'mid','h4',0,3); select t_hp(:'mid','h4',85);   -- Wuzu, range 2
+select t_place(:'mid','g4',0,1); select t_hp(:'mid','g4',75);   -- Lumea, range 2
+select public.submit_attack(:'mid','h4','g4');
+select t_ok(t_get(:'mid','h4','hp')::int < 85,
+            'while Lumea, which reaches two, ANSWERS from two');
 
 -- ---- melee reaches diagonally -------------------------------------------
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
@@ -108,7 +198,9 @@ select t_ok(t_get(:'mid','h1','hp')::int < 110, 'and are answered diagonally');
 
 -- ---- burn -----------------------------------------------------------------
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_place(:'mid','h2',2,3); select t_place(:'mid','g1',2,1);
+-- Nose to nose: the spec's King Dereo has a range of one, where the live
+-- roster's Dereo reached two. Two tiles apart is out of range now.
+select t_place(:'mid','h2',2,2); select t_place(:'mid','g1',2,1);
 select t_hp(:'mid','h2',70); select t_hp(:'mid','g1',70);
 -- Dereo set that Dereo alight two assertions ago; put it out first, or this
 -- section measures the previous test's fire rather than its own.
@@ -145,12 +237,15 @@ select t_ok(t_get(:'m2','h2','name') = 'Eva', 'ben hosts with Eva in slot 2');
 select t_reset(:'m2'); select t_place(:'m2','h2',1,3); select t_place(:'m2','h4',1,4);
 select t_hp(:'m2','h4',40);
 select public.submit_attack(:'m2','h2','h4');
-select t_ok(t_get(:'m2','h4','hp')::int between 45 and 55, 'Eva mends an ally for 5-15');
+-- 15-25 since 0031: the spec gives Eva a 20 where the live roster had 10, and
+-- a mender mends for what it would have hurt for.
+select t_ok(t_get(:'m2','h4','hp')::int between 55 and 65, 'Eva mends an ally for 15-25');
 select t_ok(t_fx(:'m2','heal')::int > 0, 'recorded as a heal, not damage');
 
-select t_reset(:'m2'); select t_hp(:'m2','h4',68);
+-- h4 is Lumea, whose maximum is 75 since 0031 (it was 70).
+select t_reset(:'m2'); select t_hp(:'m2','h4',73);
 select public.submit_attack(:'m2','h2','h4');
-select t_ok(t_get(:'m2','h4','hp')::int = 70, 'mending never goes over maximum HP');
+select t_ok(t_get(:'m2','h4','hp')::int = 75, 'mending never goes over maximum HP');
 
 select t_reset(:'m2'); select t_place(:'m2','g1',1,1);
 select public.submit_attack(:'m2','h2','g1');
@@ -165,23 +260,26 @@ select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1
 
 select t_trees(:'mid', '[{"id":"t1","x":0,"y":4,"hp":30,"maxHp":30}]'::jsonb);
 select t_place(:'mid','h1',3,5); select t_place(:'mid','h2',4,5); select t_place(:'mid','h4',5,5);
-select t_place(:'mid','h3',0,5);      -- Mako, mov 3
-select t_raises(format('select public.submit_move(%L,''h3'',0,2)', :'mid'),
+select t_place(:'mid','h3',0,5);      -- Mako, mov 2 since 0031
+select t_raises(format('select public.submit_move(%L,''h3'',0,3)', :'mid'),
                 'cannot reach', 'a tree makes a walker go around it');
-select public.submit_move(:'mid','h3',1,3);
-select t_ok(t_get(:'mid','h3','x')='1' and t_get(:'mid','h3','y')='3',
-            'three steps around the tree is fine');
+select public.submit_move(:'mid','h3',1,4);
+select t_ok(t_get(:'mid','h3','x')='1' and t_get(:'mid','h3','y')='4',
+            'two steps around the tree is fine');
 select t_reset(:'mid');
 select t_raises(format('select public.submit_move(%L,''h3'',0,4)', :'mid'),
                 'cannot reach', 'and you cannot stand in it');
 
+-- h4 rather than h2: the shot needs a unit that reaches two tiles, and since
+-- 0031 the crown reaches one. Wuzu is the range-2 card on this side.
+select t_reset(:'mid');
 select t_trees(:'mid', '[{"id":"t1","x":2,"y":2,"hp":30,"maxHp":30}]'::jsonb);
-select t_place(:'mid','h2',2,3); select t_place(:'mid','g1',2,1);
+select t_place(:'mid','h4',2,3); select t_place(:'mid','g1',2,1);
 select t_full(:'mid','g1');
-select t_raises(format('select public.submit_attack(%L,''h2'',''g1'')', :'mid'),
+select t_raises(format('select public.submit_attack(%L,''h4'',''g1'')', :'mid'),
                 'tree is in the way', 'a tree in the line stops the shot');
 select t_trees(:'mid', '[{"id":"t1","x":0,"y":2,"hp":30,"maxHp":30}]'::jsonb);
-select public.submit_attack(:'mid','h2','g1');
+select public.submit_attack(:'mid','h4','g1');
 select t_ok(t_get(:'mid','g1','hp')::int < t_get(:'mid','g1','maxHp')::int,
             'a tree off the line does not');
 
@@ -192,13 +290,21 @@ select t_hp(:'mid','g4',70);          -- it has been shot at all file; stand it 
 select public.submit_attack(:'mid','h1','g4');
 select t_ok(t_get(:'mid','g4','hp')::int < 70, 'a neighbouring tree does not block a melee hit');
 
-select t_reset(:'mid'); select t_hp(:'mid','h4',120);
+-- Wuzu hits for 20-30 since 0031, where the live roster had it on 31-41 --
+-- so felling a 30-point tree is no longer a certainty and the blow is pinned
+-- rather than rolled. A test that passes four times in five is worse than no
+-- test: it teaches you to re-run it.
+select t_reset(:'mid'); select t_hp(:'mid','h4',85);
 select t_place(:'mid','h4',2,3);      -- Wuzu beside the tree
 select t_ok(t_tree_hp(:'mid','t1') = 30, 'a tree has 30 HP');
+select t_dmg(:'mid','h4',20);
+select public.submit_attack(:'mid','h4','t1');
+select t_ok(t_tree_hp(:'mid','t1') = 10, 'a 20-point blow takes a tree to 10');
+select t_reset(:'mid'); select t_dmg(:'mid','h4',30);
 select public.submit_attack(:'mid','h4','t1');
 select t_ok((select jsonb_array_length(state->'obstacles') from public.matches where id=:'mid') = 0,
-            'Wuzu fells a tree in one swing');
-select t_ok(t_get(:'mid','h4','hp')::int = 120, 'a tree does not counter');
+            'and the next one fells it');
+select t_ok(t_get(:'mid','h4','hp')::int = 85, 'a tree does not counter');
 
 -- ---- decks fall back when the roster changes underneath them ------------
 select t_ok(public.deck_of('bbbbbbbb-0000-0000-0000-000000000002')

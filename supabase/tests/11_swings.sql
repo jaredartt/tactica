@@ -46,7 +46,7 @@ select t_match('eeee0000-0000-0000-0000-00000000000e',
 -- from 09_combat.sql's t_duel rather than shared with it: this file has to
 -- keep passing on the day somebody retunes that one.
 create or replace function t_duel2(p_m uuid) returns void language sql as $$
-  select t_reset(p_m),
+  select t_reset(p_m), t_noauras(p_m),
          t_place(p_m,'h1',2,2), t_place(p_m,'g3',2,3),
          t_full(p_m,'h1'), t_full(p_m,'g3'),
          t_dmg(p_m,'h1',40), t_dmg(p_m,'g3',40),

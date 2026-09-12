@@ -47,17 +47,23 @@ select t_place(:'m','h2',2,5);                          -- Mako, mov 3, same lan
 select t_raises(format('select public.submit_move(%L,''h2'',2,2)', :'m'),
                 'cannot reach', 'Mako has to go round both');
 
--- ---- Wuzu walks through the wood ----------------------------------------
+-- ---- Wuzu goes OVER the wood now ----------------------------------------
+-- It walked through it until 0031, felling it on the way. The spec has no
+-- trampling in it anywhere and makes Wuzu a Flying unit, so the tree is
+-- something it passes over and leaves standing. The old behaviour is asserted
+-- as gone rather than deleted, so that anybody who brings trampling back finds
+-- out here.
 select t_reset(:'m');
 select t_trees(:'m', '[{"id":"t1","x":2,"y":4,"hp":30,"maxHp":30}]'::jsonb);
 select t_place(:'m','h2',5,0);
-select t_place(:'m','h4',2,5);                          -- Wuzu, mov 1, tree ahead
-select public.submit_move(:'m','h4',2,4);
-select t_ok(t_get(:'m','h4','y') = '4', 'Wuzu steps onto the tree''s tile');
-select t_ok((select jsonb_array_length(state->'obstacles') from public.matches where id=:'m') = 0,
-            'and the tree is gone');
-select t_ok((select state->'log'->-1->>'text' from public.matches where id=:'m')
-              like '%comes down%', 'the log says so');
+select t_place(:'m','h4',2,5);                          -- Wuzu, mov 3, tree ahead
+select public.submit_move(:'m','h4',2,3);
+select t_ok(t_get(:'m','h4','y') = '3', 'WUZU FLIES OVER THE TREE');
+select t_ok((select jsonb_array_length(state->'obstacles') from public.matches where id=:'m') = 1,
+            'and the tree is still standing — nothing tramples any more');
+select t_reset(:'m'); select t_place(:'m','h4',2,5);
+select t_raises(format('select public.submit_move(%L,''h4'',2,4)', :'m'),
+                'cannot reach', 'and it cannot come down in one either');
 
 -- ---- Mako is never answered ---------------------------------------------
 select t_reset(:'m'); select t_trees(:'m', '[]'::jsonb);
@@ -96,7 +102,8 @@ select t_place(:'m','h3',2,4); select t_place(:'m','h1',2,3);   -- Umiro beside 
 select t_ok(t_get(:'m','h3','cures') = 'true', 'Umiro cures');
 select public.submit_attack(:'m','h3','h1');
 select t_ok(t_get(:'m','h1','burned') = 'false', 'mending an ally puts the fire out');
-select t_ok(t_get(:'m','h1','hp')::int between 50 and 60, 'and mends 10-20 while doing it');
+-- 20-30 since 0031: the spec gives Umiro a 25 where the live roster had 15.
+select t_ok(t_get(:'m','h1','hp')::int between 60 and 70, 'and mends 20-30 while doing it');
 select t_ok(t_fx(:'m','cured') = 'true', 'the clients are told, so they can show it');
 
 -- Eva mends but does not cure
@@ -153,7 +160,8 @@ select t_reset(:'p'); select t_place(:'p','h1',2,2); select t_place(:'p','g1',2,
 select t_hp(:'p','h1',8); select t_full(:'p','g1');
 select public.submit_attack(:'p','h1','g1');
 select t_ok(not t_alive(:'p','h1'), 'Lium kills the attacker with the answer');
-select t_ok(t_get(:'p','g1','hp')::int = 80,
+-- 85 since 0031; the spec's Lium, where the live roster had 80.
+select t_ok(t_get(:'p','g1','hp')::int = 85,
             'and the blow it was answering never lands -- Lium is untouched');
 select t_ok(t_fx(:'p','dmg')::int = 0, 'recorded as no damage dealt');
 select t_ok(t_fx(:'p','parry') = 'true', 'and flagged as a parry');
@@ -165,29 +173,36 @@ select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 select t_park(:'p', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'p','g2','name') = 'Himanta', 'the guest fields Himanta in slot 2');
 
+-- Himanta flew until 0031 and this block asserted that it crossed trees and
+-- bodies. The spec makes it a ROGUE -- flight belongs to the Flying class now
+-- -- so it is on the ground with everybody else, and the old behaviour is
+-- asserted as gone rather than deleted.
 select t_trees(:'p', '[{"id":"t1","x":3,"y":4,"hp":30,"maxHp":30}]'::jsonb);
 select t_place(:'p','g2',3,5);       -- Himanta, mov 2, a tree directly ahead
 select t_place(:'p','g3',2,5);       -- and the only way round it blocked
-select public.submit_move(:'p','g2',3,3);
-select t_ok(t_get(:'p','g2','y') = '3',
-            'Himanta crosses a tree a walker would have to go round');
-
-select t_reset(:'p'); select t_place(:'p','g2',3,5); select t_place(:'p','g3',3,3);
 select t_raises(format('select public.submit_move(%L,''g2'',3,3)', :'p'),
-                'cannot reach', 'but it still cannot land on somebody');
+                'cannot reach', 'HIMANTA IS A ROGUE NOW, and walks: the tree is in its way');
+
+select t_reset(:'p'); select t_place(:'p','g2',3,5); select t_place(:'p','g3',0,5);
+select public.submit_move(:'p','g2',4,4);
+select t_ok(t_get(:'p','g2','x') = '4' and t_get(:'p','g2','y') = '4',
+            'and goes round it like anybody else when there is a way round');
 
 select t_reset(:'p'); select t_place(:'p','g2',3,5);
 select t_raises(format('select public.submit_move(%L,''g2'',3,4)', :'p'),
-                'cannot reach', 'nor come down in a tree');
+                'cannot reach', 'and still cannot stand in a tree');
 
--- it reaches two tiles, which no other flier does
+-- Range 1 since 0031, where the live roster gave it two.
 -- h1 is not on the board any more; it walked into the parry two tests ago
 select t_reset(:'p'); select t_trees(:'p', '[]'::jsonb);
 select t_place(:'p','g2',2,2); select t_place(:'p','h2',2,4);
 select t_full(:'p','h2');
+select t_raises(format('select public.submit_attack(%L,''g2'',''h2'')', :'p'),
+                'out of range', 'and it no longer strikes from two tiles away');
+select t_place(:'p','h2',2,3);
 select public.submit_attack(:'p','g2','h2');
 select t_ok(t_get(:'p','h2','hp')::int < t_get(:'p','h2','maxHp')::int,
-            'and strikes from two tiles away');
+            'but it strikes what is next to it');
 
 select set_config('app.uid','11110000-0000-0000-0000-00000000000a',false);
 -- ---- Sinie mends everyone at once ---------------------------------------
@@ -205,9 +220,12 @@ select t_ok(t_get(:'b','h1','blooms') = 'true', 'and she carries the flag');
 
 -- three allies hurt: one clicked, one in reach, one out of it
 select t_reset(:'b');
-select t_place(:'b','h1',2,2);          -- Sinie, reach 1-2
-select t_place(:'b','h2',2,3);          -- clicked
-select t_place(:'b','h3',3,1);          -- in reach, not clicked
+-- Sinie reaches THREE since 0031, and a 6x6 board has no tile further than
+-- three from the middle -- so she starts in the corner, or "out of reach"
+-- cannot exist to be tested.
+select t_place(:'b','h1',0,0);          -- Sinie, reach 1-3
+select t_place(:'b','h2',0,1);          -- clicked
+select t_place(:'b','h3',1,1);          -- in reach, not clicked
 select t_place(:'b','h4',5,5);          -- far away
 select t_hp(:'b','h2',10); select t_hp(:'b','h3',10); select t_hp(:'b','h4',10);
 select public.submit_attack(:'b','h1','h2');

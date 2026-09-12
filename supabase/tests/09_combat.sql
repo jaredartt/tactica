@@ -96,7 +96,8 @@ select t_park(:'m', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 select t_ok(t_get(:'m','h1','name') = 'Dione & Grifo', 'the host leads with the pair');
 select t_ok(t_get(:'m','g3','name') = 'Lumea', 'and the guest fields Lumea in slot 3');
 select t_ok(t_get(:'m','h2','royal') = 'true', 'the crown came onto the board flagged');
-select t_ok(t_get(:'m','h1','pow')::int = 22, 'and every unit carries its single number');
+-- 30 since 0031: the spec's number for the pair, where the live roster had 22.
+select t_ok(t_get(:'m','h1','pow')::int = 30, 'and every unit carries its single number');
 select t_ok(t_get(:'m','h1','parryPct')::int = 5 and t_get(:'m','h1','critPct')::int = 5,
             'with the two rates beside it');
 select t_ok(t_get(:'m','g1','parryPct')::int = 5, 'Lium is the only one better at it');
@@ -104,7 +105,7 @@ select t_ok(t_get(:'m','g1','parryPct')::int = 5, 'Lium is the only one better a
 -- Stand the two of them a tile apart and fix both to 40, so every number
 -- below is exact rather than a band.
 create or replace function t_duel(p_m uuid) returns void language sql as $$
-  select t_reset(p_m),
+  select t_reset(p_m), t_noauras(p_m),
          t_place(p_m,'h1',2,2), t_place(p_m,'g3',2,3),
          t_full(p_m,'h1'), t_full(p_m,'g3'),
          t_dmg(p_m,'h1',40), t_dmg(p_m,'g3',40),
@@ -231,7 +232,7 @@ select t_trees(:'k', '[]'::jsonb);
 select t_park(:'k', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
 set cn.force_parry = 'never'; set cn.force_crit = 'never';
 
-select t_ok(t_get(:'k','g1','name') = 'Dereo' and t_get(:'k','g1','royal') = 'true',
+select t_ok(t_get(:'k','g1','name') = 'King Dereo' and t_get(:'k','g1','royal') = 'true',
             'the guest''s crown is g1');
 select t_reset(:'k');
 select t_place(:'k','h1',2,2); select t_place(:'k','g1',2,3);

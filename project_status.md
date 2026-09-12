@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 704 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 742 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, and `21_reach.sql` is 0030's. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, `21_reach.sql` is 0030's, and `22_auras.sql` is F1's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1275,6 +1275,27 @@ Answered by Jared, and they matter more than the ordering:
   phase of its own and it is now not needed.
 - **The damage roll stays.** The spec's one DMG number is the middle; the
   engine keeps rolling it plus or minus five.
+
+### F1 · The numbers, the classes and the crowns — DONE
+
+**`0031_roster_numbers.sql` is built and tested (`22_auras.sql`) but NOT
+yet run in production.** What it turned out to cost is worth recording: the
+migration is one file, and **eleven existing test files had to change**.
+Every one of them was a number pinned to the live roster asserting itself --
+which is the guard working, not failing. Dereo at 70 hit points, Lium at 80,
+Mako crossing three tiles, Wuzu felling a tree in one swing, Himanta gliding
+over it, Eva mending 5-15, Sinie unable to reach the far corner of a 6x6
+board, "Dereo cannot strike something in its face". The old behaviour is
+asserted as GONE rather than deleted wherever the change is a rule change,
+so that anybody who brings trampling or a gliding Rogue back finds out here.
+
+Two things the measuring caught that reading would not have. `cn_classes()`
+must stay callable by everybody: `cn_check_card` is a plain trigger function,
+so revoking it turned a non-admin's refused INSERT into "permission denied
+for function cn_classes" instead of the RLS refusal it is meant to be. And
+the auras reach into every test that measures an exact number, because every
+deck carries a Royal -- `t_noauras()` in the helpers is how a test says it is
+measuring arithmetic rather than arithmetic plus a crown.
 
 ### F1 · The numbers, the classes and the crowns
 

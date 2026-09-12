@@ -22,9 +22,11 @@ select t_ok((select count(*) from public.cards where range <> rmax) = 0,
 
 -- The two this was reported about, by name, because "no card has X" passes
 -- happily on an empty table and these are the two that were wrong.
-select t_ok((select range from public.cards where slug = 'dereo') = 2
-        and (select rmin from public.cards where slug = 'dereo') = 1,
-            'DEREO still reaches two, and can now be got at from next door');
+-- Dereo reached two until 0031, which gave the spec's Royal a range of one.
+-- Wuzu carries the range-2 half of this assertion now.
+select t_ok((select range from public.cards where slug = 'wuzu') = 2
+        and (select rmin from public.cards where slug = 'wuzu') = 1,
+            'WUZU reaches two, and can be got at from next door');
 select t_ok((select range from public.cards where slug = 'fey') = 3
         and (select rmin from public.cards where slug = 'fey') = 1
         and (select crmax from public.cards where slug = 'fey') = 3,
@@ -63,7 +65,7 @@ select set_config('request.jwt.claims', '', false);
 
 -- ---- and it is true on the board, not only in the table ---------------------
 -- The columns are only worth anything if the attack validation reads them, so
--- this walks a range-2 mage up to a foe and strikes it from ONE tile away --
+-- this walks a range-2 unit up to a foe and strikes it from ONE tile away --
 -- the exact move that used to be refused with "too close for that unit".
 delete from public.match_results; delete from public.matches; delete from auth.users;
 insert into auth.users (id, email, raw_user_meta_data) values
@@ -86,7 +88,7 @@ select public.set_ready(:'id');
 select t_trees(:'id','[]'::jsonb);
 
 select u->>'id' as mage from public.matches m, jsonb_array_elements(m.state->'units') u
- where m.id = :'id' and u->>'owner' = 'host' and u->>'slug' = 'dereo' limit 1 \gset
+ where m.id = :'id' and u->>'owner' = 'host' and u->>'slug' = 'wuzu' limit 1 \gset
 select u->>'id' as prey from public.matches m, jsonb_array_elements(m.state->'units') u
  where m.id = :'id' and u->>'owner' = 'guest' limit 1 \gset
 
@@ -104,4 +106,4 @@ select t_ok((select (u->>'hp')::int from public.matches m,
             < (select (u->>'maxHp')::int from public.matches m,
                  jsonb_array_elements(m.state->'units') u
                 where m.id = :'id' and u->>'id' = :'prey'),
-            'A RANGE-2 MAGE CAN STRIKE THE THING STANDING NEXT TO IT — which it could not before 0030');
+            'A RANGE-2 UNIT CAN STRIKE THE THING STANDING NEXT TO IT — which it could not before 0030');

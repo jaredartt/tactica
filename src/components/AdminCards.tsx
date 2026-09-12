@@ -32,8 +32,11 @@ import { clearCards } from '../lib/useCards'
 type Row = Card & { is_active: boolean }
 
 const BLANK: Omit<Row, 'id'> = {
-  slug: '', name: '', role: '', hp: 80, mov: 2,
+  slug: '', name: '', hp: 80, mov: 2,
   // `range` is the one that is edited; the other four follow it server-side.
+  // A new card starts as a Knight rather than as nothing: since 0031 an
+  // active card must have one of the five classes, and '' is not one.
+  role: 'knight',
   range: 1, rmin: 1, rmax: 1, crmin: 1, crmax: 1, dmin: 15, dmax: 25, power: 20,
   parry_pct: 5, crit_pct: 5, parry_all: false, royal: false,
   burns: false, heals: false, tramples: false, flies: false,
@@ -142,7 +145,17 @@ export function AdminCards() {
               <input value={draft.name ?? ''} onChange={(e) => set({ name: e.target.value })} />
             </label>
             <label><span>Role</span>
-              <input value={draft.role ?? ''} onChange={(e) => set({ role: e.target.value })} />
+              {/* A picker, not a text box. Since 0031 a class is one of five
+                  checked values -- it is what the Royal auras match on -- so
+                  typing "Swordsmen" here would be a card the server refuses,
+                  and finding that out on Save is a worse way to learn it. */}
+              <select value={draft.role ?? ''} onChange={(e) => set({ role: e.target.value })}>
+                <option value="royal">Royal</option>
+                <option value="rogue">Rogue</option>
+                <option value="knight">Knight</option>
+                <option value="mage">Mage</option>
+                <option value="flying">Flying</option>
+              </select>
             </label>
             <label className="admin-colour"><span>Accent</span>
               <input

@@ -218,24 +218,27 @@ select t_raises(format('select public.save_kingdom(''kC'', null, null, %L::text[
 -- kind of rule that rots untested. The slug is captured in a variable rather
 -- than found again afterwards: "put back whichever one is royal and is not
 -- dereo" is a restore that hardcodes today's roster to undo itself.
-do $$ declare v_borrowed text; begin
-  select slug into v_borrowed from public.cards
+-- Since 0031 `royal` is DERIVED from the class, so the crown is borrowed by
+-- borrowing the class: setting the flag alone is overwritten by the trigger on
+-- its way in, which is the flag doing its job.
+do $$ declare v_borrowed text; v_was text; begin
+  select slug, role into v_borrowed, v_was from public.cards
    where is_active and not royal order by sort limit 1;
-  update public.cards set royal = true where slug = v_borrowed;
+  update public.cards set role = 'royal' where slug = v_borrowed;
   perform t_raises(format('select public.save_kingdom(''kC'', null, null, %L::text[])',
                           array(select slug from public.cards
                                  where is_active and royal order by sort)
                             || t_plain(public.deck_size() - 2)),
                    'exactly one royal',
                    'and a finished deck with two is refused too');
-  update public.cards set royal = false where slug = v_borrowed;
+  update public.cards set role = v_was where slug = v_borrowed;
 end $$;
 select t_ok((select count(*) from public.cards where is_active and royal) = 1,
             'the roster is back to one crown');
 
 select t_raises(format('select public.save_kingdom(''kC'', null, null, %L::text[])',
-                       array[t_crown(), t_plain(1)[1], t_plain(1)[1],
-                             t_plain(2)[2], t_plain(3)[3]]),
+                       array[t_crown(), (t_plain(1))[1], (t_plain(1))[1],
+                             (t_plain(2))[2], (t_plain(3))[3]]),
                 'no repeats',
                 'and one with the same card twice as well');
 
@@ -342,7 +345,7 @@ select t_ok(public.deck_of('c1110000-0000-0000-0000-00000000001c') = t_legal(),
 -- block for the same reason as the borrowed crown above: "reactivate whatever
 -- is inactive" would wake up cards that were meant to stay asleep.
 do $$ declare v_gone text; begin
-  v_gone := t_plain(1)[1];
+  v_gone := (t_plain(1))[1];
   update public.cards set is_active = false where slug = v_gone;
   perform t_ok(public.deck_of('c1110000-0000-0000-0000-00000000001c') = public.default_deck(),
                'a kingdom holding a card that has since left the roster is not fielded');

@@ -113,3 +113,26 @@ export function primeLang() {
   const lang = currentLang()
   if (lang !== 'en') void loadLang(lang)
 }
+
+/**
+ * A unit's class, in the reader's language.
+ *
+ * Written out one branch at a time rather than as `t('class.' + role)`, and
+ * this project has the scar to justify the tedium: `t('settings.theme' + v)`
+ * once shipped the literal string `settings.themeSystem` onto a screen,
+ * because a constructed key is invisible to a search and invisible to
+ * i18ncheck. Five branches is a small price for a key nobody can lose.
+ *
+ * An unrecognised class falls through to itself, so a card added by hand shows
+ * its own word rather than a blank space.
+ */
+export function useClassName(): (role: string | null | undefined) => string {
+  const t = useT()
+  return (role) =>
+    role === 'royal' ? t('class.royal')
+    : role === 'rogue' ? t('class.rogue')
+    : role === 'knight' ? t('class.knight')
+    : role === 'mage' ? t('class.mage')
+    : role === 'flying' ? t('class.flying')
+    : (role ?? '')
+}

@@ -273,5 +273,10 @@
   "tourney.bye": "bye",
   "tourney.done": "played",
   "tourney.waiting": "not yet",
-  "tourney.play": "Play"
+  "tourney.play": "Play",
+  "class.royal": "Royal",
+  "class.rogue": "Rogue",
+  "class.knight": "Knight",
+  "class.mage": "Mage",
+  "class.flying": "Flying"
 }

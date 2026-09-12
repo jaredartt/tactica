@@ -90,7 +90,7 @@ select t_ok((select count(*) = 5 from public.match_deploy d, jsonb_array_element
               where d.match_id=:'mid' and d.side='guest' and (u->>'y')::int >= 4),
             'the guest army starts at the top');
 select t_ok(t_dget(:'mid','guest','g1','name') = 'Wuzu', 'the guest fields the deck they chose');
-select t_ok(t_dget(:'mid','host','h2','name') = 'Dereo', 'the host fields the deck they chose');
+select t_ok(t_dget(:'mid','host','h2','name') = 'King Dereo', 'the host fields the deck they chose');
 select t_ok((select count(*) = 0 from public.match_deploy d,
                  jsonb_array_elements(d.units) u, public.matches m,
                  jsonb_array_elements(m.state->'obstacles') o
@@ -181,9 +181,11 @@ select t_raises(format('select public.submit_move(%L,''h1'',9,9)', :'mid'),
 select t_raises(format('select public.submit_move(%L,''h1'',1,5)', :'mid'),
                 'cannot reach', 'cannot stack two units on a tile');
 
-select public.submit_move(:'mid', 'h1', 0, 3);
-select t_ok(t_get(:'mid','h1','y') = '3', 'move applied');
-select t_raises(format('select public.submit_move(%L,''h1'',0,4)', :'mid'),
+-- One tile, not two: h1 is Dione & Grifo and the spec gives a Knight a move
+-- of 1. It was 2 until 0031.
+select public.submit_move(:'mid', 'h1', 0, 4);
+select t_ok(t_get(:'mid','h1','y') = '4', 'move applied');
+select t_raises(format('select public.submit_move(%L,''h1'',0,3)', :'mid'),
                 'already moved', 'one move per unit per turn');
 
 select public.end_turn(:'mid');
@@ -279,7 +281,11 @@ select t_norows(format('update public.matches set state = ''{}''::jsonb where id
 -- editor's guard rails that was refused by the slug check before the policy
 -- ever got a look at it. The assertion still passed, for the wrong reason: it
 -- was testing the validator, not the wall.
-select t_raises('insert into public.cards (slug, name, accent) values (''cheat'', ''Cheat'', ''#2f4bff'')',
+-- ...and 0031 made it happen a second time: a card with no CLASS is refused
+-- by the trigger before the policy is consulted. The row here is valid in
+-- every way a card can be valid, so the only thing left to stop it is the wall.
+select t_raises('insert into public.cards (slug, name, role, accent)
+                   values (''cheat'', ''Cheat'', ''knight'', ''#2f4bff'')',
                 'policy', 'non-admins cannot add cards');
 -- bob is the guest in both rooms, so he should see guest rows and, however
 -- he asks, never a host one.

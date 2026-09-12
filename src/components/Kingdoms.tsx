@@ -8,7 +8,7 @@ import {
   DECK_SIZE, reachText, type Card, type Kingdom, type Profile, unitPower,
 } from '../lib/types'
 import { artUrl } from '../lib/art'
-import { abilityText, useT } from '../lib/i18n'
+import { abilityText, useClassName, useT } from '../lib/i18n'
 import { Ability } from './Ability'
 import { Avatar } from './Avatar'
 import { Modal } from './Modal'
@@ -54,6 +54,7 @@ export function Kingdoms({ profile, roster, onProfile }: {
   onProfile: (patch: Partial<Profile>) => void
 }) {
   const t = useT()
+  const className = useClassName()
   const cards = useMemo(() => new Map(roster.map((c) => [c.slug, c])), [roster])
 
   // An account with nothing saved starts on a blank one rather than on an
@@ -271,7 +272,7 @@ export function Kingdoms({ profile, roster, onProfile }: {
               return (
                 <button
                   key={c.id} type="button" aria-pressed={picked}
-                  aria-label={t('team.cardLabel', { name: c.name, role: c.role })}
+                  aria-label={t('team.cardLabel', { name: c.name, role: className(c.role) })}
                   className={`rtile${picked ? ' is-picked' : ''}${!picked && full ? ' is-spare' : ''}`}
                   style={{ '--accent': c.accent } as React.CSSProperties}
                   onClick={() => toggleCard(c.slug)}
@@ -287,7 +288,7 @@ export function Kingdoms({ profile, roster, onProfile }: {
                   <span className="rtile-info">
                     <span className="rti-head">
                       <b>{c.name}</b>
-                      {c.role && <em>{c.role}</em>}
+                      {c.role && <em>{className(c.role)}</em>}
                     </span>
                     <span className="rti-stats">
                       <span><i>{t('stat.hp')}</i><b>{c.hp}</b></span>

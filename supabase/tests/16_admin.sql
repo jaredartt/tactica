@@ -48,7 +48,9 @@ language sql stable as $$ select count(*)::int from public.cards where is_active
 create or replace function t_spare() returns void language sql as $$
   insert into public.cards (slug, name, role, hp, mov, rmin, rmax, crmin, crmax,
                             dmin, dmax, power, accent, sort, is_active)
-  values ('t-spare', 'Spare', 'Test', 80, 2, 1, 1, 1, 1, 15, 25, 20, '#123456', 99, true)
+  -- 'knight' rather than 'Test': since 0031 a class is one of five checked
+  -- values, and a spare card has to be a real kind of thing like any other.
+  values ('t-spare', 'Spare', 'knight', 80, 2, 1, 1, 1, 1, 15, 25, 20, '#123456', 99, true)
   on conflict (slug) do update set is_active = true;
 $$;
 
@@ -123,14 +125,34 @@ select t_raises('update public.cards set is_active = false where royal',
                 'RETIRING THE LAST ROYAL IS REFUSED — a match with no royal cannot end');
 select t_ok(t_crowns() = 1, 'and the crown is still there afterwards');
 
-select t_raises('update public.cards set royal = false where royal',
+-- Un-crowning by hand does not reach the statement trigger any more: since
+-- 0031 `royal` is DERIVED from the class, so the write is overwritten on its
+-- way in and the crown never leaves. Stronger than the refusal it replaces --
+-- there is no longer a way to ask for the thing that had to be refused.
+update public.cards set royal = false where royal;
+select t_ok(t_crowns() = 1,
+            'and un-crowning by hand does nothing at all now — the class is the crown');
+-- Taking the class away trips the AURA guard first: Dereo carries one, and an
+-- aura on something that is not a Royal is a card that cannot be right. So the
+-- crown is guarded twice over, and both guards are worth naming.
+select t_raises('update public.cards set role = ''mage'' where slug = ''dereo''',
+                'only a Royal carries an aura',
+                'while taking the class away trips the aura guard first');
+update public.cards set aura_kind = null, aura_class = null, aura_pct = null
+ where slug = 'dereo';
+select t_raises('update public.cards set role = ''mage'' where slug = ''dereo''',
                 'no royal left',
-                'and so is quietly un-crowning it, which is the same thing');
+                'AND WITH THE AURA OUT OF THE WAY, THE ROSTER STILL REFUSES TO LOSE ITS CROWN');
+update public.cards set aura_kind = 'resist', aura_class = 'knight', aura_pct = 20
+ where slug = 'dereo';
+select t_ok((select aura_pct from public.cards where slug = 'dereo') = 20,
+            'and the aura is handed back, so nothing after this file is playing a different game');
 
--- Not the last one. A second crown means either may go.
-update public.cards set royal = true where slug = 't-spare';
+-- Not the last one. A second crown means either may go -- and since 0031 a
+-- crown is a CLASS, so the spare is promoted rather than flagged.
+update public.cards set role = 'royal' where slug = 't-spare';
 select t_ok(t_crowns() = 2, 'with two crowns on the roster');
-update public.cards set royal = false where slug = 't-spare';
+update public.cards set role = 'knight' where slug = 't-spare';
 select t_ok(t_crowns() = 1, 'the second one can be taken off again');
 
 -- Everything EXCEPT the crown, so it is the SIZE rule that has to refuse this

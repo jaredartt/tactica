@@ -40,6 +40,17 @@ end $$;
 -- Rigging. These write the board directly, which no client can do -- that is
 -- the point: a test needs a known position, not a random one.
 -- ---------------------------------------------------------------------------
+-- The crowns, silenced. 0031 gave the Royals auras that reach across the whole
+-- board -- Dereo takes 20% off every blow a Knight lands on his side -- and
+-- every deck in this suite carries a Royal, because a kingdom must. So any
+-- test measuring an EXACT number is measuring the aura too unless it says
+-- otherwise. This is how it says otherwise. The auras have their own file.
+create or replace function t_noauras(p_m uuid) returns void language sql as $$
+  update public.matches set state = jsonb_set(state, '{units}', (
+    select jsonb_agg(u - 'auraKind' - 'auraClass' - 'auraPct')
+      from jsonb_array_elements(state->'units') u)) where id = p_m;
+$$;
+
 create or replace function t_set(p_m uuid, p_u text, p_key text, p_val jsonb)
 returns void language sql as $$
   update public.matches set state = jsonb_set(state, '{units}', (
