@@ -13,6 +13,7 @@ import { useT } from '../lib/i18n'
 import { useCards } from '../lib/useCards'
 import { Avatar } from './Avatar'
 import { IconGear } from './Icons'
+import { AdminCards } from './AdminCards'
 import { Kingdoms } from './Kingdoms'
 import { KingdomSwitch } from './KingdomSwitch'
 import { Logo } from './Logo'
@@ -49,7 +50,15 @@ const TILES = [
   { id: 'ladder',   tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%' },
   { id: 'team',     tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%' },
   { id: 'comics',   tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%'  },
+  /* Backstage, and only for the one account that has the flag. There is no
+     picture behind it and there should not be: every other tile is a door into
+     the game and this one is a door into the workings. A missing background is
+     invisible rather than broken -- the tile is simply its own flat colour. */
+  { id: 'admin',    tint: '#3f3f56', art: '',                   focus: '0%'  },
 ] as const
+
+/** The tiles that are doors into the game rather than into its workings. */
+const PLAYER_TILES = TILES.filter((t) => t.id !== 'admin')
 
 type PageId = (typeof TILES)[number]['id']
 
@@ -192,7 +201,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
       </header>
 
       <nav className="menu-grid">
-        {TILES.map((tile_) => (
+        {(profile.is_admin ? TILES : PLAYER_TILES).map((tile_) => (
           <button
             key={tile_.id}
             className={`mtile mt-${tile_.id}`}
@@ -236,7 +245,10 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
       {overlay === 'settings' && <SettingsCard onClose={() => setOverlay(null)} />}
 
       {page && tile && (
-        <Page title={title(tile.id)} tint={tile.tint} onClose={close} wide={page === 'team'}>
+        <Page
+          title={title(tile.id)} tint={tile.tint} onClose={close}
+          wide={page === 'team' || page === 'admin'}
+        >
           {page === 'ranked' && (
             <div className="modelist">
               <KingdomSwitch profile={profile} onProfile={onProfile} />
@@ -320,6 +332,12 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
           )}
 
           {page === 'comics' && <Comics />}
+
+          {/* Guarded here as well as in the menu. Nothing else opens this page,
+              but a screen whose only lock is that its door is not drawn is not
+              locked -- and the real lock, the RLS policy on `cards`, is on the
+              server where it belongs. */}
+          {page === 'admin' && profile.is_admin && <AdminCards />}
 
           {page === 'spectate' && (
             <>

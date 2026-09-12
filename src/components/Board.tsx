@@ -40,8 +40,12 @@ const LONG_SLOP = 10
  * The tap that ends a long press must NOT also select, so the fired flag is
  * copied into `swallow` on the way up and read by the click handler that comes
  * after it -- pointerup has already reset everything else by then.
+ *
+ * Lifting does NOT close the card. It used to, which meant a card could only
+ * be read with a finger held over the board -- and made the purple keywords on
+ * it impossible to tap at all, since tapping means letting go first.
  */
-function useLongPress(onFire: () => void, onRelease: () => void) {
+function useLongPress(onFire: () => void) {
   const timer = useRef<number | undefined>(undefined)
   const from = useRef<{ x: number; y: number } | null>(null)
   const fired = useRef(false)
@@ -50,13 +54,20 @@ function useLongPress(onFire: () => void, onRelease: () => void) {
   const stop = () => {
     window.clearTimeout(timer.current)
     from.current = null
-    if (fired.current) { fired.current = false; swallow.current = true; onRelease() }
+    if (fired.current) { fired.current = false; swallow.current = true }
   }
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   return {
     handlers: {
       onPointerDown(e: React.PointerEvent) {
+        // Disarm first. `swallow` is set on the way up and meant to be eaten
+        // by the click that follows -- but since a peeked card puts a scrim in
+        // the way, that click can land somewhere else entirely and never
+        // arrive. Left armed it ate the NEXT ordinary tap on this unit, so a
+        // long press made the unit unselectable exactly once, which is the
+        // kind of bug nobody reports and everybody feels.
+        swallow.current = false
         if (e.pointerType !== 'touch') return
         from.current = { x: e.clientX, y: e.clientY }
         fired.current = false
@@ -107,10 +118,12 @@ interface Props {
   /** The unit or tree the pointer is over. The card it opens is drawn beside
    *  the board, not inside it, so the board reports and Match renders. */
   onHover: (id: string | null) => void
-  /** The unit or tree being held down on a touch screen -- see useLongPress.
-   *  Same shape as onHover and for the same reason: the board knows what is
-   *  being pressed, Match knows where a card goes. */
-  onPeek?: (id: string | null) => void
+  /** The unit or tree a finger has just been held on -- see useLongPress.
+   *  Fires ONCE, on the press; the card it opens stays until something
+   *  dismisses it, which is Match's business rather than the board's. It used
+   *  to close on release, which meant reading a card with your own finger over
+   *  the board, and made the purple keywords on it untappable. */
+  onPeek?: (id: string) => void
   /** Where the opponent is looking, and a way to tell them where you are.
    *  Both optional: a board with neither is simply a board with no ghost on
    *  it, which is what deployment and a finished match should be. */
@@ -520,7 +533,7 @@ export function Board({
           shaking={blow?.tgt === t.id}
           falling={blow?.tgt === t.id && blow.killedTgt}
           onHover={(over) => onHover(over ? t.id : null)}
-          onPeek={(on) => onPeek?.(on ? t.id : null)}
+          onPeek={() => onPeek?.(t.id)}
           onClick={(e) => {
             e.stopPropagation()
             if (shownTargets.has(t.id)) { onAttack(t.id); setMode(null) }
@@ -558,7 +571,7 @@ export function Board({
                   : undefined
             }
             onHover={(over) => onHover(over ? u.id : null)}
-            onPeek={(on) => onPeek?.(on ? u.id : null)}
+            onPeek={() => onPeek?.(u.id)}
             slotRef={(el) => { if (el) slots.current.set(u.id, el); else slots.current.delete(u.id) }}
             onClick={(e) => { e.stopPropagation(); clickUnit(u) }}
           />
@@ -800,10 +813,10 @@ function Tree({
   falling: boolean
   onClick: (e: React.MouseEvent) => void
   onHover: (over: boolean) => void
-  onPeek: (on: boolean) => void
+  onPeek: () => void
 }) {
   const pct = Math.max(0, Math.min(100, (tree.hp / tree.maxHp) * 100))
-  const press = useLongPress(() => onPeek(true), () => onPeek(false))
+  const press = useLongPress(onPeek)
   return (
     <div className="tree-slot" style={style}>
       <div
@@ -873,11 +886,11 @@ function UnitCard({
   slotVars?: React.CSSProperties
   onClick: (e: React.MouseEvent) => void
   onHover: (over: boolean) => void
-  onPeek: (on: boolean) => void
+  onPeek: () => void
   slotRef: (el: HTMLDivElement | null) => void
 }) {
   const t = useT()
-  const press = useLongPress(() => onPeek(true), () => onPeek(false))
+  const press = useLongPress(onPeek)
   const hpPct = Math.max(0, Math.min(100, (unit.hp / unit.maxHp) * 100))
 
   // The piece on the board no longer leans toward the pointer -- it holds

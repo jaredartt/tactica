@@ -177,9 +177,14 @@ select t_ok(t_get(:'mid','h4','hp')::int = 120, 'a tree does not counter');
 -- ---- decks fall back when the roster changes underneath them ------------
 select t_ok(public.deck_of('bbbbbbbb-0000-0000-0000-000000000002')
             = array['dereo','eva','umiro','lumea','mako'], 'a saved team is used');
-update public.cards set is_active = false where slug = 'dereo';
+-- Eva rather than Dereo, and the change is the point rather than a
+-- workaround: Dereo is the roster's only royal, and since 0025 retiring the
+-- last royal is refused outright. A match needs a crown to be able to end, so
+-- "what happens when the last one is retired" is not a state this test gets to
+-- set up any more -- 16_admin.sql asserts the refusal instead.
+update public.cards set is_active = false where slug = 'eva';
 select t_ok(public.deck_of('bbbbbbbb-0000-0000-0000-000000000002') = public.default_deck(),
             'a deck holding a retired card falls back to the default');
-update public.cards set is_active = true where slug = 'dereo';
+update public.cards set is_active = true where slug = 'eva';
 
 \echo '--- combat, terrain and distance: all assertions passed ---'

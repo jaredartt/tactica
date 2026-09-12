@@ -4,6 +4,7 @@ import { reachText, unitPower } from '../lib/types'
 import { artUrl } from '../lib/art'
 import { abilityText, useT } from '../lib/i18n'
 import { lessMotion } from '../lib/settings'
+import { Ability } from './Ability'
 import { useCardsBySlug } from '../lib/useCards'
 
 /**
@@ -166,7 +167,10 @@ export function UnitBigCard({ unit, side, pinned }: {
         {/* The card row's sentence where there is one, the snapshot's
             otherwise -- same rule as the strip under the board. */}
         {say && (
-          <div className="bc-say"><span className="bc-glyph"><Mark /></span><p>{say}</p></div>
+          <div className="bc-say">
+            <span className="bc-glyph"><Mark /></span>
+            <p><Ability text={say} /></p>
+          </div>
         )}
       </div>
     </Shell>
@@ -193,7 +197,7 @@ export function TreeBigCard({ tree, side }: { tree: Obstacle; side: CardSide }) 
         </div>
         <div className="bc-say">
           <span className="bc-glyph"><Mark /></span>
-          <p>{t('tree.note')}</p>
+          <p><Ability text={t('tree.note')} /></p>
         </div>
       </div>
     </Shell>

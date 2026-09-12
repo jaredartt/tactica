@@ -274,7 +274,12 @@ select t_raises(format('select public.cn_set_ready(%L, ''host'', true)', :'mid')
                 'permission denied', 'a player cannot force the other one ready');
 select t_norows(format('update public.matches set state = ''{}''::jsonb where id = %L', :'mid'),
                 'clients cannot write match state directly');
-select t_raises('insert into public.cards (name) values (''Cheat'')',
+-- A card that would otherwise be FINE, on purpose. It used to be
+-- `(name) values ('Cheat')` -- a card with no slug -- and once 0025 added the
+-- editor's guard rails that was refused by the slug check before the policy
+-- ever got a look at it. The assertion still passed, for the wrong reason: it
+-- was testing the validator, not the wall.
+select t_raises('insert into public.cards (slug, name, accent) values (''cheat'', ''Cheat'', ''#2f4bff'')',
                 'policy', 'non-admins cannot add cards');
 -- bob is the guest in both rooms, so he should see guest rows and, however
 -- he asks, never a host one.

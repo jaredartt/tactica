@@ -9,6 +9,7 @@ import {
 } from '../lib/types'
 import { artUrl } from '../lib/art'
 import { abilityText, useT } from '../lib/i18n'
+import { Ability } from './Ability'
 import { Avatar } from './Avatar'
 import { Modal } from './Modal'
 
@@ -295,7 +296,7 @@ export function Kingdoms({ profile, roster, onProfile }: {
                       <span><i>{t('stat.rng')}</i><b>{reachText(c.rmin, c.rmax)}</b></span>
                       <span><i>{t('stat.ctr')}</i><b>{reachText(c.crmin, c.crmax)}</b></span>
                     </span>
-                    {abilityText(c) && <span className="rti-ability">{abilityText(c)}</span>}
+                    <Ability className="rti-ability" text={abilityText(c)} plain />
                     <span className="rti-cta">
                       {t(picked ? 'team.remove' : full ? 'team.full' : 'team.add')}
                     </span>

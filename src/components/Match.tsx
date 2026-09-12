@@ -16,6 +16,7 @@ import {
   unitPower,
 } from '../lib/types'
 import { abilityText, useT } from '../lib/i18n'
+import { Ability } from './Ability'
 import { KingdomSwitch } from './KingdomSwitch'
 import { useCardsBySlug } from '../lib/useCards'
 import { playLose, playTurn, playWin } from '../lib/sfx'
@@ -287,6 +288,9 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
     : hoverTree ? <TreeBigCard tree={hoverTree} side="right" />
     : null
 
+  // Opened by a long press and closed by the next tap anywhere else. The
+  // scrim below is what catches that tap, which also keeps it off the board --
+  // dismissing a card should never be the tap that moves a unit.
   const peekUnit = unitAt(peeked)
   const peekTree = treeAt(peeked)
   const peekCard = peekUnit ? <UnitBigCard unit={peekUnit} side="peek" />
@@ -405,6 +409,13 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
               >
                 {pinnedCard}
                 {hoverCard}
+                {peekCard && (
+                  <div
+                    className="peekscrim"
+                    onPointerDown={() => setPeeked(null)}
+                    aria-hidden="true"
+                  />
+                )}
                 {peekCard}
                 <Board
                   state={shown ?? s}
@@ -447,11 +458,10 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
                       snapshot cannot hold a translation written after the
                       match began. Falls back to the snapshot for a slug that
                       is no longer in the roster. */}
-                  {(abilityText(bySlug.get(selectedUnit.slug)) || selectedUnit.ability) && (
-                    <span className="unitbar-ability">
-                      {abilityText(bySlug.get(selectedUnit.slug)) || selectedUnit.ability}
-                    </span>
-                  )}
+                  <Ability
+                    className="unitbar-ability"
+                    text={abilityText(bySlug.get(selectedUnit.slug)) || selectedUnit.ability}
+                  />
                 </div>
               ) : (
                 /* Mounted even when nothing is selected. If it came and went

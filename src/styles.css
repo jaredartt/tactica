@@ -58,6 +58,11 @@
      green IS the text. The dark theme needs no such thing: on near-black the
      bright green is already 8.1. */
   --good-ink: #0a8043;
+  /* The keyword purple. It is the menu's own team-tile colour, which is
+     already the app's purple, and it clears 4.5 on both papers. Like --you-ink
+     and --good-ink it is a colour that is TYPE rather than a surface, so the
+     dark theme lifts it -- #7c3aed on near-black is 3.25. */
+  --kw: #7c3aed;
 
   --you:     #2f4bff;   /* your side */
   --foe:     #f2503c;   /* the other side */
@@ -107,6 +112,7 @@
      used only where the blue IS the text. */
   --you-ink: #8b9dff;
   --good-ink: var(--good);
+  --kw: #a78bfa;
 }
 
 * { box-sizing: border-box; }
@@ -1320,6 +1326,22 @@ form .btn.primary { width: 100%; margin-top: 10px; }
   z-index: 60;
 }
 .bigcard-peek .bc-box { box-shadow: 0 26px 70px rgba(14, 14, 20, 0.5); }
+/* The card itself takes no taps -- they fall through to the scrim and dismiss
+   it -- but the purple words in it do. That is the whole reason the card stays
+   up after the finger lifts: a keyword cannot be tapped while a finger is
+   already down on the board. */
+.bigcard-peek { pointer-events: none; }
+.bigcard-peek .kw { pointer-events: auto; }
+.peekscrim {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(14, 14, 20, 0.32);
+  /* Its own fade, not the bubble's: kw-in carries a translate, and borrowing
+     it would slide a full-screen scrim in from one side. */
+  animation: peek-fade 0.14s ease-out;
+}
+@keyframes peek-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .peekscrim { animation: none; } }
+:root[data-reduce-motion="1"] .peekscrim { animation: none; }
 @keyframes bc-peek-in {
   from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
 }
@@ -1951,6 +1973,185 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 /* Said plainly and said last, because it is the one sentence on this page that
    is about the NEXT screen rather than this one. */
 .fieldingnote { margin: -4px 0 0; }
+
+/* ---------- the card editor -----------------------------------------------
+
+   Backstage, and it looks like it: a plain two-column form with no lean, no
+   art and no tint. Every other screen in this app is dressed, because every
+   other screen is the game. This one is a table of numbers that decide the
+   game, and dressing it up would make it harder to read a hit-point value at
+   a glance -- which is the only thing anybody is here to do.
+
+   English only, and no keys in the dictionary for any of it: see
+   AdminCards.tsx for why.
+   ------------------------------------------------------------------------- */
+.admin {
+  display: grid; grid-template-columns: minmax(170px, 230px) 1fr;
+  gap: 20px; align-items: start;
+}
+.admin-list { display: flex; flex-direction: column; gap: 4px; }
+.admin-row {
+  display: flex; align-items: center; gap: 8px; text-align: left;
+  padding: 7px 10px; border: 1px solid transparent; border-radius: 9px;
+  background: none; font: inherit; color: var(--ink); cursor: pointer;
+}
+.admin-row:hover { background: var(--paper-2); }
+.admin-row.is-open { border-color: var(--ink); background: var(--paper-2); }
+/* Retired, not gone. It is still in the list because every saved kingdom that
+   holds it still points at it, and finding it again is how you bring it back. */
+.admin-row.is-retired .admin-rowname { opacity: 0.5; text-decoration: line-through; }
+.admin-swatch {
+  flex: none; width: 12px; height: 12px; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(14, 14, 20, 0.18);
+}
+.admin-rowname {
+  flex: 1; font-size: 13px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.admin-tag {
+  flex: none; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.admin-form { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.admin-grid {
+  display: grid; gap: 10px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.admin-nums { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.admin-form label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.admin-form label > span { font-size: 12px; color: var(--muted); }
+.admin-form input[type="text"], .admin-form input:not([type]),
+.admin-form input[type="number"], .admin-form textarea {
+  font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: 8px;
+  padding: 8px 10px; min-width: 0; width: 100%;
+}
+.admin-form textarea { resize: vertical; line-height: 1.4; }
+.admin-form input:focus, .admin-form textarea:focus {
+  outline: none; border-color: var(--you);
+}
+.admin-colour { flex-direction: row !important; align-items: center; flex-wrap: wrap; }
+.admin-colour > span { flex: 1 1 100%; }
+.admin-colour input[type="color"] {
+  flex: none; width: 38px; height: 34px; padding: 2px;
+  border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper);
+}
+.admin-hex { flex: 1 1 9ch; }
+
+/* A GRID, not a wrapping flex row. As a flex row the ten boxes shrank to fit
+   and their labels overflowed sideways into the next one -- "Parries parries"
+   sat on top of the checkbox after it. A track that cannot go below 140px
+   cannot do that, and ten of them wrap into rows on their own. */
+.admin-flags {
+  display: grid; gap: 6px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.admin-flag {
+  flex-direction: row !important; align-items: flex-start; gap: 7px !important;
+  font-size: 13px; cursor: pointer; min-width: 0;
+}
+/* `width: auto`, and it is load-bearing. There is a global `input { width:
+   100% }` near the top of this file for the forms that want it, and a checkbox
+   inside a flex row obeying it became 146px wide -- so its label was pushed a
+   whole grid track to the right and drawn over the neighbour's box. It read as
+   a wrapping bug and was a width. */
+.admin-flag input {
+  flex: none; margin-top: 2px;
+  width: auto; min-width: 0; height: auto;
+}
+.admin-flag > span { font-size: 13px !important; color: var(--ink) !important; }
+.admin-wide { grid-column: 1 / -1; }
+.admin-acts { justify-content: flex-start; }
+
+.admin-arts { display: flex; gap: 14px; flex-wrap: wrap; }
+.admin-arts figure {
+  margin: 0; display: flex; flex-direction: column; gap: 5px; width: 150px;
+}
+/* A broken image is the normal state here -- a card with no art yet, or a slug
+   that has not been uploaded against. It is a box with nothing in it rather
+   than a browser's broken-file glyph. */
+.admin-arts img {
+  width: 150px; height: 150px; object-fit: cover;
+  background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 8px;
+}
+.admin-arts figcaption { font-size: 12px; color: var(--muted); }
+.admin-arts input[type="file"] { font-size: 11px; max-width: 150px; }
+
+@media (max-width: 760px) {
+  .admin { grid-template-columns: 1fr; }
+  .admin-list { flex-direction: row; flex-wrap: wrap; }
+  .admin-row { border: 1px solid var(--line-2); }
+}
+
+/* ---------- the purple words ----------------------------------------------
+
+   A vague word with a number behind it. The number comes out of the database
+   sentence itself -- see keywords.ts -- so nothing here knows anything about
+   burn or crit or parry, and a card retuned in the admin panel arrives with
+   its own tooltips already attached.
+
+   It is a <button> because it is one: it can be tabbed to, it answers a tap on
+   a phone, and it says so. Styled back down to a word, because a word inside a
+   sentence that looks like a control is a sentence nobody reads.
+   -------------------------------------------------------------------------- */
+.kw {
+  font: inherit; color: var(--kw); font-weight: 600;
+  background: none; border: 0; padding: 0; margin: 0;
+  cursor: help;
+  /* Dotted rather than solid: solid reads as a link and this goes nowhere. */
+  text-decoration: underline dotted currentColor;
+  text-underline-offset: 0.18em;
+}
+button.kw:hover, button.kw:focus-visible { text-decoration-style: solid; outline: none; }
+button.kw:focus-visible { border-radius: 3px; box-shadow: 0 0 0 2px var(--kw); }
+/* The number left in the sentence, for the roster grid -- see Ability.tsx on
+   why a hover panel inside a button gets the plain treatment. */
+.kw-inline { color: var(--kw); font-weight: 600; }
+
+/* Not display:none and not zero-size: both are skipped by some screen readers.
+   This is the one that is read and never drawn. */
+.sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; border: 0; overflow: hidden; white-space: nowrap;
+  clip: rect(0 0 0 0); clip-path: inset(50%);
+}
+
+/* Portalled to the body, because every place a keyword appears is inside
+   something that clips -- see Ability.tsx. Fixed, so the coordinates it is
+   given are the ones it is drawn at. */
+.kwbubble {
+  position: fixed; z-index: 80; pointer-events: none;
+  /* --nudge is written by Ability.tsx after measuring, to pull a bubble that
+     ran off the edge back on. Zero unless it did. */
+  transform: translate(calc(-50% + var(--nudge, 0px)), calc(-100% - 10px));
+  max-width: min(62vw, 240px);
+  padding: 6px 10px; border-radius: 9px;
+  background: var(--ink); color: var(--paper);
+  font: 600 12px/1.35 var(--body); text-align: center;
+  white-space: pre-wrap;
+  box-shadow: 0 8px 22px rgba(14, 14, 20, 0.28);
+  animation: kw-in 0.12s ease-out;
+}
+/* The tail. Drawn on the bubble rather than on the word, so it stays put when
+   the bubble is nudged back onto the screen and the word is not underneath it
+   any more -- a tail that lies about where it is pointing is worse than none,
+   so it is centred and small enough to read as a shape rather than a pointer. */
+.kwbubble::after {
+  content: ''; position: absolute; left: 50%; top: 100%;
+  transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--ink);
+}
+@keyframes kw-in {
+  from { opacity: 0; transform: translate(calc(-50% + var(--nudge, 0px)), calc(-100% - 4px)); }
+}
+@media (prefers-reduced-motion: reduce) { .kwbubble { animation: none; } }
+:root[data-reduce-motion="1"] .kwbubble { animation: none; }
+
+/* On the roster tile the panel is drawn over a darkened picture, so the purple
+   has to be the light one whatever the page's theme is doing. */
+.rtile-info .kw, .rtile-info .kw-inline { color: #a78bfa; }
 
 /* ---------- the pre-battle switch -----------------------------------------
 

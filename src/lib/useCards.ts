@@ -48,6 +48,20 @@ export function fetchCards(): Promise<Card[]> {
   return inflight
 }
 
+/**
+ * Forget the roster, so the next screen that wants it fetches it again.
+ *
+ * Exactly one caller: the admin editor, after a card is written. Everything
+ * else reads from one cached fetch per session, which is right for eleven rows
+ * nobody changes -- except at the moment somebody does, and then a screen still
+ * showing the old numbers is a screen disagreeing with the database.
+ */
+export function clearCards() {
+  cache = null
+  inflight = null
+  listeners.forEach((l) => l([]))
+}
+
 export function useCards(): Card[] {
   const [cards, setCards] = useState<Card[]>(cache ?? [])
   useEffect(() => {

@@ -104,10 +104,19 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 555 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 595 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
-Phase C's, and `13_settings.sql`, `14_ability_es.sql` and `15_kingdoms.sql`
-are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql` and
+`16_admin.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+
+**A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
+flaky at about one run in two, and had been since the day it was written:
+`t_match()` lays eight trees at RANDOM, and the "a move does not touch the
+clock" step walks a unit from (2,2) to (3,2) -- which fails outright whenever a
+tree happened to be standing there. `09_combat.sql` clears the trees for
+exactly this reason; `12_clock.sql` never did. One line, `t_trees(:'m','[]')`,
+and six runs out of six. Worth checking in any new file that calls `t_match()`
+and then moves anything.
 
 That script has now had **three** silent-failure bugs, which is worth saying out
 loud: if a test run ever looks too quiet, suspect the runner before you suspect
@@ -207,7 +216,17 @@ The Kingdoms slice was checked with 131 (`kingharness.tsx` + `kcheck.cjs`,
 `lobbyharness.tsx` + `lcheck.cjs`), against nine mutants rather than against
 the old code -- see Phase D below for why and for the list. The card slice
 added 78 more (`cardharness.tsx` + `ccheck.cjs`), and those DO run against the
-previous commit, where 48 of them fail.
+previous commit, where 48 of them fail; the purple words took that file to 124
+and added 116 in node (`kwcheck.cjs`); the admin editor took the lobby suite
+from 25 to 68. **294 browser assertions and 116 in node**, all told.
+
+**The Supabase shim in `mksite.py` is a small fake server now**, not an inert
+stub: it records every rpc, insert, update and storage upload on `window.__DB`,
+answers from `window.__RPC_REPLY`, can be made to refuse with
+`window.__DB_ERR`, and -- since the card editor needed it -- actually APPLIES
+`.eq()` filters rather than handing the same rows to every caller. Most of what
+is worth asserting about an editor is which calls went out, not what was
+drawn.
 
 Phase C's client was checked with 85 browser assertions (the takeover, the
 beats and their captions, the reductions that are named and the ones that are
@@ -333,6 +352,9 @@ live card carries its ability in both languages.
 
 `0024_kingdoms.sql` is **run in production** as of 2026-09-11, so ten kingdoms
 are live.
+
+`0025_admin.sql` is **run in production** as of 2026-09-12, and Jared's own
+row has `is_admin`, so the card editor is live.
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -942,16 +964,162 @@ to `color(srgb 0.46 0.53 0.98)`, components in 0..1, and a parser that only knew
 `rgb()` read those as bytes and failed a colour that was fine. It failed SAFE,
 which is why it survived two slices unnoticed.
 
+#### DONE: the purple words
+
+**There is no keyword table, and that is the whole design.** The roster spec
+settled it in one line -- *"text in parentheses is the tooltip number, not part
+of the description; the word immediately before it is the purple keyword"* --
+and 0023 wrote the spec's sentences into the database verbatim, brackets and
+all. So the ability text is ALREADY marked up, and `lib/keywords.ts` reads the
+marks out of it:
+
+    "Slightly (5%->10%) increased parry rates"
+     ^^^^^^^^  ^^^^^^^^
+     keyword   its number
+
+A hand-kept list of vague words would exist twice over, once per language, and
+would need editing every time a card is retuned in the admin panel -- a deploy
+to change a number that lives in a row. Reading the marks out of the sentence
+costs nothing, works in Spanish without anybody writing any Spanish, and means
+a new card arrives with its own tooltips attached.
+
+**The one exception** is a bracket at the END of a sentence, which is left
+exactly as written. Lumea's "choose where to throw them (15s limit)." would
+otherwise make a keyword of "them".
+
+**The two languages do not always mark the same word**, because the number does
+not always sit in the same place. English says "Slight (25%) chance to strike
+twice" and Spanish "Leve probabilidad (25%) de atacar dos veces", so one marks
+"Slight" and the other "probabilidad". Dione & Grifo goes further: the Spanish
+bracket is at the end of its sentence, so that card has a purple word in
+English and none in Spanish. Both are right about their own sentence, which is
+all a structural rule can promise, and `kwcheck.cjs` pins it.
+
+**The bubble is a portal** and has to be. Every place a keyword appears is
+inside something that clips -- the card's rules strip is line-clamped, the strip
+under the board is one line with an ellipsis -- and `position: fixed` does not
+rescue it either, because the card carries a transform and is therefore the
+containing block for its own fixed descendants.
+
+**Pointer events, not mouse events**, and this was a real bug the browser suite
+caught rather than something reasoned out in advance. With mouseenter-to-open
+and click-to-toggle, a TAP could never open anything: a tap fires a
+compatibility mouseenter first, so the bubble was already open by the time the
+click arrived and the click closed it again. Pointer events carry `pointerType`,
+so a mouse hovers and a finger presses, and each gets the behaviour it actually
+has.
+
+**A peeked card now STAYS UP when the finger lifts**, dismissed by the next tap
+anywhere else (a scrim catches it, which also keeps that tap off the board).
+That is a reversal of what shipped in 5bfb6f7 and it is not cosmetic: a card
+you have to keep a finger on is a card under your finger, and -- the reason it
+had to change -- tapping a keyword means letting go first, so on a phone the
+purple words were unreachable. A second bug fell out of it: the long press's
+click-swallow was only ever consumed by a click on the same token, and with a
+scrim in the way that click lands elsewhere, so the flag stayed armed and ate
+the NEXT ordinary tap on that unit. It is disarmed on the following pointerdown
+now.
+
+On the roster grid in My Kingdom the words are coloured but the number stays in
+the sentence: the tile there is itself a `<button>`, so a button inside it would
+be invalid and its taps would be the tile's taps. A browsing view keeps
+everything visible; the reading view is the card.
+
+Measured with **116 node assertions** (`_to_delete/kwcheck.cjs`, over the real
+text of all eleven cards in both languages -- it is a pure string function and
+belongs in node) plus **124 browser assertions** (`ccheck.cjs`, up from 78),
+against five mutants.
+
+#### DONE (server half): the admin card editor
+
+**Most of the editor already existed.** `profiles.is_admin` has been a column
+since 0001, the trigger that stops anybody promoting themselves has been there
+since 0001, and so has the RLS policy "admins write cards". 0025 adds no
+permission and no new door. What it adds is an answer to "what should an admin
+be prevented from doing by accident", and the answers matter more than they
+look:
+
+- **Retiring the last royal ends the game.** `deck_of` refuses a crownless deck
+  and falls back to `default_deck()`; `default_deck()` is the first five by
+  sort, crown or no crown; and the win condition asks whether a side still has
+  a royal ON THE BOARD. A roster with no royal is a match that cannot end --
+  both armies field five commoners and nobody can lose. One `update cards set
+  is_active = false` away, and it does not look like a mistake while you make
+  it.
+- **Dropping below five active cards** makes every deck in every account the
+  wrong length at once.
+- **A seven-character hex is not a colour.** `--ink: #ecectf4` was a real typo
+  in this project's dark palette; an accent goes from this table straight into
+  a style attribute and fails silently on screen.
+
+So 0025 is a BEFORE row trigger (repair what can be repaired -- trim, lowercase
+-- refuse the rest with a sentence rather than a constraint name) and a
+STATEMENT-level AFTER trigger for the two roster-wide facts, which are
+questions about the table after the whole update has landed. Plus the `art`
+storage bucket, wrapped in a check for the storage schema so the test harness
+-- which fakes only what the migrations need -- still applies the file.
+
+**There is deliberately no function that grants admin.** Only `service_role`
+can set the flag, which is what the dashboard's SQL editor runs as:
+`update public.profiles set is_admin = true where id = '<uuid>'`. Not even an
+admin can make another one. A door nobody needs is a door nobody has to defend.
+
+Two existing tests moved with it, and both moves are the guard proving itself.
+`01_rules.sql` used to insert a card with no slug to check the RLS wall
+refused it -- the slug guard now refuses it first, so the assertion passed for
+the wrong reason and it inserts a valid card instead. `04_roster.sql` used to
+retire **Dereo**, the only royal, to test the fallback; that is now refused
+outright, so it retires Eva.
+
+#### DONE (client half): the admin card editor
+
+`AdminCards.tsx`, reached by an eighth menu tile that is only drawn for an
+account with the flag. That is not the lock -- the lock is the RLS policy on
+`cards`, on the server -- but a door drawn for everybody is a door everybody
+tries.
+
+**In English only, and with a Save button**, and both are deliberate
+departures. Everything else in this app goes through `t()` because everything
+else is read by players; this is read by one person, who wrote the Spanish, and
+forty dictionary keys nobody will ever render in the other language is forty
+things to keep in step for no reader. And My Kingdom saves itself because it is
+your own team and a mistake costs one tap; this is the roster every match is
+built from, and a stray keystroke in a number field should not be live before
+you have finished typing it.
+
+**The server's refusals are shown verbatim.** 0025's messages are sentences
+written for whoever is editing the card -- "an accent is six hex digits, like
+#2f4bff" is more use than anything this screen could say instead.
+
+Retired cards are listed too, struck through: a retired card is the thing you
+come here to bring back. Art goes to the `art` bucket under the card's own
+slug, and the crop goes to `<slug>-face.<ext>` because that is where
+`faceUrl()` looks -- a convention from 0005 that the editor has to keep rather
+than re-open. The full art's URL gets a `?v=` cache-buster, because the URL
+does not change when the bytes do and an art fix nobody can see is an art fix
+nobody made.
+
+Measured with the lobby suite, now **68 assertions** (up from 25), against five
+mutants. Two of them found real bugs in the form rather than confirming it:
+
+- The ten flag checkboxes were a wrapping flex row, ran out of room, and their
+  labels overflowed into the neighbour. A grid whose tracks cannot go below
+  140px fixed it -- **but the first assertion written for it did not catch it**,
+  because text that overflows its box does not move the box. Two rectangles can
+  sit politely side by side while their contents are drawn across each other.
+- The real cause of that, found by measuring rather than by reading: there is a
+  global `input { width: 100% }` near the top of the stylesheet, and a checkbox
+  in a flex row obeyed it and became **146px wide**, pushing its own label a
+  whole grid track to the right. It read as a wrapping bug and it was a width.
+  The assertion that catches it is "every child stays inside its own label",
+  which is worth stealing for any other form.
+
 #### Still to do in Phase D
 
-- Purple keyword tooltips: vague words render in purple and hovering shows a
-  speech bubble with the real number. The remaining half of the card polish.
 - Deployment showing which units the opponent picked; the "Defeat the king."
-  opening; the admin card editor; the ladder's tournaments column and avatars.
+  opening; the ladder's tournaments column and avatars.
 - A **full / quick / off setting for the cinematic**, which now has a place to
   live.
-- Keyword tooltips: vague words ("slightly", "Burn", "Critical hit") render in
-  **purple**; hovering shows a small speech bubble with the real number.
 - Deployment: you can see **which units** the opponent picked (but not where
   they place them).
 - Match start: black box, white text, "Defeat the king." in epic motion.
@@ -1107,12 +1275,16 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. Phase D's settings/dark-mode, Spanish, kingdoms and card
-slices are all built, and the three light-theme contrast failures that were
-left open during dark mode are fixed. The next piece of work is the purple
-keyword tooltips, then the admin card editor, the match-feel trio (the
-opponent's picks at deployment, the "Defeat the king." opening, the cinematic's
-full/quick/off setting), and the ladder's tournaments column and avatars.
+Nothing is open. Phase D's settings/dark-mode, Spanish, kingdoms, card and
+keyword slices are all built, and so is the admin card editor, both halves. The
+next piece of work is the match-feel trio (the opponent's picks at deployment,
+the "Defeat the king." opening, the cinematic's full/quick/off setting) and the
+ladder's tournaments column and avatars.
+
+0025 is run and the flag is set, so the Cards tile is live. Nothing in the app
+can set `is_admin` -- only `service_role`, which is what the dashboard's SQL
+editor runs as -- so a second admin is a second `update public.profiles set
+is_admin = true where id = '<uuid>'` and nothing else.
 
 One thing is waiting on Jared rather than on code: the site has to be
 **deployed** for any of the Phase C client to be visible. `./deploy.sh` from an
