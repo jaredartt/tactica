@@ -1245,6 +1245,142 @@ winner. Open every day for now; Friday-only later.
 
 ---
 
+## 5b. PHASE F — the roster rework and the ability system (PLANNED, not built)
+
+The roster in section 6 is the design. The eleven cards in the database are
+not it: Dereo is a 70-point unit against the spec's 110-point Royal, Wuzu is
+120 and 30-42 against 85 and 25, Himanta flies and the spec makes it a Rogue,
+and nine of the twenty units do not exist at all. Since 0023 a card's TEXT has
+been the spec's and its NUMBERS have not, which is why the file has said for
+two phases that "a card's text is a promise rather than a description".
+
+Phase F is where the promise is kept. It is big enough that the only honest way
+to do it is in six pieces that each ship on their own.
+
+### The decisions that shape it
+
+Answered by Jared, and they matter more than the ordering:
+
+- **An ability SUBSTITUTES the attack.** One activation is still a unit's whole
+  go: move then strike, move then ability, or either alone. A turn might be
+  "Card 1 moves and uses its ability; Card 2 moves and attacks", or simply
+  "Card 2 defends". Nothing about the two-activation budget changes, which
+  means `cn_begin_act` / `cn_end_act` and the turn clock already handle it.
+- **Nothing is hidden from either player.** Mako's bomb is planted where both
+  players can see it. And **Eva's Mist is redesigned**: instead of making
+  allied Rogues invisible, it gives them a **10% chance to avoid all incoming
+  attacks** while it lasts. This is the single largest saving in the plan --
+  invisibility would have meant the two players seeing DIFFERENT BOARDS, and
+  the whole architecture is one state blob that both clients poll. That is a
+  phase of its own and it is now not needed.
+- **The damage roll stays.** The spec's one DMG number is the middle; the
+  engine keeps rolling it plus or minus five.
+
+### F1 · The numbers, the classes and the crowns
+
+One migration, one pass over the client. No new mechanics at all, which is the
+point: it is the biggest diff in the phase and the least dangerous.
+
+- `cards.role` becomes a real class -- royal, rogue, knight, mage, flying --
+  checked by the card trigger and translated in both languages rather than
+  stored as an English word.
+- The eleven live cards are restated to the spec's HP, DMG, MOV and RNG. `power`
+  is already the single damage number the spec has, so this is data.
+- The nine missing units arrive: Queen Miah, King Stelaris, Dorme, Ashvar,
+  Velmor, Sarrave, Thalgrim, Nyxara, Zephyra. **Inactive until their ability
+  exists** -- shipping a card whose text describes something that does not
+  happen is exactly the thing this phase is here to end.
+- Movement traits follow the class: Flying flies. `flies` and `tramples` stop
+  being per-card flags somebody could set by hand on a Knight.
+- **The Royal auras cost almost nothing to build**, which is worth knowing
+  before it looks like a big piece of work: `cn_damage` has carried `p_bonus`
+  and `p_resist` parameters since 0018 and nothing has ever passed them. Dereo's
+  20% resistance to Knights, Miah's 20% more damage to Mages and Stelaris's 50%
+  resistance to burn and poison are three call sites, not a new system.
+- Three Royals means the one-crown rule in `deck_of` finally has something to
+  choose between; it already works.
+
+### F2 · Burn, poison and stun
+
+- One `effects` object on a unit rather than today's loose `burned` boolean, so
+  a fourth effect is a key and not a migration.
+- **Burn** becomes 15% of max HP whenever the unit attacks or uses an ability
+  -- not its passive -- replacing today's flat 5.
+- **Poison** is 10% of max HP at the start of the unit's own turn.
+- **Stun** costs the unit its attack for a turn; since an ability substitutes
+  an attack, it costs that too.
+- Stelaris's resistance lands here.
+- The client: the icons share the slot Defend already uses, the numbers fly off
+  the same way, and each effect needs its own cinematic beat and caption in
+  both languages.
+- **An open hole worth naming now:** nothing in the new spec removes burn or
+  poison. Umiro cures today; the spec gives Umiro the Swamp instead. Either a
+  unit gains a cure or both effects are permanent until death.
+
+### F3 · The ability engine, and every ability that needs nothing new
+
+`submit_ability(match, unit, target)`, substituting the attack inside the same
+activation, on the same clock, through the same authorisation shell as
+`submit_attack`. The rules go in `cn_ability`, dispatched on the card, so that
+a new card is a row and one handler rather than a rewrite.
+
+Targeting is a small vocabulary rather than a special case per card: nothing,
+one unit in range, one tile in range, a line of two, every adjacent tile. The
+client reuses the crosshair machinery the attack already has.
+
+What ships with it, because none of it needs a new kind of thing on the board:
+
+- **Dione & Grifo** — 15 damage to every adjacent tile.
+- **Sinie** — heals 30 to one target. (Today Sinie mends everything in range;
+  the spec is single-target and bigger.)
+- **Velmor** — poisons the target and deals 10.
+- **Ashvar** — burns two tiles in a line and deals them 15.
+- **Eva** — Mist for two turns: allied Rogues get a 10% chance to avoid all
+  incoming attacks. Its ability text changes in English and Spanish with it.
+- And the passives that are pure combat arithmetic: **Himanta** (immune to
+  parries and crits, 25% to strike twice), **Thalgrim** (+25 against a poisoned
+  target), **Nyxara** (heals for 100% of damage dealt), **Zephyra** (stuns on
+  hit), **Wuzu** (5% regeneration each turn), **Sarrave** (poisons every
+  adjacent tile at the start of its turn), **Dorme** (always counters before
+  the blow lands -- the `first` path already exists for parries), **Lium**
+  (already built).
+
+### F4 · Things you put on the board
+
+`obstacles` generalises into board objects -- `{id, kind, x, y, hp, maxHp,
+owner}` -- with trees becoming `kind: 'tree'` and continuing to work unchanged.
+
+- **Mako** plants a bomb: visible to both players, 15 damage to whoever steps
+  on it.
+- **Fey** summons a wall with 20 HP that blocks movement.
+- **Lumea** summons a tornado.
+- "Can resummon if destroyed" is one alive at a time per summoner, not a
+  cooldown.
+
+### F5 · Lumea's fifteen seconds
+
+The only genuinely new INTERACTION in the whole rework, which is why it is
+alone and last: an opponent steps into the tornado, and Lumea's controller gets
+fifteen seconds to choose where to throw them while everything else waits. That
+is a pending decision on the match with its own deadline and its own default
+when it expires -- a shape the engine has never had.
+
+### F6 · Umiro's Swamp
+
+Nearby units cannot use passives or abilities. Deliberately last: it has to
+negate everything else in the phase, so it wants a single chokepoint to gate
+rather than a condition sprinkled through fifteen handlers -- and F3 is what
+creates that chokepoint.
+
+### Still open, and worth answering before F1 rather than during it
+
+- The three Royals are written **A:** in the spec but describe permanent team
+  effects. Treating them as passives; they are never activated.
+- Does Rogue imply today's "sneak" (never answered by a counter)? Mako has it
+  now, and under the spec Mako's slot is spent on the trap instead.
+- Burn and poison as a percentage of MAX hit points, not current. Assumed.
+- Nothing cures. See F2.
+
 ## 6. The roster spec
 
 **Classes:** Royal · Rogue · Knight · Mage · Flying
