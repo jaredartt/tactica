@@ -15,6 +15,7 @@ import { Avatar } from './Avatar'
 import { IconGear } from './Icons'
 import { AdminCards } from './AdminCards'
 import { Kingdoms } from './Kingdoms'
+import { Tournament } from './Tournament'
 import { KingdomSwitch } from './KingdomSwitch'
 import { Logo } from './Logo'
 import { ProfileCard } from './ProfileCard'
@@ -50,6 +51,11 @@ const TILES = [
   { id: 'ladder',   tint: '#2f4bff', art: 'cards/dereo.webp',   focus: '14%' },
   { id: 'team',     tint: '#7c3aed', art: 'menu/team.webp',     focus: '26%' },
   { id: 'comics',   tint: '#0f8b8d', art: 'menu/comics.webp',   focus: '4%'  },
+  /* Last of the player tiles, which puts it bottom-right at every width the
+     grid wraps at -- where the spec asked for it. No picture yet; the flat
+     colour is what a missing background looks like, and it looks deliberate
+     rather than broken. */
+  { id: 'tournament', tint: '#b8860b', art: 'menu/tournament.webp', focus: '20%' },
   /* Backstage, and only for the one account that has the flag. There is no
      picture behind it and there should not be: every other tile is a door into
      the game and this one is a door into the workings. A missing background is
@@ -247,7 +253,7 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
       {page && tile && (
         <Page
           title={title(tile.id)} tint={tile.tint} onClose={close}
-          wide={page === 'team' || page === 'admin'}
+          wide={page === 'team' || page === 'admin' || page === 'tournament'}
         >
           {page === 'ranked' && (
             <div className="modelist">
@@ -338,6 +344,11 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
               locked -- and the real lock, the RLS policy on `cards`, is on the
               server where it belongs. */}
           {page === 'admin' && profile.is_admin && <AdminCards />}
+
+          {/* The bracket lives in its own file: it polls, it is the referee
+              for every stalled match in the tournament, and none of that
+              belongs in a menu. */}
+          {page === 'tournament' && <Tournament profile={profile} onEnter={onEnter} />}
 
           {page === 'spectate' && (
             <>

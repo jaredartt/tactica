@@ -356,3 +356,69 @@ export function unitPower(u: { pow?: number | null; power?: number | null; dmin:
   const p = u.pow ?? u.power
   return p ?? Math.round((u.dmin + u.dmax) / 2)
 }
+
+/* ---------------------------------------------------------------------------
+ * Tournaments. The shape of what tournament_state() returns in 0028, and
+ * nothing more: the client draws this, it does not compute it. Which round a
+ * player is in, whose match is whose and where the byes fell were all decided
+ * on the server when the bracket locked, and re-deriving any of it here would
+ * be a second implementation of the same rules waiting to disagree.
+ * ------------------------------------------------------------------------- */
+
+export type TourneyStatus = 'open' | 'running' | 'finished'
+
+export interface TourneyEntry {
+  id: string
+  name: string
+  avatar: string | null
+  lp: number
+  /** Null until the bracket locks -- seeds do not exist before then. */
+  seed: number | null
+  out: boolean
+}
+
+/** One slot of the bracket, won or waiting. `aId`/`bId` are null while the
+ *  match that feeds them is still being played. */
+export interface TourneySlot {
+  id: string
+  round: number
+  slot: number
+  aId: string | null
+  aName: string | null
+  bId: string | null
+  bName: string | null
+  /** The real match, once there is one to play or watch. */
+  match: string | null
+  winnerId: string | null
+  winnerName: string | null
+  /** Nobody was there to play: a win that had already happened when the
+   *  bracket locked. */
+  bye: boolean
+}
+
+export interface Tourney {
+  id: string
+  status: TourneyStatus
+  /** When the bracket locks. Null until the third entrant arrives, and null
+   *  again once it has locked. */
+  locksAt: string | null
+  startedAt: string | null
+  finishedAt: string | null
+  /** The power of two the bracket was drawn at, and how many rounds that is.
+   *  Null while sign-ups are still open. */
+  size: number | null
+  rounds: number | null
+  winnerId: string | null
+  winnerName: string | null
+  /** The server's clock, so a countdown does not drift with a wrong watch. */
+  now: string
+  entries: TourneyEntry[]
+  bracket: TourneySlot[]
+  me: {
+    in: boolean
+    out: boolean
+    seed: number | null
+    /** The match you are meant to be playing right now, if any. */
+    match: string | null
+  }
+}

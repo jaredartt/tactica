@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Kingdom, MatchRow, Unit } from './types'
+import type { Kingdom, MatchRow, Tourney, Unit } from './types'
 
 /**
  * Every one of these is a call to a Postgres function that validates the move
@@ -274,4 +274,49 @@ export async function setUsername(name: string): Promise<string> {
   const { data, error } = await supabase.rpc('set_username', { p_name: name })
   if (error) throw error
   return data as string
+}
+
+/* ---------------------------------------------------------------------------
+ * Tournaments.
+ *
+ * Four calls, and all four return the whole tournament: the server builds the
+ * view in one place (tournament_state in 0028) so the screen never has to
+ * stitch a bracket together from three tables and guess at the order.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The heartbeat, and the referee.
+ *
+ * It is not only "tell me what is happening". Anybody's tick locks a bracket
+ * whose countdown has run out and pushes along any match in it that has
+ * stalled -- which is why the tournament page calls it while it is open even
+ * when the player is only watching. A bracket whose progress depended on the
+ * two people who have stopped playing would never finish. See 0028's header.
+ */
+export async function tournamentTick(): Promise<Tourney | null> {
+  const { data, error } = await supabase.rpc('tournament_tick')
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as Tourney | null) ?? null
+}
+
+export async function tournamentJoin(): Promise<Tourney | null> {
+  const { data, error } = await supabase.rpc('tournament_join')
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as Tourney | null) ?? null
+}
+
+/** Sign-ups: leaving takes your name off. Mid-bracket: it is a forfeit, and
+ *  the server advances whoever you were playing. Both are the same button and
+ *  the screen says which one it is before you press it. */
+export async function tournamentLeave(): Promise<Tourney | null> {
+  const { data, error } = await supabase.rpc('tournament_leave')
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as Tourney | null) ?? null
+}
+
+/** Skip the countdown. Admins only, and the server is what says so. */
+export async function tournamentStartNow(): Promise<Tourney | null> {
+  const { data, error } = await supabase.rpc('tournament_start_now')
+  if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
+  return (data as Tourney | null) ?? null
 }
