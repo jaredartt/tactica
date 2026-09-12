@@ -1823,19 +1823,28 @@ form .btn.primary { width: 100%; margin-top: 10px; }
 /* Reduce motion keeps the CUTS and drops the drifting. The cinematic still
    plays -- it is how you find out what happened -- it simply stops floating,
    lunging and shaking while it does. */
+/* AND THE PARRY FLASH GOES AWAY ALTOGETHER, rather than merely stopping.
+   This is the difference between the two kinds of thing in this block and it
+   was a real bug: .duel-flash is a solid white sheet whose ONLY fade-out is
+   its animation, so `animation: none` did not calm it down -- it froze it at
+   full opacity, over the fighter, for the rest of the exchange. An element
+   that is nothing but its own disappearance has to be removed, not stilled.
+   .duel-pop is the opposite case and is why the mistake was easy to make:
+   a damage number carries information, so it is pinned VISIBLE by the line
+   below rather than hidden. Anything added here needs that question asked of
+   it -- does it say something, or is it only a movement? */
 @media (prefers-reduced-motion: reduce) {
-  .duel, .duel-side, .duel-figure, .duel-pop, .duel-ripple, .duel-flash {
-    animation: none !important;
-  }
+  .duel, .duel-side, .duel-figure, .duel-pop { animation: none !important; }
+  .duel-flash, .duel-ripple { display: none !important; }
   .duel-pop { opacity: 1; }
   .duel-hpfill { transition: none; }
 }
 :root[data-reduce-motion="1"] .duel,
 :root[data-reduce-motion="1"] .duel-side,
 :root[data-reduce-motion="1"] .duel-figure,
-:root[data-reduce-motion="1"] .duel-pop,
-:root[data-reduce-motion="1"] .duel-ripple,
-:root[data-reduce-motion="1"] .duel-flash { animation: none !important; }
+:root[data-reduce-motion="1"] .duel-pop { animation: none !important; }
+:root[data-reduce-motion="1"] .duel-flash,
+:root[data-reduce-motion="1"] .duel-ripple { display: none !important; }
 :root[data-reduce-motion="1"] .bigcard,
 :root[data-reduce-motion="1"] .bigcard .bc-box { animation: none !important; }
 :root[data-reduce-motion="1"] .duel-pop { opacity: 1; }
@@ -2691,3 +2700,37 @@ button.kw:focus-visible { border-radius: 3px; box-shadow: 0 0 0 2px var(--kw); }
   .modal { padding: 16px 16px 20px; border-radius: 15px; }
   .settings input[type="range"] { width: 110px; }
 }
+
+/* ---------- the crash panel ------------------------------------------------
+
+   What used to be a blank white page. See Boundary.tsx for why this exists at
+   all; the styling rule here is that it must not depend on anything the app
+   sets up, because the app is what just fell over -- so it paints its own
+   background and its own colours rather than reading a theme token that a
+   half-mounted tree may never have defined. */
+.crashed {
+  position: fixed; inset: 0; z-index: 999;
+  display: grid; place-items: center;
+  padding: 20px;
+  background: #0e0e14;
+  color: #f2f2f7;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  overflow: auto;
+}
+.crashed-box { width: min(680px, 100%); }
+.crashed h1 {
+  margin: 0 0 8px; font-size: clamp(20px, 4vw, 28px); line-height: 1.15;
+}
+.crashed p { margin: 0 0 14px; opacity: 0.82; line-height: 1.5; }
+.crashed-what {
+  margin: 0 0 16px; padding: 12px 14px;
+  max-height: 42vh; overflow: auto;
+  background: #16161f; border: 1px solid #2a2a38; border-radius: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  /* Selectable on purpose: on a phone there is no console, and the only way a
+     stack reaches anybody is by being copied off the screen. */
+  user-select: text; -webkit-user-select: text;
+}
+.crashed-row { display: flex; flex-wrap: wrap; gap: 10px; }

@@ -1379,6 +1379,46 @@ are all built; the three light-theme contrast failures left open during dark
 mode are fixed, and so are two nobody had measured and a SQL test that had been
 passing on luck since it was written.
 
+#### THE WHITE SCREEN, and why there is now a crash panel
+
+Reported from a real game: "every time that I attack, then suddenly everything
+turns white", on a phone and on a Mac, staying white until a reload. That
+sentence describes React unmounting the whole tree after a throw and leaving
+the browser's blank page -- and it is the same sentence for EVERY possible
+crash, which is what made it expensive. On a phone there is no console to look
+in at all.
+
+`Boundary.tsx` catches it: a dark panel naming the error, with the stack, on
+screen, selectable, with a Copy button. Two boundaries -- one around the whole
+app and one around the match with a way OUT of it, since the lobby is still
+standing behind a match that fell over. It is deliberately in English and does
+not use the translator: the translator is a hook in a tree that has just proved
+it can throw, and a boundary that needs the app to work is not a boundary. The
+panel also says out loud that reloading does not forfeit, because the instinct
+is that it might -- the board and the clock are both on the server.
+
+Measured against a throw from a render AND a throw from an effect (the
+cinematic would have thrown in an effect): panel shown, 0.00 of the screen
+white, message readable, in both.
+
+**A boundary is not the fix for whatever threw**, and at the time of writing
+the cause is still unknown: a real attack driven through the whole match screen
+in a new harness (`matchfx.tsx` -- select, Attack, target, fake server answers
+with the fx) survives the ordinary blow, a tree, a kill and all three cinematic
+settings, in both themes, with and without reduce-motion. So it depends on live
+data the fixtures do not have, and the panel is how the next occurrence will
+say which component it was.
+
+**One real bug did fall out of the search.** With reduce-motion on,
+`.duel-flash` is a solid white sheet whose only fade-out IS its animation, so
+`animation: none` did not calm it down -- it froze it at full opacity over the
+fighter for the rest of the exchange. A parry chain measured 15% of the screen
+solid white, permanently; it is now `display: none` and measures 0.00, while
+ordinary motion still flashes and clears. The lesson is written into the
+stylesheet: an element that is nothing but its own disappearance has to be
+REMOVED under reduce-motion, not stilled -- and `.duel-pop` right beside it is
+the opposite case, pinned visible, because a damage number says something.
+
 #### Phase E -- tournaments: the server half
 
 **`0028_tournaments.sql` is built and tested (`19_tournaments.sql`, 48

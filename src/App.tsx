@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Auth } from './components/Auth'
 import { Lobby } from './components/Lobby'
 import { Match } from './components/Match'
+import { Boundary } from './components/Boundary'
 import { Logo } from './components/Logo'
 import { useWipe } from './components/Wipe'
 import { attachUiSounds } from './lib/sfx'
@@ -86,10 +87,15 @@ export default function App() {
   if (matchId)
     return (
       <>
-        <Match
-          matchId={matchId} profile={profile} onProfile={patchProfile}
-          onLeave={leave} onGoTo={goTo}
-        />
+        {/* The match is the part with the most moving pieces and the only part
+            where a crash strands you mid-turn, so it gets its own boundary
+            with a way OUT of it -- the lobby is still standing behind this. */}
+        <Boundary where="match" onOut={leave}>
+          <Match
+            matchId={matchId} profile={profile} onProfile={patchProfile}
+            onLeave={leave} onGoTo={goTo}
+          />
+        </Boundary>
         {wipe}
       </>
     )
