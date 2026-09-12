@@ -104,10 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 620 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 633 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
-`16_admin.sql` and `17_trio.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+`16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
+is a bug fix of its own. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -356,8 +357,10 @@ are live.
 `0025_admin.sql` is **run in production** as of 2026-09-12, and Jared's own
 row has `is_admin`, so the card editor is live.
 
-**`0026_trio_and_ladder.sql` is built and tested (`17_trio.sql`) but NOT yet
-run in production.**
+`0026_trio_and_ladder.sql` is **run in production** as of 2026-09-12.
+
+**`0027_blind_ranked.sql` is built and tested (`18_ranked_blind.sql`) but NOT
+yet run in production. It is a LIVE BUG FIX and should go out on its own.**
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -1190,6 +1193,39 @@ Nothing. Phase D is finished.
   UPDATE policy on `cards`. In-flight matches keep their snapshot because units
   are copied into `matches.state` at deploy — that is correct, not a bug.
 - Ladder: new **tournaments** stat; show everyone's avatar.
+
+### A bug that was live for six migrations: ranked deployment was not blind
+
+Found while reading how a match gets created, on the way into Phase E, and it
+is worth writing down in full because of HOW it survived.
+
+0008 made deployment secret, and the mechanism is the important part: during
+the phase the two armies are **not in `matches.state` at all**. They live in
+`match_deploy`, one row per side, behind `my_deploy()` which hands you only
+your own. A policy that merely hid the other side would still have put both
+armies in a row that both clients poll, and "you can read it out of the network
+tab" is not something a competitive mode may say.
+
+0012 rewrote `ranked_tick` to make who-goes-first a coin flip. It built the
+match with `cn_place()` -- which writes both armies straight into
+`matches.state` -- and never called `cn_open_deploy()`. **So from 0012 until
+0027, ranked matches were not blind.** Friends rooms and practice were never
+affected; `join_match` and `create_bot_match` both still open a proper
+deployment.
+
+It survived because nothing asserted it on that path. `06_bot_ranked.sql`
+checks that the queue pairs people and that the coin is fair; every
+blind-deployment assertion in the suite was about rooms. `18_ranked_blind.sql`
+now asks the question of **all three ways a match can begin**, in one file, on
+purpose -- a rule that is only checked on the path somebody happened to think
+about is a rule with a date on it.
+
+And one more lesson, from the fix rather than the bug. The first draft of 0027
+RETYPED the queue-insert instead of splicing it, and dropped the `joined_at`
+clause that stops a tick from restarting your wait. The suite failed in
+`06_bot_ranked.sql` -- a file with nothing to do with the change -- on "nor
+with a tab that stopped calling in". Splice, never rewrite from memory; this
+project's own rule, caught by this project's own tests.
 
 ### Phase E — tournaments (its own project)
 
