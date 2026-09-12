@@ -50,6 +50,14 @@ select t_ok(public.cn_cine_ms(
 select t_match('aaaa1111-0000-0000-0000-00000000001a',
                'bbbb1111-0000-0000-0000-00000000001b') as m \gset
 
+-- NO TREES. This file was flaky at about one run in two and had been since it
+-- was written: t_match lays eight trees at random, and the "a move does not
+-- touch the clock" step walks h1 from (2,2) to (3,2) -- which fails outright
+-- with "that unit cannot reach that tile" whenever a tree happened to be
+-- standing there. 09_combat.sql clears them for exactly this reason; this file
+-- never did, and passed on luck. Nothing here is about terrain.
+select t_trees(:'m', '[]'::jsonb);
+
 create or replace function t_duel3(p_m uuid) returns void language sql as $$
   select t_reset(p_m),
          t_place(p_m,'h1',2,2), t_place(p_m,'g3',2,3),
