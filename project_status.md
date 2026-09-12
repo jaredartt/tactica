@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 633 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 681 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, and `19_tournaments.sql` is Phase E's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1379,9 +1379,69 @@ are all built; the three light-theme contrast failures left open during dark
 mode are fixed, and so are two nobody had measured and a SQL test that had been
 passing on luck since it was written.
 
-The next piece of work is **Phase E -- tournaments**, which is its own project.
-`profiles.tournaments` and the ladder's Cups column are already there waiting
-for it.
+#### Phase E -- tournaments: the server half
+
+**`0028_tournaments.sql` is built and tested (`19_tournaments.sql`, 48
+assertions, eight mutants) but NOT yet run in production.** The client half is
+next.
+
+**THE LIFECYCLE IS A COUNTDOWN FROM THE THIRD ENTRANT.** Sign-ups are always
+open -- exactly one `open` tournament exists at a time, enforced by a partial
+unique index rather than by everybody remembering -- and nothing happens while
+one or two people are in it, because two people who want a match already have
+Ranked. The third entrant starts `locks_at`; when it runs out the bracket locks
+around whoever is in at that instant, and somebody who joins a second later is
+in the next one. Dropping back below three cancels the clock, because the clock
+is not a schedule: it is the visible form of "three people are here". An admin
+can skip it (`tournament_start_now`), which is the only thing in the file that
+asks who you are.
+
+**SEEDING IS BY LP, AND THE BYES ARE FREE.** `cn_bracket_order` builds the
+standard bracket order the way it is defined rather than by typing it out, and
+two properties fall out of it: the seeds in a first-round pair sum to size+1,
+and one of any pair is therefore in the better half. The first gives byes to
+the top seeds with no bye-handing-out code anywhere; the second is why a
+first-round slot can never be empty of everybody. `19_tournaments.sql` asserts
+both over every bracket size from 2 to 64, because they are what the rest of
+the file assumes.
+
+**A BYE IS A WIN THAT HAS ALREADY HAPPENED** -- recorded the instant the
+bracket locks, propagated like any other, so nothing downstream ever asks
+whether a slot was won or walked into. A slot whose two sides are both known
+builds its match at once, which means two byes meeting each other start playing
+before the first round has finished.
+
+**ADVANCEMENT HANGS OFF A TRIGGER ON `matches`.** There are six ways a match
+can end -- a king falling in `cn_attack`, `resign_match`, `claim_win`, the
+abandon sweep, `force_timeout`'s chain, and the walkover 0028 adds -- and every
+one ends with the same UPDATE. Teaching six call sites about brackets would
+mean the seventh, written by somebody not thinking about tournaments, stalls a
+bracket forever. The test drives advancement through `resign_match` on purpose:
+a test that called some `cn_tourney_report()` would prove nothing about the
+other five.
+
+**IT IS LP-NEUTRAL.** Tournament matches are `ranked = false`, which is not a
+new rule -- `finish_match` is the only thing that touches LP and every caller
+already guards it. A cup is its own stat: `profiles.tournaments`, added empty
+in 0026, incremented here for the champion only.
+
+**AND THE BRACKET CANNOT STALL**, which is the hardest thing in the file. A
+match between two people who have both shut their laptops has, until now,
+simply sat there -- nothing in a database moves a clock on its own,
+`force_timeout` needs a caller, and both callers have gone. In a friendly room
+that is nobody's problem; in a bracket it holds up everybody still playing. So
+the tournament page is the referee: `tournament_tick` from ANYBODY, an entrant
+or a spectator or somebody two rounds away waiting, pushes every stuck match
+along, and a match where both sides have slept through three turns each is
+decided for the higher seed rather than left pending. Arbitrary, said out loud
+in the log, and the alternative is worse.
+
+#### Still to do in Phase E
+
+- **The client half**: the Tournaments tile (bottom-rightmost), a bracket that
+  sizes itself to the entrant count, the countdown, spectating any live match
+  in the tournament, and the waiting state between rounds.
+- Friday-only. Open every day for now.
 
 0025 is run and the flag is set, so the Cards tile is live. Nothing in the app
 can set `is_admin` -- only `service_role`, which is what the dashboard's SQL
