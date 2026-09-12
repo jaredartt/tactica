@@ -9,7 +9,12 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('bbbbbbbb-0000-0000-0000-000000000002', 'b@x.com', '{"username":"ben"}');
 
 -- ---- the roster reads back the way it was specified ---------------------
-select t_ok((select hp=110 and mov=2 and rmin=1 and rmax=1 and crmin=1 and crmax=2
+-- crmax was 2 until 0030 -- the pair struck at one and answered at two. There
+-- is no separate counter reach any more ("range and reach IS THE SAME thing"),
+-- so it is 1, and this line is pinned to the live numbers on purpose: the
+-- whole point of asserting them is that a migration named for one rule cannot
+-- quietly retune a card on its way past.
+select t_ok((select hp=110 and mov=2 and rmin=1 and rmax=1 and crmin=1 and crmax=1
                and power=22 and dmin=17 and dmax=27 from public.cards where slug='dione-grifo'),
             'Dione & Grifo');
 select t_ok((select hp=120 and mov=1 and rmax=1 and power=36 and dmin=31 and dmax=41 and tramples
@@ -18,9 +23,15 @@ select t_ok((select hp=60 and mov=3 and rmax=1 and power=25 and dmin=20 and dmax
                from public.cards where slug='mako'), 'Mako');
 select t_ok((select hp=70 and mov=3 and rmax=1 and power=19 and dmin=14 and dmax=24 and flies
                from public.cards where slug='lumea'), 'Lumea');
-select t_ok((select hp=70 and mov=2 and rmin=2 and rmax=2 and crmin=1 and crmax=2
+-- rmin was 2 until 0030: Dereo could hit at exactly two tiles and not at one,
+-- so a mage with a sword at its throat was safe from the one thing that should
+-- beat it. A range is one number now and it starts at 1.
+select t_ok((select hp=70 and mov=2 and rmin=1 and rmax=2 and crmin=1 and crmax=2
                and power=20 and dmin=15 and dmax=25 and burns from public.cards where slug='dereo'), 'Dereo');
-select t_ok((select hp=65 and mov=2 and rmin=2 and rmax=3 and crmin=3 and crmax=3
+-- Fey was 2-3 and answered only at exactly 3 -- the one card in the roster
+-- with a counter reach of its own. 0030 collapsed the four reach numbers into
+-- one: 1 to 3, striking and answering alike.
+select t_ok((select hp=65 and mov=2 and rmin=1 and rmax=3 and crmin=1 and crmax=3
                and power=16 and dmin=11 and dmax=21 from public.cards where slug='fey'), 'Fey');
 select t_ok((select hp=70 and mov=3 and rmin=1 and rmax=2 and power=10 and dmin=5 and dmax=15 and heals
                from public.cards where slug='eva'), 'Eva');
@@ -51,17 +62,32 @@ select t_reset(:'mid'); select t_place(:'mid','h3',3,5);       -- Mako, mov 3
 select public.submit_move(:'mid','h3',3,2);
 select t_ok(t_get(:'mid','h3','y')='2', 'Mako crosses three tiles');
 
--- ---- exactly two, and who can answer it ---------------------------------
+-- ---- one to two, and who can answer it ----------------------------------
+-- Until 0030 Dereo reached EXACTLY two and this block asserted that it could
+-- not strike the thing in its face. That was the engine's invention, not the
+-- design's: "range 2 means being able to attack 1 and 2 tiles far away". A
+-- range is one number now and every tile from 1 to it is in reach.
 select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_place(:'mid','h2',0,3);          -- Dereo, reaches exactly 2
+select t_place(:'mid','h2',0,3);          -- Dereo, range 2, so one tile or two
 select t_place(:'mid','g4',0,2);          -- Lumea, one tile away
-select t_raises(format('select public.submit_attack(%L,''h2'',''g4'')', :'mid'),
-                'too close', 'Dereo cannot strike something in its face');
+select t_hp(:'mid','g4',70);
+select public.submit_attack(:'mid','h2','g4');
+select t_ok(t_get(:'mid','g4','hp')::int < 70,
+            'DEREO CAN STRIKE THE THING IN ITS FACE — a range of 2 is 1 and 2');
+select t_reset(:'mid'); select t_park(:'mid', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
+select t_place(:'mid','h2',0,3);
 select t_place(:'mid','g4',0,0);
 select t_raises(format('select public.submit_attack(%L,''h2'',''g4'')', :'mid'),
-                'out of range', 'nor three tiles off');
+                'out of range', 'but not three tiles off — the number is still the number');
 
+-- Dereo took an answer in the block above -- Lumea reaches one tile and Dereo
+-- was standing in it -- so its health is set back explicitly here. t_reset
+-- puts the flags back, not the hit points.
 select t_place(:'mid','g4',0,1);
+select t_hp(:'mid','h2',70);
+-- ...and Lumea's, for the same reason: the roll below is measured against a
+-- full 70, and it took one from Dereo a moment ago.
+select t_hp(:'mid','g4',70);
 select public.submit_attack(:'mid','h2','g4');
 select t_ok(t_get(:'mid','h2','hp')::int = 70,
             'Lumea answers at one tile, so it cannot answer at two');

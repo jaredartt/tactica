@@ -87,8 +87,17 @@ select t_raises('insert into public.cards (name, accent) values (''Nameless'', '
 select t_raises('update public.cards set name = ''   '' where slug = ''t-spare''',
                 'needs a name', 'and so is one with no name');
 
-select t_raises('update public.cards set rmax = 0 where slug = ''t-spare''',
-                'reach', 'a reach that ends before it starts is refused');
+-- 0030 turned this guard into a repair, and that is the better answer: the
+-- four reach columns are DERIVED from `range` now, so they cannot disagree
+-- with each other for anybody to refuse. A backwards reach is not rejected, it
+-- stops existing.
+update public.cards set rmax = 0, rmin = 4 where slug = 't-spare';
+select t_ok((select rmin from public.cards where slug = 't-spare') = 1
+        and (select rmax from public.cards where slug = 't-spare')
+            = (select range from public.cards where slug = 't-spare'),
+            'a reach that ends before it starts is REPAIRED now, not refused — see 0030');
+select t_raises('update public.cards set range = -1 where slug = ''t-spare''',
+                'a range is 1 to 12', 'while a range that is not a number of tiles still is');
 select t_raises('update public.cards set mov = -1 where slug = ''t-spare''',
                 'move', 'and a move backwards');
 select t_raises('update public.cards set power = 5000 where slug = ''t-spare''',

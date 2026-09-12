@@ -33,7 +33,8 @@ type Row = Card & { is_active: boolean }
 
 const BLANK: Omit<Row, 'id'> = {
   slug: '', name: '', role: '', hp: 80, mov: 2,
-  rmin: 1, rmax: 1, crmin: 1, crmax: 1, dmin: 15, dmax: 25, power: 20,
+  // `range` is the one that is edited; the other four follow it server-side.
+  range: 1, rmin: 1, rmax: 1, crmin: 1, crmax: 1, dmin: 15, dmax: 25, power: 20,
   parry_pct: 5, crit_pct: 5, parry_all: false, royal: false,
   burns: false, heals: false, tramples: false, flies: false,
   sneaks: false, cures: false, parries: false, blooms: false,
@@ -43,8 +44,12 @@ const BLANK: Omit<Row, 'id'> = {
 
 const NUMBERS = [
   ['hp', 'HP'], ['power', 'Power'], ['mov', 'Move'],
-  ['rmin', 'Reach from'], ['rmax', 'Reach to'],
-  ['crmin', 'Counter from'], ['crmax', 'Counter to'],
+  // ONE BOX, not four. Since 0030 `range` is the only reach number anybody
+  // sets: a range of N means every tile from 1 to N, for striking and for
+  // answering alike, and the trigger derives rmin/rmax/crmin/crmax from it on
+  // the way in. Four boxes with an unwritten invariant between them is four
+  // ways to make a card that cannot be hit from next door.
+  ['range', 'Range (1 to N tiles)'],
   ['parry_pct', 'Parry %'], ['crit_pct', 'Crit %'], ['sort', 'Sort'],
 ] as const
 

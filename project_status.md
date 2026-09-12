@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 692 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 704 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own, `19_tournaments.sql` is Phase E's, and `20_toast.sql` is a bug fix of its own. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, and `21_reach.sql` is 0030's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1378,6 +1378,47 @@ card rework, the purple words, the admin card editor and the match-feel trio
 are all built; the three light-theme contrast failures left open during dark
 mode are fixed, and so are two nobody had measured and a SQL test that had been
 passing on luck since it was written.
+
+#### RANGE AND REACH ARE THE SAME THING, AND A RANGE STARTS AT 1
+
+**`0030_one_reach.sql` is built and tested (`21_reach.sql`) but NOT yet run in
+production.** Jared's words, and they settle something the schema had been
+treating as four numbers:
+
+> "range 2 means being able to attack 1 and 2 tiles far away, and range 3 means
+> 1, 2, and 3 tiles far away" · "range and reach IS THE SAME thing"
+
+Two cards had a hole in the middle of their range. Dereo struck at exactly 2
+and Fey at 2 or 3, so **a mage with a sword at its throat could neither strike
+back nor answer** -- invulnerable to the one thing that should beat it. And
+counter reach was its own pair of columns, which is where Fey's "only something
+with the same reach answers" came from: crmin 3, crmax 3. The roster spec in
+section 6 has ONE `RNG` column and always did; four numbers was the engine's
+invention, not the design's.
+
+**The repair is in the trigger, not only in the data**, and that is the part
+worth arguing for. Setting eleven rows right fixes today; deriving rmin, rmax,
+crmin and crmax from `range` inside `cn_check_card` means the card editor
+cannot reintroduce a minimum range by hand next month -- and means the editor
+shows ONE box instead of four with an unwritten invariant between them. 0025
+already repairs rather than refuses where a repair is unambiguous; "a range
+starts at 1" is that kind of rule. `21_reach.sql` asserts it by writing a card
+the old way and watching it come back normalised, which is the assertion that
+still works on a card nobody has written yet.
+
+**Four existing tests had to change, and every one of them was the old rule
+asserting itself.** `04_roster.sql` pinned Dereo at rmin 2 and Fey at crmin 3 --
+pinned deliberately, so a migration named for one rule cannot quietly retune a
+card on its way past, which is exactly the guard working. `04` also asserted
+"Dereo cannot strike something in its face", now inverted. `07_abilities.sql`
+asserted that Dione & Grifo answer from two tiles while striking at one; they
+do not any more, and the old behaviour is asserted as GONE rather than deleted,
+so that anybody who brings it back finds out. `16_admin.sql`'s "a reach that
+ends before it starts is refused" became a repair.
+
+**What this does NOT do:** HP, damage, movement and the abilities all still
+differ from the spec. That is the roster rework, and it is a phase rather than
+a line.
 
 #### THE WHITE SCREEN: POSTGRES DOES NOT REPLICATE AN UNCHANGED TOASTED COLUMN
 

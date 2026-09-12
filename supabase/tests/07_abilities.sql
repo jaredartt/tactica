@@ -74,12 +74,20 @@ select t_full(:'m','g1');   -- it has to survive to answer
 select public.submit_attack(:'m','h4','g1');
 select t_ok(t_get(:'m','h4','hp')::int < 120, 'Wuzu takes the answer Mako did not');
 
--- the pair also answer from two tiles, which almost nothing else does
+-- The pair used to answer from TWO tiles while striking at one -- a counter
+-- reach of its own, which is the thing 0030 removed. "Range and reach IS THE
+-- SAME thing": a unit answers what it could have struck and no further, so a
+-- reach-1 pair does not reach a mage standing two away. The spec's ability for
+-- Dione & Grifo ("Back to Back -- deals 15 to all nearby (Range 1) tiles")
+-- never mentioned answering at two either; that was the engine's invention.
+-- This is the old behaviour asserted as gone, deliberately, rather than
+-- deleted -- so that anybody who brings it back finds out here.
 select t_reset(:'m'); select t_place(:'m','g1',2,1); select t_place(:'m','h4',2,3);
 select t_set(:'m','h4','rmax','2'::jsonb); select t_hp(:'m','h4',120);
 select t_full(:'m','g1');
 select public.submit_attack(:'m','h4','g1');
-select t_ok(t_get(:'m','h4','hp')::int < 120, 'and from two tiles away');
+select t_ok(t_get(:'m','h4','hp')::int = 120,
+            'AND NOT FROM TWO: since 0030 a unit answers only what it could have struck');
 
 -- ---- Umiro puts a fire out ----------------------------------------------
 select t_reset(:'m');
@@ -101,8 +109,13 @@ select t_set(:'m','h3','cures','true'::jsonb);
 
 -- ---- Fey reaches three, and only another three answers -------------------
 select t_reset(:'m'); select t_park(:'m', array['h1','h2','h3','h4','h5','g1','g2','g3','g4','g5']);
-select t_ok((select rmin=2 and rmax=3 and crmin=3 and crmax=3
-               from public.cards where slug='fey'), 'Fey is 2-3, answering only at 3');
+-- Fey was 2-3, answering only at 3, which meant a mage with a sword at its
+-- throat could neither strike back nor be answered. Since 0030 a range is one
+-- number and it starts at 1: Fey reaches 1, 2 and 3, and answers across all
+-- three.
+select t_ok((select rmin=1 and rmax=3 and crmin=1 and crmax=3 and range=3
+               from public.cards where slug='fey'),
+            'FEY REACHES 1, 2 AND 3, and answers across all three');
 select t_place(:'m','g3',2,2); select t_place(:'m','h4',2,5);   -- Fey vs Wuzu, three apart
 select t_set(:'m','g3','rmax','3'::jsonb);
 select set_config('app.uid','22220000-0000-0000-0000-00000000000b',false);

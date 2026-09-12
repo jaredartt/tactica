@@ -11,12 +11,13 @@ export interface Unit {
   hp: number
   maxHp: number
   mov: number
-  /** Attack reach, in tiles, counting a diagonal as one. An Archer is 2..2 --
-   *  it cannot shoot something standing next to it. */
+  /** Reach, in tiles, counting a diagonal as one. Since 0030 rmin is always 1
+   *  -- a range of N is every tile from 1 to N, with no hole in the middle --
+   *  and a unit answers anything it could have struck, so crmin/crmax follow
+   *  rmin/rmax. A unit snapshot carries the four; the single number they are
+   *  derived from lives on the card, which is where it is edited. */
   rmin: number
   rmax: number
-  /** Counter reach. Separate from the attack reach on purpose: it is the only
-   *  thing that decides whether a defender strikes back. */
   crmin: number
   crmax: number
   dmin: number
@@ -212,6 +213,12 @@ export interface Card {
   role: string
   hp: number
   mov: number
+  /** THE reach, and since 0030 the only one of the five anybody sets: N means
+   *  every tile from 1 to N, for striking and for answering alike. The four
+   *  below are derived from it by cn_check_card on the way in, which is why
+   *  the card editor shows one box rather than four with an unwritten
+   *  invariant between them. */
+  range: number
   rmin: number
   rmax: number
   crmin: number
@@ -346,7 +353,15 @@ export const BOT_LEVELS = [
   { level: 3, key: 'ruthless' },
 ] as const
 
-export const reachText = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo}–${hi}`)
+/**
+ * A range reads as ONE number, because since 0030 that is what it is: N means
+ * every tile from 1 to N, for striking and for answering alike. The band form
+ * is kept for a low end above 1, which nothing has any more -- a card that
+ * grew one would be a rule change, and a rule change should show up on screen
+ * rather than be rounded off by the formatter that prints it.
+ */
+export const reachText = (lo: number, hi: number) =>
+  (lo <= 1 ? `${hi}` : lo === hi ? `${lo}` : `${lo}–${hi}`)
 
 /** The single number to print for a unit or a card. Falls back to the middle
  *  of the old band, which is exactly how 0018 derived `power` in the first
