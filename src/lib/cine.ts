@@ -77,27 +77,31 @@ export function cineMs(swings: Swing[]): number {
  */
 export function swingsOf(fx: Fx): Swing[] {
   if (Array.isArray(fx.swings)) return fx.swings
+  // Only an ability has no target, and an ability always carries its swings --
+  // so there is nothing here to reconstruct from the totals.
+  if (fx.tgt == null) return []
+  const tgt = fx.tgt
   const out: Swing[] = []
   if (fx.heal > 0) {
-    out.push({ k: 'heal', by: fx.atk, at: fx.tgt, dmg: fx.heal, why: 'mend' })
+    out.push({ k: 'heal', by: fx.atk, at: tgt, dmg: fx.heal, why: 'mend' })
     return out
   }
   if (fx.dmg > 0 || fx.counter === 0) {
     out.push({
-      k: 'hit', by: fx.atk, at: fx.tgt, dmg: fx.dmg,
+      k: 'hit', by: fx.atk, at: tgt, dmg: fx.dmg,
       crit: fx.crit ?? false, counter: false, why: fx.tree ? 'tree' : 'strike',
     })
   }
   if (fx.burnAtk > 0) out.push({ k: 'burn', by: fx.atk, at: fx.atk, dmg: fx.burnAtk })
-  if (fx.killedTgt) out.push({ k: 'down', by: fx.tgt, at: fx.tgt })
+  if (fx.killedTgt) out.push({ k: 'down', by: tgt, at: tgt })
   if (fx.counter > 0) {
     out.push({
-      k: 'hit', by: fx.tgt, at: fx.atk, dmg: fx.counter,
+      k: 'hit', by: tgt, at: fx.atk, dmg: fx.counter,
       crit: fx.critCounter ?? false, counter: true,
       why: fx.parry ? 'quick' : 'counter', first: fx.parry,
     })
   }
-  if (fx.burnTgt > 0) out.push({ k: 'burn', by: fx.tgt, at: fx.tgt, dmg: fx.burnTgt })
+  if (fx.burnTgt > 0) out.push({ k: 'burn', by: tgt, at: tgt, dmg: fx.burnTgt })
   if (fx.killedAtk) out.push({ k: 'down', by: fx.atk, at: fx.atk })
   return out
 }
@@ -202,7 +206,18 @@ export function buildCine(fx: Fx, a: Fighter, b: Fighter, t: Tr = rawTr): Cine {
       else bHp = Math.max(0, bHp - n(s.dmg))
       shake = Boolean(s.crit)
 
-      if (s.why === 'tree') {
+      if (s.why === 'mist') {
+        // The blow went where the Rogue had been. Named before every other
+        // branch because a dodge is not a weaker version of a hit -- it is a
+        // different thing that happens to arrive in a hit's clothing.
+        text = t('duel.mist', { who: actorName, target: otherName })
+        note = t('duel.noteMist')
+      } else if (s.why === 'twice') {
+        text = t('duel.twice', { who: actorName, n: n(s.dmg) })
+        note = t('duel.noteTwice')
+      } else if (s.why === 'ability') {
+        text = t('duel.ability', { who: actorName, target: otherName, n: n(s.dmg) })
+      } else if (s.why === 'tree') {
         text = t('duel.strikesTree', { who: actorName, n: n(s.dmg) })
       } else if (s.why === 'quick') {
         text = t('duel.answersFirst', { who: actorName, n: n(s.dmg) })
@@ -220,7 +235,9 @@ export function buildCine(fx: Fx, a: Fighter, b: Fighter, t: Tr = rawTr): Cine {
       if (s.crit) why.push(t('duel.noteCrit'))
       if (s.counter && s.why !== 'quick') why.push(t('duel.noteCounter'))
       if (s.def) why.push(t('duel.noteGuard'))
-      if (why.length) note = why.join(', ') + '.'
+      // A dodge has nothing to reduce: no crit, no counter, no guard applied
+      // to a blow that never arrived, so its own note stands.
+      if (why.length && s.why !== 'mist') note = why.join(', ') + '.'
       if (s.why === 'quick') {
         note = t('duel.noteQuick') + (s.crit ? t('duel.noteQuickCrit') : '')
       }

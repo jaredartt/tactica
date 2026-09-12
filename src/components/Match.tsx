@@ -7,7 +7,7 @@ import { useMatch, useMessages, useServerClock } from '../lib/useMatch'
 import { useGhost } from '../lib/useGhost'
 import {
   botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
-  myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitDefend, submitMove,
+  myDeploy, requestRematch, resignMatch, setReady, submitAbility, submitAttack, submitDefend, submitMove,
   submitWait, theirArmy,
 } from '../lib/api'
 import {
@@ -491,6 +491,8 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
                   onSelect={setSelected}
                   onMove={(x, y) => selected && guard(() => submitMove(match.id, selected, x, y))}
                   onAttack={(target) => selected && guard(() => submitAttack(match.id, selected, target))}
+                  onAbility={(unitId, target) =>
+                    guard(() => submitAbility(match.id, unitId, target))}
                   onDefend={(unitId) => guard(() => submitDefend(match.id, unitId))}
                   onWait={() => guard(() => submitWait(match.id))}
                   onDeploy={(id, x, y) =>

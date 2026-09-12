@@ -174,7 +174,6 @@
   "board.attack": "Attack",
   "board.strikeMend": "Strike / Mend",
   "board.ability": "Ability",
-  "board.abilityOff": "Abilities are not built yet.",
   "board.defend": "Defend",
   "board.defendNote": "Halves what lands on this unit until its next turn.",
   "board.wait": "Wait",
@@ -278,5 +277,11 @@
   "class.rogue": "Rogue",
   "class.knight": "Knight",
   "class.mage": "Mage",
-  "class.flying": "Flying"
+  "class.flying": "Flying",
+  "duel.mist": "{who} swings — and {target} is not there.",
+  "duel.noteMist": "The mist.",
+  "duel.twice": "{who} strikes again for {n}.",
+  "duel.noteTwice": "Slippery — a second blow.",
+  "duel.ability": "{who} catches {target} for {n}.",
+  "board.abilityPassive": "This one carries a passive, not an ability."
 }

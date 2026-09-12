@@ -20,6 +20,17 @@ export interface Unit {
   rmax: number
   crmin: number
   crmax: number
+  /** WHAT IT CAN DO, since 0033. `abilityKind` is null for a unit whose card
+   *  carries a passive instead -- or nothing at all yet. `abilityN` is the
+   *  ability's number (15 damage, 30 healing, 10 per cent) and `abilityTurns`
+   *  how long it lasts, where that means anything. */
+  abilityKind?: 'aoe_adjacent' | 'heal_any' | 'mist' | null
+  abilityN?: number | null
+  abilityTurns?: number | null
+  /** Passives the engine reads directly rather than through an ability. */
+  slippery?: boolean
+  twicePct?: number
+  regenPct?: number
   dmin: number
   dmax: number
   /** The single number a player reads. The roll is pow +/- 5, and dmin/dmax
@@ -87,8 +98,16 @@ export interface LogEntry {
  *  clients can animate it without parsing the log text. */
 export interface Fx {
   seq: number
+  /** 'ability' since 0033. Absent on an ordinary exchange, which is every fx
+   *  written before it -- so a client reading an old match sees nothing new. */
+  kind?: 'ability'
+  /** Which ability it was, when kind is 'ability'. */
+  why?: string
+  /** One actor, any number of receivers -- the shape an ability needs and an
+   *  attack never did. Back to Back lands on everything around it at once. */
+  hits?: { id: string; dmg?: number; heal?: number }[]
   atk: string
-  tgt: string
+  tgt: string | null
   dmg: number
   heal: number
   killedTgt: boolean
@@ -144,6 +163,9 @@ export interface Swing {
   /** It landed BEFORE the blow it answers. Quick Dagger, and nothing else. */
   first?: boolean
   why?: 'strike' | 'counter' | 'quick' | 'tree' | 'mend' | 'roll' | 'all'
+    // Since 0033: a blow the mist ate, Himanta's second swing, and a
+    // blow an ability landed rather than an exchange.
+    | 'mist' | 'twice' | 'ability'
 }
 
 export interface MatchState {
@@ -167,6 +189,9 @@ export interface MatchState {
   away?: Side | null
   units: Unit[]
   log: LogEntry[]
+  /** Eva's, one entry per side: how many turns are left and how likely a
+   *  Rogue on that side is to be somewhere else when a blow arrives. */
+  mist?: Partial<Record<Side, { t: number; pct: number }>>
   winner: Side | null
   fx?: Fx
 }
@@ -213,6 +238,13 @@ export interface Card {
   role: string
   hp: number
   mov: number
+  /** The card's side of 0033's ability columns. See Unit for what they mean. */
+  ability_kind?: string | null
+  ability_n?: number | null
+  ability_turns?: number | null
+  slippery?: boolean
+  twice_pct?: number
+  regen_pct?: number
   /** THE reach, and since 0030 the only one of the five anybody sets: N means
    *  every tile from 1 to N, for striking and for answering alike. The four
    *  below are derived from it by cn_check_card on the way in, which is why

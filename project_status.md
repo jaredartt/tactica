@@ -1372,10 +1372,10 @@ migration. That is not passing, it is being lucky.
   poison. Umiro cures today; the spec gives Umiro the Swamp instead. Either a
   unit gains a cure or both effects are permanent until death.
 
-### F3 · The ability engine — SERVER HALF DONE, client half next
+### F3 · The ability engine — DONE, both halves
 
-**`0033_abilities.sql` is built and tested (`24_abilities.sql`) but NOT yet run
-in production, and it must go out WITH the client**: it adds a swing kind the
+**`0033_abilities.sql` is run in production, and the client half is built.**
+The two belong together: it adds a swing kind the
 cinematic has to narrate (`mist`), and an old client would caption a dodge as
 an ordinary blow for nought.
 
@@ -1388,6 +1388,24 @@ spec's and deliberately changed no behaviour; F1 restated the numbers and left
 the same gap. **After 0033 no card does anything its own description does not
 say.** Five gain what they promised; six lose what they never advertised, and
 four of those six are plain fighters until F4, F5 and F6.
+
+**THE ABILITY BUTTON IS ON.** It has sat in the action menu since Phase C,
+deliberately empty and disabled, so that switching it on would not move the
+other four items under somebody's thumb on the day it landed -- and that is
+exactly what it cost to turn on: nothing moved. Its tooltip now says which of
+the two "no" it means, because "abilities are not built yet" and "this card
+carries a passive" are different news.
+
+**An ability that aims is a mode; one that does not is a button.** Healing
+Petals lights its targets and waits, reusing the crosshair machinery the attack
+already had. Back to Back and the Mist fire from the menu, because there is
+nothing to point at.
+
+**And an ability gets NO cinematic.** The Duel is two fighters facing each
+other; an ability is one unit and a crowd. What it gets instead is the board's
+own language -- a number off every unit it touched -- which is the half that is
+information rather than performance. `fx.hits` is the shape that needed: one
+actor, any number of receivers, which an attack never had.
 
 **An ability substitutes the attack**, so `submit_ability` is the same citizen
 as `submit_attack` -- same shell, same `cn_begin_act` budget, same clock push --

@@ -174,7 +174,6 @@
   "board.attack": "Atacar",
   "board.strikeMend": "Golpear / Curar",
   "board.ability": "Habilidad",
-  "board.abilityOff": "Las habilidades aún no están hechas.",
   "board.defend": "Defender",
   "board.defendNote": "Reduce a la mitad lo que reciba esta unidad hasta su próximo turno.",
   "board.wait": "Esperar",
@@ -278,5 +277,11 @@
   "class.rogue": "Furtivo",
   "class.knight": "Caballero",
   "class.mage": "Mago",
-  "class.flying": "Volador"
+  "class.flying": "Volador",
+  "duel.mist": "{who} golpea… y {target} ya no está ahí.",
+  "duel.noteMist": "La niebla.",
+  "duel.twice": "{who} golpea otra vez para {n}.",
+  "duel.noteTwice": "Escurridizo — un segundo golpe.",
+  "duel.ability": "{who} alcanza a {target} para {n}.",
+  "board.abilityPassive": "Esta lleva una pasiva, no una habilidad."
 }

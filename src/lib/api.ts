@@ -320,3 +320,19 @@ export async function tournamentStartNow(): Promise<Tourney | null> {
   if (error) throw new Error(error.message.replace(/^.*?:\s*/, ''))
   return (data as Tourney | null) ?? null
 }
+
+/**
+ * Use a unit's ability. It SUBSTITUTES the attack: one activation is still a
+ * unit's whole go, so this costs exactly what striking would have and cannot
+ * be followed by one.
+ *
+ * `target` is null for an ability that does not take one -- Back to Back hits
+ * everything around it and the Mist hits nowhere in particular.
+ */
+export async function submitAbility(matchId: string, unitId: string, target: string | null) {
+  return unwrap(
+    await supabase
+      .rpc('submit_ability', { p_match: matchId, p_unit: unitId, p_target: target })
+      .single(),
+  )
+}

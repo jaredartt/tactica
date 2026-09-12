@@ -7,8 +7,9 @@ import { useT } from '../lib/i18n'
 import { Duel } from './Duel'
 import { artUrl, faceUrl } from '../lib/art'
 import {
-  canAct, deployTiles, draw, drawSign, flipFor, key, ownSide, pathTo, reachable,
-  targetsFor, undraw, willCounter,
+  canAct, cheb, deployTiles, draw, drawSign, flipFor, key, losClear, ownSide,
+  pathTo, reachable,
+  targetsFor, undraw, willCounter, type Target,
 } from '../lib/rules'
 import { playMove, playPlace, playSelect } from '../lib/sfx'
 
@@ -111,6 +112,8 @@ interface Props {
   onSelect: (id: string | null) => void
   onMove: (x: number, y: number) => void
   onAttack: (targetId: string) => void
+  /** `target` is null for an ability that takes none. */
+  onAbility: (unitId: string, target: string | null) => void
   onDefend: (unitId: string) => void
   /** Close the open go without striking. Takes no unit: the server already
    *  knows which one is mid-go, and asking it is how the two stay agreed. */
@@ -164,10 +167,12 @@ interface Blow {
  * once -- which is what this did before -- makes a tile and a target look like
  * alternatives when they are two halves of one go.
  */
-type Mode = 'menu' | 'move' | 'attack'
+// 'ability' is the aimed kind only. Back to Back and the Mist have nothing to
+// point at, so they fire from the menu and never become a mode.
+type Mode = 'menu' | 'move' | 'attack' | 'ability'
 
 export function Board({
-  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onDefend,
+  state, mySide, isMyTurn, deploying, selectedId, onSelect, onMove, onAttack, onAbility, onDefend,
   onWait, onDeploy, onHover, onPeek, ghost = null, onLook, onWatching,
 }: Props) {
   const t = useT()
@@ -259,6 +264,11 @@ export function Board({
   const before = useRef<{ units: Unit[]; trees: Obstacle[] }>({ units: state.units, trees })
   const lastSeq = useRef<number>(state.fx?.seq ?? 0)
   const [blow, setBlow] = useState<Blow | null>(null)
+  // AN ABILITY LANDS ON ANY NUMBER OF UNITS AT ONCE, which `blow` -- built for
+  // an exchange between exactly two -- cannot hold. Back to Back hits
+  // everything around it in one go, so its numbers get their own little piece
+  // of state rather than a `blow` bent into a shape it was never for.
+  const [pops, setPops] = useState<{ id: string; dmg?: number; heal?: number }[]>([])
 
   // The exchange, as a cinematic. Built HERE because this is where the board a
   // moment ago still exists: a unit killed by the blow is gone from
@@ -286,6 +296,22 @@ export function Board({
     lastSeq.current = fx.seq
 
     const a = prev.units.find((u) => u.id === fx.atk)
+
+    // ---- an ability -------------------------------------------------------
+    // No cinematic: the Duel is two fighters facing each other and an ability
+    // is one unit and a crowd. What it gets instead is the board's own
+    // language -- a number off every unit it touched -- which is the half that
+    // is information rather than performance.
+    if (fx.kind === 'ability') {
+      setPops(fx.hits ?? [])
+      const done = setTimeout(() => setPops([]), FX_MS)
+      return () => clearTimeout(done)
+    }
+
+    // Past the ability branch, an fx always names a target -- only an ability
+    // may have none. Said as a guard rather than asserted with `!`, because
+    // the day a third kind of fx arrives this is where it should stop.
+    if (fx.tgt == null) return
     const tgt = prev.units.find((u) => u.id === fx.tgt)
     const wood = prev.trees.find((o) => o.id === fx.tgt)
     if (!a || (!tgt && !wood)) return
@@ -351,13 +377,48 @@ export function Board({
     return targetsFor(state, selected)
   }, [state, selected, mine, deploying, canStrike])
 
+  // WHAT AN ABILITY CAN BE POINTED AT. Only `heal_any` takes a target, and it
+  // takes ANY unit in reach -- ally, enemy or itself -- which is the one place
+  // an ability's targeting is not the attack's. Lit here so the board can show
+  // it; the server decides, as always.
+  const aims = useMemo(() => {
+    const out = new Map<string, Target>()
+    if (!selected || !mine || deploying || !canStrike) return out
+    if (selected.abilityKind !== 'heal_any') return out
+    for (const u of state.units) {
+      if (u.id === selected.id) continue
+      const d = cheb(selected, u)
+      if (d < 1 || d > selected.rmax) continue
+      if (!losClear(state, selected, u)) continue
+      out.set(u.id, u.owner === selected.owner
+        ? { kind: 'ally', unit: u } : { kind: 'foe', unit: u })
+    }
+    return out
+  }, [state, selected, mine, deploying, canStrike])
+
+  /** Can this unit use its ability at all, right now? */
+  const canAbility = Boolean(
+    selected && mine && isMyTurn && selected.abilityKind && !selected.acted
+    && canAct(state, selected)
+    && (selected.abilityKind !== 'heal_any' || aims.size > 0),
+  )
+
+  /** Abilities that hit nowhere in particular go straight off the menu. */
+  const fireAbility = () => {
+    if (!selected) return
+    if (selected.abilityKind === 'heal_any') { setMode('ability'); return }
+    onAbility(selected.id, null)
+    setMode(null)
+  }
+
   // And what the board actually draws. In deployment there is no menu -- you
   // are placing, not activating -- so the tiles are lit the moment you pick
   // something up, exactly as they always were.
   const showTiles = deploying || mode === 'move'
   const showTargets = !deploying && mode === 'attack'
+  const showAims = !deploying && mode === 'ability'
   const shownTiles = showTiles ? litTiles : new Set<string>()
-  const shownTargets = showTargets ? targets : new Map()
+  const shownTargets = showTargets ? targets : showAims ? aims : new Map()
 
   // Which way a piece leans when it swings. Drawn direction again, for the
   // same reason the travel above is: half a turn of the board turns a lunge
@@ -408,7 +469,10 @@ export function Board({
   // reported too -- those change what you are about to do without the pointer
   // having moved at all.
   useEffect(() => {
-    onLook?.({ tile: overTile, unit: selectedId, mode })
+    // The opponent's pointer shows a crosshair for aiming of either kind:
+    // they can see you are pointing at something, not what you will do
+    // with it, which is the same thing an attack tells them.
+    onLook?.({ tile: overTile, unit: selectedId, mode: mode === 'ability' ? 'attack' : mode })
   }, [overTile, selectedId, mode, onLook])
 
   // And what to draw of theirs. The highlights are RECOMPUTED here rather than
@@ -475,7 +539,10 @@ export function Board({
     }
     // Aiming. Attacking has its own sound a moment later, from the exchange;
     // putting one here as well would double every blow.
-    if (shownTargets.has(u.id)) { onAttack(u.id); setMode(null); return }
+    if (shownTargets.has(u.id)) {
+      if (showAims) onAbility(selectedId!, u.id); else onAttack(u.id)
+      setMode(null); return
+    }
     // Clicking the open menu's own unit closes it, which is the second way out
     // besides Cancel and the one a thumb finds first.
     if (u.id === selectedId && mode) { setMode(null); return }
@@ -544,7 +611,10 @@ export function Board({
           onPeek={() => onPeek?.(t.id)}
           onClick={(e) => {
             e.stopPropagation()
-            if (shownTargets.has(t.id)) { onAttack(t.id); setMode(null) }
+            if (shownTargets.has(t.id)) {
+              if (showAims) onAbility(selectedId!, t.id); else onAttack(t.id)
+              setMode(null)
+            }
             else { onSelect(null); setMode(null) }
           }}
         />
@@ -656,11 +726,18 @@ export function Board({
             >
               {t(selected.heals ? 'board.strikeMend' : 'board.attack')}
             </button>
-            {/* Kept in the menu, and kept off. Every unit's ability is written
-                on its card already, and leaving the slot out until Phase C
-                would move the other four items under the player's thumb on the
-                day it lands. */}
-            <button role="menuitem" disabled title={t('board.abilityOff')}>
+            {/* On at last. The slot has been here since Phase C, deliberately
+                empty, so that switching it on would not move the other four
+                items under the player's thumb. Off still, for a unit whose
+                card carries a passive rather than an ability -- with a
+                different reason said in the tooltip, because "not yet" and
+                "not this card" are not the same news. */}
+            <button
+              role="menuitem"
+              disabled={!canAbility}
+              title={selected.abilityKind ? undefined : t('board.abilityPassive')}
+              onClick={fireAbility}
+            >
               {t('board.ability')}
             </button>
             <button
@@ -708,6 +785,15 @@ export function Board({
       )}
 
       {/* Everything below is transient: it exists only while an exchange plays. */}
+      {/* An ability's numbers, one per unit it reached. */}
+      {pops.map((h) => {
+        const u = state.units.find((x) => x.id === h.id)
+        if (!u) return null
+        return h.heal !== undefined && h.heal > 0
+          ? <div key={h.id} className="dmg dmg-heal" style={at({ x: u.x, y: u.y })}>+{h.heal}</div>
+          : <div key={h.id} className="dmg" style={at({ x: u.x, y: u.y })}>-{h.dmg}</div>
+      })}
+
       {blow && (
         <>
           {blow.killedTgt && blow.tgtUnit && (
