@@ -104,11 +104,11 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 742 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 749 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
 Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
 `16_admin.sql` and `17_trio.sql` are Phase D's, and `18_ranked_blind.sql`
-is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, `21_reach.sql` is 0030's, and `22_auras.sql` is F1's. Run the whole thing with `./supabase/tests/run.sh`.
+is a bug fix of its own, `19_tournaments.sql` is Phase E's, `20_toast.sql` is a bug fix of its own, `21_reach.sql` is 0030's, `22_auras.sql` is F1's, and `23_ghosts.sql` is 0032's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -1320,6 +1320,40 @@ point: it is the biggest diff in the phase and the least dangerous.
   resistance to burn and poison are three call sites, not a new system.
 - Three Royals means the one-crown rule in `deck_of` finally has something to
   choose between; it already works.
+
+#### THE FOUR CARDS NOBODY REMEMBERS
+
+**`0032_the_four_ghosts.sql` is built and tested (`23_ghosts.sql`) but NOT yet
+run in production.** 0031 went out and two of its own checks read false:
+`twenty_units` and `every_card_has_a_real_class`. The roster was fine; the
+CHECKS were wrong.
+
+`public.cards` has never held only the roster. **0001 seeds four placeholder
+cards** -- Vanguard, Skirmisher, Archer, Bulwark -- under a comment reading
+"replace these from the admin panel once it exists", with no slug and no class.
+0005 retired them (`where slug is null`) and left them there, because in this
+project a card is retired and never deleted. 0005's own six-card roster is
+still there too, superseded by 0010 and never removed. The live table holds
+about thirty rows, of which twenty are the roster and eleven are playable --
+and 0031's counts said `from public.cards` with no WHERE.
+
+**Why nothing caught it, which is the part worth keeping.** The suite runs
+0001, so the ghosts are in the test database too -- but **a migration's
+verification block is not run by the suite**: `run.sh` sends migration output
+to /dev/null, because whether it applies is all that file is asking. And
+`04_roster.sql` scopes its assertions to the twenty slugs on purpose, which is
+right for asserting a roster and is exactly why it could not see this.
+
+0032 gives every row a class and makes it a rule rather than a tidy-up: the
+trigger required a class only on an ACTIVE card, which is how four rows sat
+there for thirty-one migrations with no kind at all. An empty class is now
+filled in on any write, retired rows included.
+
+**The assertion had to move to `01_rules.sql`**, and that is a lesson of its
+own: `16_admin.sql` writes every row in the table on its way past, and the
+trigger fills a blank class in on any write -- so asserted anywhere after it,
+this would have passed because of a test file rather than because of the
+migration. That is not passing, it is being lucky.
 
 ### F2 · Burn, poison and stun
 

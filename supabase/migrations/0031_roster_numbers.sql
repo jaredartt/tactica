@@ -929,10 +929,21 @@ on conflict (slug) do update set
 -- Did it work? All true means yes.
 -- ---------------------------------------------------------------------------
 select
-  (select count(*) from public.cards) = 20                      as twenty_units,
-  (select count(*) from public.cards where is_active) = 11       as eleven_of_them_playable,
+  -- SCOPED TO THE TWENTY BY NAME. These two read `from public.cards` with no
+  -- WHERE when this file shipped, and both came back false on a database that
+  -- was perfectly correct: 0001 seeds four placeholder cards with no slug and
+  -- no class, 0005 retired them, and they have been in the table ever since.
+  -- The count was twenty-four and four rows have never had a class. 0032 gives
+  -- them one; this is the check saying what it meant to say.
+  (select count(*) from public.cards where slug in (
+     'dereo','miah','stelaris','dione-grifo','lium','mako','eva','himanta',
+     'dorme','fey','umiro','sinie','ashvar','velmor','sarrave','thalgrim',
+     'nyxara','wuzu','lumea','zephyra')) = 20                     as twenty_units,
   (select count(*) from public.cards
-    where not (role = any(public.cn_classes()))) = 0             as every_card_has_a_real_class,
+    where is_active and slug is not null) = 11                    as eleven_of_them_playable,
+  (select count(*) from public.cards
+    where slug is not null
+      and not (role = any(public.cn_classes()))) = 0              as every_card_has_a_real_class,
   (select hp = 110 and power = 30 and mov = 1 and range = 1 and royal
      from public.cards where slug = 'dereo')                     as dereo_is_the_specs_royal,
   (select dmin = 25 and dmax = 35

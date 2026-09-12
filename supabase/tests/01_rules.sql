@@ -15,6 +15,22 @@ select t_ok((select count(*) from public.cards where is_active) = 11, 'eleven un
 
 -- ---- decks --------------------------------------------------------------
 select set_config('app.uid', '11111111-1111-1111-1111-111111111111', false);
+-- ---- every row of the card table, before anything has touched one --------
+-- This lives in the FIRST test file on purpose. 0001 seeds four placeholder
+-- cards with no slug and no class, 0005 retired them, and they have been in
+-- the table ever since -- which is what made two of 0031's own checks read
+-- false in production. 0032 gives them a class and makes it a rule.
+--
+-- It has to be asserted here because 16_admin.sql writes every row in the
+-- table on its way past, and the trigger fills a blank class in on any write.
+-- Asserted later, this would pass because of a test file rather than because
+-- of the migration -- which is not passing, it is being lucky.
+select t_ok((select count(*) from public.cards
+              where role not in ('royal','rogue','knight','mage','flying')) = 0,
+            'EVERY ROW IN cards HAS A REAL CLASS — the four ghosts from 0001 included');
+select t_ok((select count(*) from public.cards where slug is null and is_active) = 0,
+            'and nothing without a slug is playable, which is what 0005 decided');
+
 select t_raises('select public.set_deck(array[''dereo'',''eva'',''wuzu''])',
                 'exactly 5', 'a team is exactly five cards');
 select t_raises('select public.set_deck(array[''dereo'',''dereo'',''eva'',''wuzu'',''mako''])',
