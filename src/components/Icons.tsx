@@ -51,6 +51,17 @@ export const IconLang = (p: { className?: string }) => (
   </svg>
 )
 
+/** A clapperboard, near enough at 24 units: a bar over a rectangle. The one
+ *  glyph that means "a thing that plays" without being a triangle, which is
+ *  already what a play button is and would read as a control. */
+export const IconCine = (p: { className?: string }) => (
+  <svg {...box} {...p} aria-hidden="true">
+    <rect x="3" y="9" width="18" height="11" rx="2" />
+    <path d="M3.6 9 7 4.6M9.6 9 13 4.6M15.6 9 19 4.6" />
+    <path d="M3.2 8.2 20 4.2" />
+  </svg>
+)
+
 export const IconSignOut = (p: { className?: string }) => (
   <svg {...box} {...p} aria-hidden="true">
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />

@@ -293,7 +293,12 @@ export interface Profile {
 export interface LadderRow {
   id: string
   username: string
+  /** A card slug, as on Profile. Only actually selected by the view since
+   *  0026 -- before that this field was declared and always undefined. */
   avatar: string | null
+  /** Phase E's stat. 0 for everybody until tournaments exist; the column is
+   *  there so the ladder settles its shape once. */
+  tournaments?: number
   lp: number
   tier: string
   wins: number

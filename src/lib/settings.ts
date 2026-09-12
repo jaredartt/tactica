@@ -24,6 +24,18 @@ import { pushSettings } from './api'
 export type Theme = 'system' | 'light' | 'dark'
 export type Lang = 'en' | 'es'
 
+/** How much of a fight you want to watch. 'full' is the takeover Phase C
+ *  built, 'quick' is the same beats told faster with no squaring-up, and
+ *  'off' leaves the board's own lunges and numbers and never takes the screen.
+ *
+ *  THE CLOCK IS THE SAME WHICHEVER YOU PICK. 0021 pushes the turn deadline by
+ *  the full cinematic's length regardless, so turning this down hands you that
+ *  time back as thinking time -- which is exactly what the Skip button has
+ *  done since Phase C shipped. Making the server compute a different deadline
+ *  per side would leak a preference into a shared clock to close a hole that
+ *  is already open on purpose. */
+export type CineMode = 'full' | 'quick' | 'off'
+
 export interface Settings {
   /** 0..1 */
   sfx: number
@@ -39,11 +51,14 @@ export interface Settings {
    *  on a Spanish laptop has said so by choosing, and there is no 'system'
    *  here because a half-translated screen is worse than a decision. */
   lang: Lang
+  /** See CineMode. */
+  cine: CineMode
 }
 
 const KEY = 'cn.settings'
 const DEFAULTS: Settings = {
   sfx: 0.5, music: 0.4, reduceMotion: false, theme: 'system', lang: 'en',
+  cine: 'full',
 }
 
 const clamp = (n: number) => Math.max(0, Math.min(1, Number(n) || 0))
@@ -61,8 +76,15 @@ function clean(v: Partial<Settings> | null | undefined): Settings {
     reduceMotion: Boolean(v.reduceMotion),
     theme: asTheme(v.theme),
     lang: asLang(v.lang),
+    cine: asCine(v.cine),
   }
 }
+
+/** Unlike the theme, an unrecognised value falls back to the DEFAULT rather
+ *  than being kept -- and 0026 drops it on the server for the mirror-image
+ *  reason. Either way nobody ends up with a preference that means nothing. */
+const asCine = (v: unknown): CineMode =>
+  (v === 'quick' || v === 'off' || v === 'full') ? v : DEFAULTS.cine
 
 function read(): Settings {
   try {

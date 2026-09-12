@@ -1,8 +1,8 @@
 import { supabase } from '../lib/supabase'
-import { setSettings, useSettings, type Lang, type Theme } from '../lib/settings'
+import { setSettings, useSettings, type Lang, type Theme, type CineMode } from '../lib/settings'
 import { loadLang, useT } from '../lib/i18n'
 import { playHit } from '../lib/sfx'
-import { IconLang, IconMotion, IconMusic, IconSignOut, IconSound, IconTheme } from './Icons'
+import { IconLang, IconMotion, IconMusic, IconSignOut, IconSound, IconTheme, IconCine } from './Icons'
 import { Modal } from './Modal'
 
 /** A row: an icon, a label, and the one control that changes it. */
@@ -76,6 +76,29 @@ export function SettingsCard({ onClose }: { onClose: () => void }) {
                 aria-checked={s.theme === v}
                 className={s.theme === v ? 'is-on' : ''}
                 onClick={() => setSettings({ theme: v })}
+              >
+                {t(key)}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        {/* Three positions, and the middle one is the interesting one: 'off'
+            is not "no feedback", it is "no takeover" -- the board's own lunges
+            and damage numbers stay whichever way this points. */}
+        <Row icon={<IconCine />} label={t('settings.cine')} note={t('settings.cineNote')}>
+          <div className="seg" role="radiogroup" aria-label={t('settings.cine')}>
+            {/* Written out, not built. See the theme above for the bug that
+                taught this file to do it that way. */}
+            {([['full', 'settings.cineFull'],
+               ['quick', 'settings.cineQuick'],
+               ['off', 'settings.cineOff']] as [CineMode, string][]).map(([v, key]) => (
+              <button
+                key={v}
+                role="radio"
+                aria-checked={s.cine === v}
+                className={s.cine === v ? 'is-on' : ''}
+                onClick={() => setSettings({ cine: v })}
               >
                 {t(key)}
               </button>

@@ -390,13 +390,22 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                       <th className="num">{t('ladder.w')}</th>
                       <th className="num">{t('ladder.l')}</th>
                       <th className="num">{t('ladder.streak')}</th>
+                      <th className="num" title={t('ladder.cupsNote')}>{t('ladder.cups')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ladder.map((r, i) => (
                       <tr key={r.id} className={r.id === profile.id ? 'is-you' : ''}>
                         <td className="num rank">{i + 1}</td>
-                        <td>{r.username}</td>
+                        <td>
+                          {/* A face, at last: the leaderboard view never
+                              selected `avatar`, so LadderRow has carried the
+                              field with nothing behind it since 0016. */}
+                          <span className="ladder-who">
+                            <Avatar slug={r.avatar} name={r.username} size={26} />
+                            {r.username}
+                          </span>
+                        </td>
                         <td>
                           <span className={`tier t-${r.tier.toLowerCase()}`}>
                             {tierName(r.tier)}
@@ -409,6 +418,12 @@ export function Lobby({ profile, onEnter, onProfile }: Props) {
                           {r.streak > 0 ? `${r.streak}${t('ladder.w')}`
                            : r.streak < 0 ? `${-r.streak}${t('ladder.l')}`
                            : t('common.dash')}
+                        </td>
+                        {/* Zero for everybody until Phase E fills it. The
+                            column is here now so the table settles once
+                            rather than shifting under everybody later. */}
+                        <td className="num cups">
+                          {r.tournaments ? r.tournaments : t('common.dash')}
                         </td>
                       </tr>
                     ))}

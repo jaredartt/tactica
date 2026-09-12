@@ -1974,6 +1974,86 @@ form .btn.primary { width: 100%; margin-top: 10px; }
    is about the NEXT screen rather than this one. */
 .fieldingnote { margin: -4px 0 0; }
 
+/* ---------- which five they brought ---------------------------------------
+
+   Deployment stays blind about WHERE, which is the whole point of it, and
+   stops being blind about WHICH -- see their_army() in 0026. Faces and names,
+   small, under the board beside the Ready button: it is a thing to glance at
+   while placing, not a thing to study.
+   ------------------------------------------------------------------------- */
+.theirs {
+  flex: 1 1 100%;
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px 12px; flex-wrap: wrap;
+  padding-top: 4px;
+}
+.theirs-label {
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted);
+}
+.theirs-one { display: flex; align-items: center; gap: 6px; }
+.theirs-one b { font-weight: 400; font-size: 12px; color: var(--ink-2); }
+@media (max-width: 560px) {
+  /* The faces alone. Five names wrap to three rows on a phone and push the
+     Ready button off the screen, and the face is the half you recognise. */
+  .theirs-one b { display: none; }
+  .theirs { gap: 4px 7px; }
+}
+
+/* ---------- "Defeat the king." --------------------------------------------
+
+   Once per match, at the moment it becomes one. Black, white, and gone in two
+   seconds -- it is paid for out of a thirty-second first turn, so it is short
+   and any key or tap takes the rest of it back.
+   ------------------------------------------------------------------------- */
+.proclaim {
+  position: fixed; inset: 0; z-index: 70;
+  display: grid; place-items: center;
+  background: #05050a;
+  cursor: pointer;
+  animation: proclaim-box 2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.proclaim p {
+  margin: 0; padding: 0 6vw;
+  font-family: var(--display); font-weight: 900;
+  font-size: clamp(30px, 7.5vw, 74px); line-height: 1.05;
+  letter-spacing: -0.02em; text-transform: uppercase; text-align: center;
+  /* Fixed white on fixed black: this is the one surface in the app that is the
+     same in both themes, because it is a title card and not part of the page. */
+  color: #ffffff;
+  animation: proclaim-word 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+/* The box irises open and shuts; the words come up through it and keep going.
+   Two curves rather than one so the type is still rising while the black is
+   already leaving, which is what makes it read as a camera move rather than a
+   panel. */
+@keyframes proclaim-box {
+  0%   { opacity: 0; clip-path: inset(46% 0 46% 0); }
+  14%  { opacity: 1; clip-path: inset(0 0 0 0); }
+  78%  { opacity: 1; clip-path: inset(0 0 0 0); }
+  100% { opacity: 0; clip-path: inset(46% 0 46% 0); }
+}
+@keyframes proclaim-word {
+  0%   { opacity: 0; transform: translateY(26px) scale(0.96); letter-spacing: 0.12em; }
+  30%  { opacity: 1; transform: translateY(0) scale(1); letter-spacing: -0.02em; }
+  80%  { opacity: 1; transform: translateY(-6px) scale(1.02); }
+  100% { opacity: 0; transform: translateY(-16px) scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .proclaim, .proclaim p { animation: none; }
+  .proclaim p { opacity: 1; }
+}
+:root[data-reduce-motion="1"] .proclaim,
+:root[data-reduce-motion="1"] .proclaim p { animation: none; }
+:root[data-reduce-motion="1"] .proclaim p { opacity: 1; }
+
+/* ---------- the ladder's two new columns ---------------------------------- */
+.ladder-who { display: flex; align-items: center; gap: 8px; }
+/* Zero is a dash. A column of noughts reads as a broken feature; a column of
+   dashes reads as a thing that has not happened yet, which is the truth until
+   Phase E exists. */
+.ladder .cups { color: var(--muted); }
+
 /* ---------- the card editor -----------------------------------------------
 
    Backstage, and it looks like it: a plain two-column form with no lean, no

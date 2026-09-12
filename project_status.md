@@ -104,10 +104,10 @@ cd /home/claude/cn && ./t.sh 01_rules.sql 02_presence.sql 03_ladder.sql 04_roste
 Postgres must run as the `pg` user, not root. Stage files first with
 `device_stage_files` so `/mnt/user-data/uploads/Documents/tactica/...` is fresh.
 
-**Current: 595 assertions, all green.** `09_combat.sql` is the Phase A file;
+**Current: 620 assertions, all green.** `09_combat.sql` is the Phase A file;
 `10_board.sql` is Phase B's, `11_swings.sql` and `12_clock.sql` are
-Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql` and
-`16_admin.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
+Phase C's, and `13_settings.sql`, `14_ability_es.sql`, `15_kingdoms.sql`,
+`16_admin.sql` and `17_trio.sql` are Phase D's. Run the whole thing with `./supabase/tests/run.sh`.
 
 **A test that passes on luck is a test that fails on luck.** `12_clock.sql` was
 flaky at about one run in two, and had been since the day it was written:
@@ -355,6 +355,9 @@ are live.
 
 `0025_admin.sql` is **run in production** as of 2026-09-12, and Jared's own
 row has `is_admin`, so the card editor is live.
+
+**`0026_trio_and_ladder.sql` is built and tested (`17_trio.sql`) but NOT yet
+run in production.**
 
 `0017` is confirmed run, so who opens is now a coin flip in every mode.
 
@@ -1114,12 +1117,71 @@ mutants. Two of them found real bugs in the form rather than confirming it:
   The assertion that catches it is "every child stays inside its own label",
   which is worth stealing for any other form.
 
+#### DONE: the match-feel trio, and the ladder's two columns
+
+**`0026_trio_and_ladder.sql` is built and tested but NOT yet run in
+production.** Three small things that needed the same migration, plus the
+ladder.
+
+**WHICH FIVE THEY BROUGHT.** Deployment has been blind since 0008 and most of
+that blindness is the point: WHERE the archer is standing is the secret the
+phase exists to keep. WHICH FIVE never was, and knowing it is what turns the
+phase from a guess into a decision. `their_army()` hands back identity and not
+one coordinate, only to a player (a spectator gets nothing -- they could
+relay it), and only while the match is still deploying.
+
+It **lists what it returns** rather than subtracting `x` and `y`. Subtracting
+the two keys that are secret today leaves every key added tomorrow exposed by
+default, and the next field on a unit will be added by somebody thinking about
+combat rather than about this function. The test asks what keys came out, not
+whether `x` was among them, for the same reason.
+
+**"DEFEAT THE KING."** Black, white, two seconds, once per match, at the moment
+it becomes one. It costs two seconds of a thirty-second first turn -- which is
+real, and is why it is short and why any key or tap takes the rest back. The
+alternative, pushing the deadline the way 0021 pays for the cinematic, is a
+migration and a round trip to buy back something a player can take by tapping.
+It does NOT play for a match joined mid-way: a title card for a film that is
+half over.
+
+**FULL / QUICK / OFF.** A `cine` key in the settings blob -- no column, because
+0022's cleaner keeps keys it does not recognise, though 0026 validates it now
+that it is a known one. `quicken()` in cine.ts is a pure **re-timing** of a
+built cinematic: same beats, same captions, same reductions, moved closer
+together, with the squaring-up dropped first because it is the part that
+carries no information. `off` means no TAKEOVER, not no feedback -- the board's
+own lunge, shake and damage numbers are the half that is information and they
+stay whichever way the setting points.
+
+**The clock does not change**, and that is written into the migration because
+it looks like an oversight. 0021 pushes the deadline by the full cinematic's
+length whatever the setting says, so turning it down hands you that time back
+as thinking time -- which is exactly what Skip has done since Phase C shipped.
+Computing a different deadline per side would leak a preference into a shared
+clock to close a hole that is already open on purpose.
+
+**THE LADDER** grows two columns. The leaderboard view never selected
+`avatar`, so `LadderRow` has carried that field with nothing behind it since
+0016 -- faces at last. And `tournaments`, Phase E's stat, added now so the
+table settles its shape once rather than shifting under everybody later; it
+reads a dash for everybody until Phase E fills it, because a column of noughts
+reads as a broken feature and a column of dashes reads as a thing that has not
+happened yet.
+
+Measured with **25 SQL assertions** (`17_trio.sql`, against four mutants) and
+the browser suites, now **329** between them -- ccheck 124 to 148, lcheck 68 to
+75.
+
+**The fake server learned realtime.** The board deliberately ignores an `fx`
+that was already there when it mounted, because joining a match mid-exchange
+must not replay it -- so nothing that reacts to a CHANGE could be tested at
+all. `mksite.py`'s shim now keeps a channel registry and exposes
+`window.__PUSH(channel, payload)`, and the harness wraps that in
+`window.__FIGHT()`. That is what made the cinematic setting testable.
+
 #### Still to do in Phase D
 
-- Deployment showing which units the opponent picked; the "Defeat the king."
-  opening; the ladder's tournaments column and avatars.
-- A **full / quick / off setting for the cinematic**, which now has a place to
-  live.
+Nothing. Phase D is finished.
 - Deployment: you can see **which units** the opponent picked (but not where
   they place them).
 - Match start: black box, white text, "Defeat the king." in epic motion.
@@ -1275,11 +1337,15 @@ So:
    **A whole activation — move + strike is one.** And **no**: two different
    units. Both built in `0019`.
 
-Nothing is open. Phase D's settings/dark-mode, Spanish, kingdoms, card and
-keyword slices are all built, and so is the admin card editor, both halves. The
-next piece of work is the match-feel trio (the opponent's picks at deployment,
-the "Defeat the king." opening, the cinematic's full/quick/off setting) and the
-ladder's tournaments column and avatars.
+**PHASE D IS FINISHED.** Settings and dark mode, Spanish, ten kingdoms, the
+card rework, the purple words, the admin card editor and the match-feel trio
+are all built; the three light-theme contrast failures left open during dark
+mode are fixed, and so are two nobody had measured and a SQL test that had been
+passing on luck since it was written.
+
+The next piece of work is **Phase E -- tournaments**, which is its own project.
+`profiles.tournaments` and the ladder's Cups column are already there waiting
+for it.
 
 0025 is run and the flag is set, so the Cards tile is live. Nothing in the app
 can set `is_admin` -- only `service_role`, which is what the dashboard's SQL

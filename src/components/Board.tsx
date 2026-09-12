@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { MatchState, Obstacle, Side, Unit } from '../lib/types'
 import type { Ghost } from '../lib/useGhost'
-import { buildCine, fighterOf, fighterOfTree, type Cine } from '../lib/cine'
+import { getSettings } from '../lib/settings'
+import { buildCine, fighterOf, fighterOfTree, quicken, type Cine } from '../lib/cine'
 import { useT } from '../lib/i18n'
 import { Duel } from './Duel'
 import { artUrl, faceUrl } from '../lib/art'
@@ -292,8 +293,15 @@ export function Board({
     // `t` is the translator here; the target unit is `tgt`. They were both
     // called t once and that is exactly the kind of collision worth renaming
     // out of existence rather than working around.
-    const next = buildCine(fx, fighterOf(a), tgt ? fighterOf(tgt) : fighterOfTree(wood!), t)
-    setQueue((q) => [...q, next])
+    // 'off' means no TAKEOVER, not no feedback: the lunge, the shake and the
+    // damage numbers below are the board's own and they stay. What goes is the
+    // full-screen retelling, which is the part that is a performance rather
+    // than information.
+    const mode = getSettings().cine
+    if (mode !== 'off') {
+      const next = buildCine(fx, fighterOf(a), tgt ? fighterOf(tgt) : fighterOfTree(wood!), t)
+      setQueue((q) => [...q, mode === 'quick' ? quicken(next) : next])
+    }
 
     setBlow({
       seq: fx.seq, atk: fx.atk, tgt: fx.tgt,

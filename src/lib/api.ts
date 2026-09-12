@@ -178,6 +178,24 @@ export async function myDeploy(matchId: string): Promise<Unit[] | null> {
   return (data as Unit[] | null) ?? null
 }
 
+/**
+ * Which five they brought -- and not one coordinate.
+ *
+ * Deployment has been blind since 0008, and most of that blindness is the
+ * point: WHERE the archer is standing is the secret the phase exists to keep.
+ * WHICH FIVE never was, and knowing it is what makes the phase a decision
+ * rather than a guess.
+ *
+ * Null while there is nothing to say: before an opponent arrives, once the
+ * match is running (the board shows everything then), and for a spectator --
+ * deployment is secret from the room as well as from the other player.
+ */
+export async function theirArmy(matchId: string): Promise<Unit[] | null> {
+  const { data, error } = await supabase.rpc('their_army', { p_match: matchId })
+  if (error) { console.warn('their_army:', error.message); return null }
+  return (data as Unit[] | null) ?? null
+}
+
 /** Lock your half in. The match starts when both players have. */
 export async function setReady(matchId: string) {
   return unwrap(await supabase.rpc('set_ready', { p_match: matchId }).single())

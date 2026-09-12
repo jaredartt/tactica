@@ -260,3 +260,33 @@ export function buildCine(fx: Fx, a: Fighter, b: Fighter, t: Tr = rawTr): Cine {
 
   return { seq: fx.seq, beats, ms: cineMs(swings), a, b }
 }
+
+/**
+ * The same fight, told faster.
+ *
+ * Presentation only, and NOT mirrored by cn_cine_ms(). Every other duration in
+ * this file has a twin in 0021 because the server pays for the time out of the
+ * turn clock; this one does not, because the clock is unchanged whichever way
+ * the setting is pointed -- see CineMode in settings.ts for why.
+ *
+ * It re-times rather than rebuilds: the beats, their captions and their
+ * reductions are exactly the ones buildCine() produced, moved closer together.
+ * The squaring-up at the front is what goes first, because it is the part that
+ * carries no information -- and the gaps are scaled rather than replaced with
+ * a constant, so a parry that was always shorter than a blow stays shorter.
+ */
+export const QUICK_LEAD = 200
+export const QUICK_HOLD = 260
+export const QUICK_RATE = 0.55
+
+export function quicken(c: Cine): Cine {
+  if (!c.beats.length) return { ...c, ms: QUICK_LEAD + QUICK_HOLD }
+  const beats = c.beats.map((b) => ({ ...b }))
+  let at = QUICK_LEAD
+  for (let i = 0; i < c.beats.length; i++) {
+    beats[i].at = Math.round(at)
+    const nextAt = i + 1 < c.beats.length ? c.beats[i + 1].at : c.ms - HOLD_MS
+    at += Math.max(90, (nextAt - c.beats[i].at) * QUICK_RATE)
+  }
+  return { ...c, beats, ms: Math.round(at + QUICK_HOLD) }
+}

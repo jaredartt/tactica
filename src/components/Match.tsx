@@ -8,7 +8,7 @@ import { useGhost } from '../lib/useGhost'
 import {
   botStep, claimWin, declineRematch, deployUnit, endTurn, forceTimeout, leaveMatch,
   myDeploy, requestRematch, resignMatch, setReady, submitAttack, submitDefend, submitMove,
-  submitWait,
+  submitWait, theirArmy,
 } from '../lib/api'
 import {
   DEPLOY_SECONDS, TURN_SECONDS, actsCap, reachText,
@@ -17,9 +17,14 @@ import {
 } from '../lib/types'
 import { abilityText, useT } from '../lib/i18n'
 import { Ability } from './Ability'
+import { Avatar } from './Avatar'
 import { KingdomSwitch } from './KingdomSwitch'
 import { useCardsBySlug } from '../lib/useCards'
 import { playLose, playTurn, playWin } from '../lib/sfx'
+
+/** How long "Defeat the king." holds the screen. Short on purpose: it is paid
+ *  for out of a thirty-second first turn, and any key or tap takes it back. */
+const PROCLAIM_MS = 2000
 
 export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
   matchId: string
@@ -65,6 +70,14 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
   // against -- so they arrive through a function that will only ever hand you
   // your own side.
   const [myUnits, setMyUnits] = useState<Unit[] | null>(null)
+  const [theirs, setTheirs] = useState<Unit[] | null>(null)
+  // Shown once, the first time a match becomes a match. Held in a ref keyed
+  // by match id rather than in state, because a rematch is a NEW id in the
+  // same mounted component and the board's own state is what tells them
+  // apart -- a boolean would open the second match with the first one's
+  // proclamation already spent.
+  const [proclaim, setProclaim] = useState(false)
+  const opened = useRef<string | null>(null)
   const firedFor = useRef<string>('')
 
   useEffect(() => {
@@ -152,6 +165,41 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
     myDeploy(matchId).then((u) => { if (alive) setMyUnits(u) })
     return () => { alive = false }
   }, [matchId, match?.status])
+
+  // Which five they brought. Fetched once per deployment rather than polled:
+  // the answer is fixed the moment the second player arrives -- join_match
+  // draws both armies -- so there is nothing to watch for.
+  useEffect(() => {
+    if (!matchId || match?.status !== 'deploying') { setTheirs(null); return }
+    let alive = true
+    theirArmy(matchId).then((u) => { if (alive) setTheirs(u) })
+    return () => { alive = false }
+  }, [matchId, match?.status])
+
+  // "Defeat the king." Once per match, at the moment it becomes one.
+  //
+  // It costs about two seconds of a thirty-second first turn, which is a real
+  // cost and the reason it is short and dismissed by any key or click. The
+  // alternative -- pushing the deadline for it, the way 0021 pays for the
+  // cinematic -- would be a migration and a round trip to buy back two seconds
+  // that a player can take back themselves by tapping.
+  useEffect(() => {
+    if (!matchId || match?.status !== 'active') return
+    if (opened.current === matchId) return
+    opened.current = matchId
+    // Only for a match watched from the start. Walking into one already in
+    // progress and being told to defeat the king is a title card for a film
+    // that is half over.
+    if ((state?.turnNumber ?? 1) <= 1 && !state?.winner) setProclaim(true)
+  }, [matchId, match?.status, state?.turnNumber, state?.winner])
+
+  useEffect(() => {
+    if (!proclaim) return
+    const away = () => setProclaim(false)
+    const id = setTimeout(away, PROCLAIM_MS)
+    window.addEventListener('keydown', away)
+    return () => { clearTimeout(id); window.removeEventListener('keydown', away) }
+  }, [proclaim])
 
   // The bot plays one action per call, on a delay, so you watch it think
   // instead of finding its whole turn already done. Every step is a fresh
@@ -329,6 +377,16 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
           {mySide === null && <span className="pill spectating">{t('match.watching')}</span>}
         </div>
       </header>
+
+      {proclaim && (
+        <div
+          className="proclaim"
+          onPointerDown={() => setProclaim(false)}
+          role="status"
+        >
+          <p>{t('match.defeatTheKing')}</p>
+        </div>
+      )}
 
       {onClock && (
         <div className={`turnbar ${urgent ? 'urgent' : ''}`}>
@@ -527,6 +585,20 @@ export function Match({ matchId, profile, onProfile, onLeave, onGoTo }: {
                       <span className="hint">
                         {t(iAmReady ? 'match.lockedIn' : 'match.deployHint')}
                       </span>
+                      {/* Which five, and not where. See their_army() in 0026:
+                          the phase stays blind about the thing it exists to
+                          keep secret. */}
+                      {theirs && theirs.length > 0 && (
+                        <div className="theirs">
+                          <span className="theirs-label">{t('match.theyBring')}</span>
+                          {theirs.map((u) => (
+                            <span key={u.id} className="theirs-one" title={u.name}>
+                              <Avatar slug={u.slug} name={u.name} size={30} />
+                              <b>{u.name}</b>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <span className="hint">{t('match.bothPlacing')}</span>
